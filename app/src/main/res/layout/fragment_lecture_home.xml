@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/tv_welcome"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Welcome, Lecturer!"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="32dp"
+        android:textColor="@android:color/black"/>
+
+    <Button
+        android:id="@+id/btn_create_lecture"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Create New Lecture"
+        android:layout_marginBottom="16dp"
+        android:padding="12dp"
+        android:backgroundTint="@color/design_default_color_primary"
+        android:textColor="@android:color/white"/>
+
+    <Button
+        android:id="@+id/btn_manage_attendance"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Manage Attendance"
+        android:layout_marginBottom="16dp"
+        android:padding="12dp"
+        android:backgroundTint="@color/design_default_color_primary"
+        android:textColor="@android:color/white"/>
+
+    <Button
+        android:id="@+id/btn_view_reports"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="View Reports"
+        android:layout_marginBottom="32dp"
+        android:padding="12dp"
+        android:backgroundTint="@color/design_default_color_primary"
+        android:textColor="@android:color/white"/>
+
+    <Button
+        android:id="@+id/btn_logout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Logout"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:backgroundTint="@android:color/darker_gray"
+        android:textColor="@android:color/white"/>
+
+</LinearLayout>
