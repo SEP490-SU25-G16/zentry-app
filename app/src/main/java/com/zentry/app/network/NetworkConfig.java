@@ -7,8 +7,8 @@ package com.zentry.app.network;
 public final class NetworkConfig {
 
     // Base URLs
-    public static final String BASE_URL = "https://api.zentry.com/"; // Production URL
-    public static final String DEV_BASE_URL = "https://dev-api.zentry.com/"; // Development URL
+    public static final String BASE_URL = "http://localhost:8080/"; // Production URL
+    public static final String DEV_BASE_URL = "http://localhost:8080/"; // Development URL
 
     // API Endpoints
     public static final String AUTH_REFRESH_ENDPOINT = "api/authentication/refresh";

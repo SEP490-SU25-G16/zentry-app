@@ -8,6 +8,6 @@ import retrofit2.http.Body;
 import retrofit2.http.POST;
 
 public interface IAuthenticationAPI {
-    @POST("api/authentication/login")
+    @POST("api/auth/sign-in")
     Call<TokenModel> login(@Body LoginRequest request);
 }

@@ -33,31 +33,31 @@ public class AuthRepository {
      */
     public void login(LoginRequest request, LoginCallback callback) {
 
-        if (isMockingLogin) {
-            // --- LOGIC MOCK LOGIN ---
-            new android.os.Handler().postDelayed(() -> {
-                // Giả lập logic kiểm tra user/pass
-                if ("test@example.com".equals(request.getUserName()) && "password".equals(request.getPassword())) {
-                    // Tạo một TokenModel giả lập
-                    TokenModel mockToken = new TokenModel(
-                            "mock_access_token_for_test",
-                            "mock_refresh_token_for_test",
-                            "mock_user_id_123",
-                            "lecturer", // Hoặc "lecturer" để test vai trò khác
-                            3600 // Thời gian hết hạn giả lập
-                    );
-
-                    // Lưu token và user info giả lập vào AuthManager
-                    authManager.saveTokens(mockToken.getAccessToken(), mockToken.getRefreshToken());
-                    authManager.saveUserInfo(mockToken.getUserId(), mockToken.getRole());
-
-                    callback.onSuccess(mockToken);
-                } else {
-                    callback.onError("Mock Login: Invalid test email or password.");
-                }
-            }, 1000); // Giả lập độ trễ 1 giây để giống gọi API thật
-            return; // Quan trọng: Thoát khỏi phương thức sau khi mock
-        }
+//        if (isMockingLogin) {
+//            // --- LOGIC MOCK LOGIN ---
+//            new android.os.Handler().postDelayed(() -> {
+//                // Giả lập logic kiểm tra user/pass
+//                if ("test@example.com".equals(request.getUserName()) && "password".equals(request.getPassword())) {
+//                    // Tạo một TokenModel giả lập
+//                    TokenModel mockToken = new TokenModel(
+//                            "mock_access_token_for_test",
+//                            "mock_refresh_token_for_test",
+//                            "mock_user_id_123",
+//                            "lecturer", // Hoặc "lecturer" để test vai trò khác
+//                            3600 // Thời gian hết hạn giả lập
+//                    );
+//
+//                    // Lưu token và user info giả lập vào AuthManager
+//                    authManager.saveTokens(mockToken.getAccessToken(), mockToken.getRefreshToken());
+//                    authManager.saveUserInfo(mockToken.getUserId(), mockToken.getRole());
+//
+//                    callback.onSuccess(mockToken);
+//                } else {
+//                    callback.onError("Mock Login: Invalid test email or password.");
+//                }
+//            }, 1000); // Giả lập độ trễ 1 giây để giống gọi API thật
+//            return; // Quan trọng: Thoát khỏi phương thức sau khi mock
+//        }
 
         api.login(request).enqueue(new Callback<TokenModel>() {
             @Override
