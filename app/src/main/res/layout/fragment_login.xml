@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/svLoginRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="#F5F9FF">
+
+    <LinearLayout
+        android:id="@+id/llLoginContent"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp">
+
+        <!-- Title -->
+        <TextView
+            android:id="@+id/tvLoginTitle"
+            android:fontFamily="@font/jostsemibold"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Sign In"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textColor="#232B42"
+            android:layout_marginTop="32dp"
+            android:layout_marginBottom="32dp" />
+
+        <!-- Email -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilLoginEmail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:startIconDrawable="@drawable/ic_email"
+            app:startIconTint="#232B42"
+            app:startIconCheckable="false"
+            app:boxBackgroundMode="outline"
+            app:boxStrokeColor="#156CF7"
+            app:boxCornerRadiusTopStart="12dp"
+            app:boxCornerRadiusTopEnd="12dp"
+            app:boxCornerRadiusBottomStart="12dp"
+            app:boxCornerRadiusBottomEnd="12dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etLoginEmail"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:hint="Email"
+                android:inputType="textEmailAddress"
+                android:paddingStart="40dp"
+                android:textColor="#232B42"
+                android:textSize="16sp"/>
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Password -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilLoginPassword"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            app:startIconDrawable="@drawable/ic_lock"
+            app:startIconTint="#232B42"
+            app:endIconMode="password_toggle"
+            app:endIconTint="#232B42"
+            app:errorEnabled="true"
+            app:boxBackgroundMode="outline"
+            app:boxStrokeColor="#156CF7"
+            app:boxCornerRadiusTopStart="12dp"
+            app:boxCornerRadiusTopEnd="12dp"
+            app:boxCornerRadiusBottomStart="12dp"
+            app:boxCornerRadiusBottomEnd="12dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etLoginPassword"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:hint="Password"
+                android:inputType="textPassword"
+                android:paddingStart="40dp"
+                android:textColor="#232B42"
+                android:textSize="16sp"/>
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Error message -->
+        <TextView
+            android:id="@+id/tvLoginPasswordError"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Enter the correct password"
+            android:textColor="#E53935"
+            android:textSize="13sp"
+            android:visibility="gone"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Forgot password -->
+        <LinearLayout
+            android:id="@+id/llLoginForgotPasswordContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="24dp">
+
+            <View
+                android:id="@+id/viewLoginSpacer"
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/tvLoginForgotPassword"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Forgot Password?"
+                android:textColor="#232B42"
+                android:fontFamily="@font/mulishextrabold"
+                android:textStyle="bold"
+                android:padding="8dp" />
+        </LinearLayout>
+
+        <!-- Sign In Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnLoginSignIn"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginBottom="24dp"
+            android:text="Sign In"
+            android:fontFamily="@font/jostsemibold"
+            android:paddingLeft="50dp"
+            android:textAllCaps="false"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            app:backgroundTint="#156CF7"
+            app:cornerRadius="28dp"
+            app:icon="@drawable/ic_arrow_right"
+            app:iconTint="@null"
+            app:iconGravity="end"
+            app:iconPadding="8dp"
+            app:iconSize="40dp"
+            android:paddingEnd="7dp" />
+
+        <!-- Or continue with -->
+        <TextView
+            android:id="@+id/tvLoginOrContinueWith"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Or continue with"
+            android:textSize="16sp"
+            android:textColor="#545454"
+            android:fontFamily="@font/jostsemibold"
+            android:gravity="center"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Google Sign In -->
+        <LinearLayout
+            android:id="@+id/llLoginGoogleSignIn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/btnLoginGoogle"
+                android:layout_width="68dp"
+                android:layout_height="68dp"
+                android:src="@drawable/ic_google"
+                android:background="@drawable/bg_circle_white"
+                android:padding="4dp"
+                android:scaleType="centerCrop" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

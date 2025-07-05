@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/svStudentSettingRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F5F9FF"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:id="@+id/llStudentSettingContent"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Profile Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardStudentSettingProfile"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardCornerRadius="16dp"
+            app:strokeColor="#FFFFFF"
+            app:cardBackgroundColor="#FFFFFF"
+            app:cardElevation="4dp">
+
+            <LinearLayout
+                android:id="@+id/llStudentSettingProfileContent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp"
+                android:gravity="center_horizontal">
+
+                <!-- Avatar + Edit Overlay -->
+                <FrameLayout
+                    android:id="@+id/flStudentSettingAvatarContainer"
+                    android:layout_width="96dp"
+                    android:layout_height="96dp">
+
+                    <ImageView
+                        android:id="@+id/ivStudentSettingAvatar"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/ic_notification"
+                        android:background="@drawable/circle_border_blue" />
+                </FrameLayout>
+
+                <!-- Name & Email -->
+                <TextView
+                    android:id="@+id/tvStudentSettingName"
+                    android:fontFamily="@font/mulishextrabold"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="Harsha"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="#232B42"/>
+
+                <TextView
+                    android:id="@+id/tvStudentSettingEmail"
+                    android:fontFamily="@font/mulishbold"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="HarshaKumara98@gmail.com"
+                    android:textSize="14sp"
+                    android:textColor="#666666"/>
+
+                <!-- Divider -->
+                <View
+                    android:id="@+id/viewStudentSettingDivider1"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginVertical="16dp"
+                    android:background="#E0E0E0"/>
+
+                <!-- Option: Profile -->
+                <LinearLayout
+                    android:id="@+id/llStudentSettingRowProfileOverview"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingVertical="12dp">
+
+                    <ImageView
+                        android:id="@+id/ivStudentSettingProfileIcon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_profile"
+                        app:tint="#202244"/>
+
+                    <TextView
+                        android:id="@+id/tvStudentSettingProfile"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:text="Profile"
+                        android:textSize="16sp"
+                        android:textColor="#232B42"/>
+
+                    <ImageView
+                        android:id="@+id/ivStudentSettingProfileArrow"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_arrow_right_detail"
+                        app:tint="#666666"/>
+                </LinearLayout>
+
+                <View
+                    android:id="@+id/viewStudentSettingDivider2"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#E0E0E0"/>
+
+                <!-- Option: Notifications -->
+                <LinearLayout
+                    android:id="@+id/llStudentSettingRowNotifications"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingVertical="12dp">
+
+                    <ImageView
+                        android:id="@+id/ivStudentSettingNotificationIcon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_notification_setting"
+                        app:tint="#202244"/>
+
+                    <TextView
+                        android:id="@+id/tvStudentSettingNotifications"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:text="Notifications"
+                        android:textSize="16sp"
+                        android:textColor="#232B42"/>
+
+                    <ImageView
+                        android:id="@+id/ivStudentSettingNotificationArrow"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_arrow_right_detail"
+                        app:tint="#666666"/>
+                </LinearLayout>
+
+                <View
+                    android:id="@+id/viewStudentSettingDivider3"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#E0E0E0"/>
+
+                <!-- Option: Device -->
+                <LinearLayout
+                    android:id="@+id/llStudentSettingRowDevice"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingVertical="12dp">
+
+                    <ImageView
+                        android:id="@+id/ivStudentSettingDeviceIcon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_device"
+                        app:tint="#202244"/>
+
+                    <TextView
+                        android:id="@+id/tvStudentSettingDevice"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:text="Device"
+                        android:textSize="16sp"
+                        android:textColor="#232B42"/>
+
+                    <ImageView
+                        android:id="@+id/ivStudentSettingDeviceArrow"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_arrow_right_detail"
+                        app:tint="#666666"/>
+                </LinearLayout>
+
+                <View
+                    android:id="@+id/viewStudentSettingDivider4"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#E0E0E0"/>
+
+                <!-- Option: Face ID -->
+                <LinearLayout
+                    android:id="@+id/llStudentSettingRowFaceId"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingVertical="12dp">
+
+                    <ImageView
+                        android:id="@+id/ivStudentSettingFaceIdIcon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_faceid"
+                        app:tint="#202244"/>
+
+                    <TextView
+                        android:id="@+id/tvStudentSettingFaceId"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:text="Face ID"
+                        android:textSize="16sp"
+                        android:textColor="#232B42"/>
+
+                    <ImageView
+                        android:id="@+id/ivStudentSettingFaceIdArrow"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_arrow_right_detail"
+                        app:tint="#666666"/>
+                </LinearLayout>
+
+                <View
+                    android:id="@+id/viewStudentSettingDivider5"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#E0E0E0"/>
+
+                <!-- Option: Logout -->
+                <LinearLayout
+                    android:id="@+id/llStudentSettingRowLogout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingVertical="12dp">
+
+                    <ImageView
+                        android:id="@+id/ivStudentSettingLogoutIcon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_logout"
+                        app:tint="#202244"/>
+
+                    <TextView
+                        android:id="@+id/tvStudentSettingLogout"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:text="Logout"
+                        android:textSize="16sp"
+                        android:textColor="#232B42"/>
+
+                    <ImageView
+                        android:id="@+id/ivStudentSettingLogoutArrow"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_arrow_right_detail"
+                        app:tint="#666666"/>
+                </LinearLayout>
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+</ScrollView>

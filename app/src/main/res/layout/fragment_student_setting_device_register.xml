@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/flStudentSettingDeviceRegisterRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:background="#F5F9FF">
+
+    <!-- Content chính với paddingTop để lùi xuống dưới toolbar -->
+    <LinearLayout
+        android:id="@+id/llStudentSettingDeviceRegisterContent"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:paddingTop="?attr/actionBarSize"
+        android:background="@android:color/transparent">
+
+        <!-- Spacer để toolbar nằm ngoài marginTop của content -->
+        <!-- AppBar “ảo” để giữ không gian nếu cần -->
+        <!-- Card message nằm chính giữa -->
+        <LinearLayout
+            android:id="@+id/llStudentSettingDeviceRegisterMessageContainer"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardStudentSettingDeviceRegisterMessage"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="24dp"
+                app:cardElevation="6dp"
+                android:layout_margin="16dp"
+                android:backgroundTint="#CECFFE">
+
+                <LinearLayout
+                    android:id="@+id/llStudentSettingDeviceRegisterCardContent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center_horizontal"
+                    android:padding="24dp">
+
+                    <TextView
+                        android:id="@+id/tvStudentSettingDeviceRegisterMessage"
+                        android:fontFamily="@font/jostextrabold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="Device have not registered.\nRegister now."
+                        android:textAlignment="center"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="18dp"/>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnStudentSettingDeviceRegister"
+                        android:fontFamily="@font/jostextrabold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:minWidth="120dp"
+                        android:text="Register"
+                        android:textAllCaps="false"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:elevation="4dp"
+                        app:backgroundTint="#A3BBFF"
+                        app:cornerRadius="22dp"
+                        app:icon="@drawable/ic_help"
+                        app:iconTint="#FFFFFF"
+                        app:iconPadding="6dp"
+                        app:iconGravity="textStart"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Toolbar custom overlay -->
+    <LinearLayout
+        android:id="@+id/llStudentSettingDeviceRegisterToolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:background="@android:color/transparent"
+        android:elevation="4dp">
+
+        <ImageView
+            android:id="@+id/ivStudentSettingDeviceRegisterBack"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_arrow_back"
+            android:contentDescription="Back"
+            app:tint="#232B42"/>
+
+        <TextView
+            android:id="@+id/tvStudentSettingDeviceRegisterTitle"
+            android:fontFamily="@font/jostsemibold"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:text="Device"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#232B42"/>
+    </LinearLayout>
+</FrameLayout>

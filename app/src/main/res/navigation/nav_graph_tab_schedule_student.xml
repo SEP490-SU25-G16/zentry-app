@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph_tab_schedule_student"
+    app:startDestination="@id/studentScheduleFragment">
+
+    <!-- 1. Main Schedule Screen for Student -->
+    <fragment
+        android:id="@+id/studentScheduleFragment"
+        android:name="vn.edu.fpt.zentryapp.student.ui.schedule.StudentScheduleFragment"
+        android:label="Schedule">
+        <!-- Navigate to Calendar view -->
+        <action
+            android:id="@+id/action_studentSchedule_to_calendar"
+            app:destination="@id/studentScheduleCalendarFragment" />
+        <!-- Navigate to Class detail -->
+        <action
+            android:id="@+id/action_studentSchedule_to_classDetail"
+            app:destination="@id/studentScheduleClassDetailFragment" />
+    </fragment>
+
+    <!-- 2. Calendar Screen -->
+    <fragment
+        android:id="@+id/studentScheduleCalendarFragment"
+        android:name="vn.edu.fpt.zentryapp.student.ui.schedule.StudentScheduleCalendarFragment"
+        android:label="Calendar">
+        <!-- Back to Schedule list -->
+        <action
+            android:id="@+id/action_calendar_to_schedule"
+            app:destination="@id/studentScheduleFragment"
+            app:popUpTo="@id/studentScheduleFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <!-- 3. Class Detail Screen -->
+    <fragment
+        android:id="@+id/studentScheduleClassDetailFragment"
+        android:name="vn.edu.fpt.zentryapp.student.ui.schedule.StudentScheduleClassDetailFragment"
+        android:label="Class Detail">
+        <!-- Back to Schedule list -->
+        <action
+            android:id="@+id/action_classDetail_to_schedule"
+            app:destination="@id/studentScheduleFragment"
+            app:popUpTo="@id/studentScheduleFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+</navigation>

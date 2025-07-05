@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph_tab_profile_lecturer"
+    app:startDestination="@id/lecturerSettingFragment">
+
+    <!-- 1. Main Settings Screen -->
+    <fragment
+        android:id="@+id/lecturerSettingFragment"
+        android:name="vn.edu.fpt.zentryapp.lecturer.ui.setting.LecturerSettingFragment"
+        android:label="Settings"
+        tools:layout="@layout/fragment_lecturer_setting">
+        <action
+            android:id="@+id/action_setting_to_deviceInfo"
+            app:destination="@id/lecturerSettingDeviceInfoFragment" />
+        <action
+            android:id="@+id/action_setting_to_deviceRegister"
+            app:destination="@id/lecturerSettingDeviceRegisterFragment" />
+        <action
+            android:id="@+id/action_setting_to_notification"
+            app:destination="@id/lecturerSettingNotificationFragment" />
+        <action
+            android:id="@+id/action_setting_to_profileOverview"
+            app:destination="@id/lecturerSettingProfileOverviewFragment" />
+    </fragment>
+
+    <!-- Device Info -->
+    <fragment
+        android:id="@+id/lecturerSettingDeviceInfoFragment"
+        android:name="vn.edu.fpt.zentryapp.lecturer.ui.setting.LecturerSettingDeviceInfoFragment"
+        android:label="Device Info"
+        tools:layout="@layout/fragment_lecturer_setting_device_info">
+        <action
+            android:id="@+id/action_deviceInfo_to_setting"
+            app:destination="@id/lecturerSettingFragment"
+            app:popUpTo="@id/lecturerSettingFragment"
+            app:popUpToInclusive="false" />
+    </fragment>
+
+    <!-- Device Register -->
+    <fragment
+        android:id="@+id/lecturerSettingDeviceRegisterFragment"
+        android:name="vn.edu.fpt.zentryapp.lecturer.ui.setting.LecturerSettingDeviceRegisterFragment"
+        android:label="Device Register"
+        tools:layout="@layout/fragment_lecturer_setting_device_register">
+        <action
+            android:id="@+id/action_deviceRegister_to_setting"
+            app:destination="@id/lecturerSettingFragment"
+            app:popUpTo="@id/lecturerSettingFragment"
+            app:popUpToInclusive="false" />
+    </fragment>
+
+    <!-- Notification Settings -->
+    <fragment
+        android:id="@+id/lecturerSettingNotificationFragment"
+        android:name="vn.edu.fpt.zentryapp.lecturer.ui.setting.LecturerSettingNotificationFragment"
+        android:label="Notifications"
+        tools:layout="@layout/fragment_lecturer_setting_notification">
+        <action
+            android:id="@+id/action_notification_to_setting"
+            app:destination="@id/lecturerSettingFragment"
+            app:popUpTo="@id/lecturerSettingFragment"
+            app:popUpToInclusive="false" />
+    </fragment>
+
+    <!-- Profile Overview -->
+    <fragment
+        android:id="@+id/lecturerSettingProfileOverviewFragment"
+        android:name="vn.edu.fpt.zentryapp.lecturer.ui.setting.LecturerSettingProfileOverviewFragment"
+        android:label="Profile Overview"
+        tools:layout="@layout/fragment_lecturer_setting_profile_overview">
+        <action
+            android:id="@+id/action_profileOverview_to_setting"
+            app:destination="@id/lecturerSettingFragment"
+            app:popUpTo="@id/lecturerSettingFragment"
+            app:popUpToInclusive="false" />
+        <action
+            android:id="@+id/action_profileOverview_to_editProfile"
+            app:destination="@id/lecturerSettingEditProfileFragment" />
+    </fragment>
+
+    <!-- Edit Profile -->
+    <fragment
+        android:id="@+id/lecturerSettingEditProfileFragment"
+        android:name="vn.edu.fpt.zentryapp.lecturer.ui.setting.LecturerSettingEditProfileFragment"
+        android:label="Edit Profile"
+        tools:layout="@layout/fragment_lecturer_setting_edit_profile">
+        <action
+            android:id="@+id/action_editProfile_to_profileOverview"
+            app:destination="@id/lecturerSettingProfileOverviewFragment"
+            app:popUpTo="@id/lecturerSettingProfileOverviewFragment"
+            app:popUpToInclusive="false" />
+    </fragment>
+</navigation>

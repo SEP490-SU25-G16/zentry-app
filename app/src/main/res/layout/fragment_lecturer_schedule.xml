@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/svScheduleRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F5F9FF"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:id="@+id/llScheduleContent"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Header -->
+        <LinearLayout
+            android:id="@+id/llScheduleHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="24dp">
+
+            <ImageView
+                android:id="@+id/ivScheduleAvatar"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/ic_launcher_foreground"
+                android:scaleType="centerCrop"
+                android:background="@drawable/circle_background" />
+
+            <LinearLayout
+                android:id="@+id/llScheduleGreetingTexts"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:layout_marginStart="12dp">
+
+                <TextView
+                    android:id="@+id/tvScheduleGreeting"
+                    android:fontFamily="@font/jostsemibold"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Hi, Harsha"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:textColor="#232B42" />
+
+                <TextView
+                    android:id="@+id/tvScheduleSubGreeting"
+                    android:fontFamily="@font/jostsemibold"
+                    android:textStyle="bold"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Are you ready to teach Today? Let's begin."
+                    android:textSize="14sp"
+                    android:textColor="#666666"
+                    android:layout_marginTop="4dp" />
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/btnScheduleNotification"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_notification"
+                app:tint="#0961F5" />
+        </LinearLayout>
+
+        <!-- Section Title with Calendar -->
+        <LinearLayout
+            android:id="@+id/llScheduleSectionTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="16dp">
+
+            <TextView
+                android:id="@+id/tvScheduleSectionTitle"
+                android:fontFamily="@font/jostsemibold"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="My Classes"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#232B42"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/tvScheduleCalendar"
+                android:fontFamily="@font/mulishextrabold"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CALENDAR"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#0961F5" />
+        </LinearLayout>
+
+        <!-- Class Card 1 -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardScheduleClass1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:clickable="true"
+            android:focusable="true"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp"
+            app:cardBackgroundColor="@color/card_bg_selector">
+
+            <LinearLayout
+                android:id="@+id/llScheduleClass1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="16dp"
+                android:gravity="center_vertical">
+
+                <LinearLayout
+                    android:id="@+id/llScheduleClass1Texts"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tvScheduleClassName1"
+                        android:fontFamily="@font/mulishextrabold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Mathematics Grade - 07"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="#232B42" />
+
+                    <TextView
+                        android:id="@+id/tvScheduleClassTime1"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Saturday 7:30 - 9:30 pm"
+                        android:textSize="14sp"
+                        android:textColor="#666666"
+                        android:layout_marginTop="4dp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:id="@+id/ivScheduleChevron1"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_arrow_right_detail"
+                    app:tint="#0961F5" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Class Card 2 -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardScheduleClass2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:clickable="true"
+            android:focusable="true"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp"
+            app:cardBackgroundColor="@color/card_bg_selector">
+
+            <LinearLayout
+                android:id="@+id/llScheduleClass2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="16dp"
+                android:gravity="center_vertical">
+
+                <LinearLayout
+                    android:id="@+id/llScheduleClass2Texts"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tvScheduleClassName2"
+                        android:fontFamily="@font/mulishextrabold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Mathematics Grade - 08"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="#232B42" />
+
+                    <TextView
+                        android:id="@+id/tvScheduleClassTime2"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Saturday 10:00 - 12:00 pm"
+                        android:textSize="14sp"
+                        android:textColor="#666666"
+                        android:layout_marginTop="4dp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:id="@+id/ivScheduleChevron2"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_arrow_right_detail"
+                    app:tint="#0961F5" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- See All -->
+        <TextView
+            android:id="@+id/tvScheduleSeeAll"
+            android:fontFamily="@font/mulishextrabold"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SEE ALL"
+            android:textColor="#0961F5"
+            android:textSize="12sp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- Start Instant Class Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnScheduleStartClass"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginBottom="24dp"
+            android:text="Start Instant Class"
+            android:textAllCaps="false"
+            android:textColor="#FFFFFF"
+            android:fontFamily="@font/jostsemibold"
+            android:textSize="18sp"
+            app:backgroundTint="@color/button_tint_selector"
+            app:cornerRadius="28dp"
+            />
+
+    </LinearLayout>
+</ScrollView>

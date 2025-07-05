@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="CalendarWeekDay" parent="TextAppearance.AppCompat.Medium">
+        <item name="android:textColor">#232B42</item>
+    </style>
+
+    <style name="CalendarDate" parent="TextAppearance.AppCompat.Large">
+        <item name="android:textColor">#FFFFFF</item>
+    </style>
+</resources>

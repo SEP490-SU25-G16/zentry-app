@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph_tab_report_student"
+    app:startDestination="@id/studentReportFragment">
+
+    <!-- 1. Main Report Screen for Student -->
+    <fragment
+        android:id="@+id/studentReportFragment"
+        android:name="vn.edu.fpt.zentryapp.student.ui.report.StudentReportFragment"
+        android:label="Reports"
+        tools:layout="@layout/fragment_student_report">
+        <action
+            android:id="@+id/action_studentReport_to_listSession"
+            app:destination="@id/studentReportListSessionFragment" />
+    </fragment>
+
+    <!-- 2. Student Session List -->
+    <fragment
+        android:id="@+id/studentReportListSessionFragment"
+        android:name="vn.edu.fpt.zentryapp.student.ui.report.StudentReportListSessionFragment"
+        android:label="Session List"
+        tools:layout="@layout/fragment_student_report_list_session">
+        <action
+            android:id="@+id/action_listSession_to_studentReport"
+            app:destination="@id/studentReportFragment"
+            app:popUpTo="@id/studentReportFragment"
+            app:popUpToInclusive="false" />
+    </fragment>
+</navigation>

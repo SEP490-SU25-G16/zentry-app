@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph_tab_profile_student"
+    app:startDestination="@id/studentSettingFragment">
+
+    <!-- 1. Main Settings Screen for Student -->
+    <fragment
+        android:id="@+id/studentSettingFragment"
+        android:name="vn.edu.fpt.zentryapp.student.ui.setting.StudentSettingFragment"
+        android:label="Settings">
+        <action
+            android:id="@+id/action_studentSetting_to_deviceInfo"
+            app:destination="@id/studentSettingDeviceInfoFragment" />
+        <action
+            android:id="@+id/action_studentSetting_to_deviceRegister"
+            app:destination="@id/studentSettingDeviceRegisterFragment" />
+        <action
+            android:id="@+id/action_studentSetting_to_notifications"
+            app:destination="@id/studentSettingNotificationFragment" />
+        <action
+            android:id="@+id/action_studentSetting_to_profileOverview"
+            app:destination="@id/studentSettingProfileOverviewFragment" />
+        <action
+            android:id="@+id/action_studentSetting_to_registerFaceId"
+            app:destination="@id/studentSettingRegisterFaceIdFragment" />
+        <action
+            android:id="@+id/action_studentSetting_to_updateFaceId"
+            app:destination="@id/studentSettingUpdateFaceIdFragment" />
+    </fragment>
+
+    <!-- 2. Device Info -->
+    <fragment
+        android:id="@+id/studentSettingDeviceInfoFragment"
+        android:name="vn.edu.fpt.zentryapp.student.ui.setting.StudentSettingDeviceInfoFragment"
+        android:label="Device Info">
+        <action
+            android:id="@+id/action_deviceInfo_to_settings"
+            app:destination="@id/studentSettingFragment"
+            app:popUpTo="@id/studentSettingFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <!-- 3. Device Register -->
+    <fragment
+        android:id="@+id/studentSettingDeviceRegisterFragment"
+        android:name="vn.edu.fpt.zentryapp.student.ui.setting.StudentSettingDeviceRegisterFragment"
+        android:label="Register Device">
+        <action
+            android:id="@+id/action_deviceRegister_to_settings"
+            app:destination="@id/studentSettingFragment"
+            app:popUpTo="@id/studentSettingFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <!-- 4. Notifications -->
+    <fragment
+        android:id="@+id/studentSettingNotificationFragment"
+        android:name="vn.edu.fpt.zentryapp.student.ui.setting.StudentSettingNotificationFragment"
+        android:label="Notifications">
+        <action
+            android:id="@+id/action_notifications_to_settings"
+            app:destination="@id/studentSettingFragment"
+            app:popUpTo="@id/studentSettingFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <!-- 5. Profile Overview -->
+    <fragment
+        android:id="@+id/studentSettingProfileOverviewFragment"
+        android:name="vn.edu.fpt.zentryapp.student.ui.setting.StudentSettingProfileOverviewFragment"
+        android:label="Profile Overview">
+        <action
+            android:id="@+id/action_profileOverview_to_settings"
+            app:destination="@id/studentSettingFragment"
+            app:popUpTo="@id/studentSettingFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <!-- 6. Register Face ID -->
+    <fragment
+        android:id="@+id/studentSettingRegisterFaceIdFragment"
+        android:name="vn.edu.fpt.zentryapp.student.ui.setting.StudentSettingRegisterFaceIdFragment"
+        android:label="Register Face ID">
+        <action
+            android:id="@+id/action_registerFaceId_to_settings"
+            app:destination="@id/studentSettingFragment"
+            app:popUpTo="@id/studentSettingFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <!-- 7. Update Face ID -->
+    <fragment
+        android:id="@+id/studentSettingUpdateFaceIdFragment"
+        android:name="vn.edu.fpt.zentryapp.student.ui.setting.StudentSettingUpdateFaceIdFragment"
+        android:label="Update Face ID">
+        <action
+            android:id="@+id/action_updateFaceId_to_settings"
+            app:destination="@id/studentSettingFragment"
+            app:popUpTo="@id/studentSettingFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+</navigation>

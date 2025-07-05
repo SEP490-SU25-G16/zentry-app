@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph_tab_report_lecturer"
+    app:startDestination="@id/lecturerReportFragment">
+
+    <!-- 1. Main Report Screen -->
+    <fragment
+        android:id="@+id/lecturerReportFragment"
+        android:name="vn.edu.fpt.zentryapp.lecturer.ui.report.LecturerReportFragment"
+        android:label="Reports"
+        tools:layout="@layout/fragment_lecturer_report">
+        <action
+            android:id="@+id/action_report_to_listSession"
+            app:destination="@id/lecturerReportListSessionFragment" />
+    </fragment>
+
+    <!-- 2. Report Session List -->
+    <fragment
+        android:id="@+id/lecturerReportListSessionFragment"
+        android:name="vn.edu.fpt.zentryapp.lecturer.ui.report.LecturerReportListSessionFragment"
+        android:label="Session List"
+        tools:layout="@layout/fragment_lecturer_report_list_session">
+        <action
+            android:id="@+id/action_listSession_to_sessionDetail"
+            app:destination="@id/lecturerReportSessionDetailFragment">
+            <argument
+                android:name="sessionId"
+                app:argType="long"
+                android:defaultValue="0" />
+        </action>
+    </fragment>
+
+    <!-- 3. Single Session Detail -->
+    <fragment
+        android:id="@+id/lecturerReportSessionDetailFragment"
+        android:name="vn.edu.fpt.zentryapp.lecturer.ui.report.LecturerReportSessionDetailFragment"
+        android:label="Session Detail"
+        tools:layout="@layout/fragment_lecturer_report_session_detail">
+        <argument
+            android:name="sessionId"
+            app:argType="long"
+            android:defaultValue="0" />
+        <action
+            android:id="@+id/action_sessionDetail_to_listSession"
+            app:destination="@id/lecturerReportListSessionFragment"
+            app:popUpTo="@id/lecturerReportListSessionFragment"
+            app:popUpToInclusive="false" />
+    </fragment>
+</navigation>

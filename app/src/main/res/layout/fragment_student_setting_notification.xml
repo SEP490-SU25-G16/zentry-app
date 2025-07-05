@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/flStudentSettingNotificationRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:background="#F5F9FF">
+
+    <!-- Content chính, paddingTop để lùi xuống dưới toolbar overlay -->
+    <LinearLayout
+        android:id="@+id/llStudentSettingNotificationContent"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:paddingTop="?attr/actionBarSize"
+        android:background="@android:color/transparent">
+
+        <!-- Spacer nhỏ -->
+        <Space
+            android:id="@+id/spStudentSettingNotificationSpacer"
+            android:layout_width="match_parent"
+            android:layout_height="48dp" />
+
+        <!-- Sound -->
+        <LinearLayout
+            android:id="@+id/llStudentSettingNotificationSound"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvStudentSettingNotificationSoundLabel"
+                android:fontFamily="@font/mulishbold"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Sound"
+                android:textColor="#202244"
+                android:textSize="16sp" />
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchStudentSettingNotificationSound"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:thumbTint="@color/switch_thumb_color"
+                android:trackTint="@color/switch_track_color" />
+        </LinearLayout>
+
+        <!-- Vibrate -->
+        <LinearLayout
+            android:id="@+id/llStudentSettingNotificationVibrate"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvStudentSettingNotificationVibrateLabel"
+                android:fontFamily="@font/mulishbold"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Vibrate"
+                android:textColor="#202244"
+                android:textSize="16sp" />
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchStudentSettingNotificationVibrate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:thumbTint="@color/switch_thumb_color"
+                android:trackTint="@color/switch_track_color" />
+        </LinearLayout>
+
+        <!-- General Notification -->
+        <LinearLayout
+            android:id="@+id/llStudentSettingNotificationGeneral"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvStudentSettingNotificationGeneralLabel"
+                android:fontFamily="@font/mulishbold"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="General Notification"
+                android:textColor="#202244"
+                android:textSize="16sp" />
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchStudentSettingNotificationGeneral"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:thumbTint="@color/switch_thumb_color"
+                android:trackTint="@color/switch_track_color" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Toolbar custom overlay -->
+    <LinearLayout
+        android:id="@+id/llStudentSettingNotificationToolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:background="@android:color/transparent"
+        android:elevation="4dp">
+
+        <ImageView
+            android:id="@+id/ivStudentSettingNotificationBack"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_arrow_back"
+            android:contentDescription="Back"
+            app:tint="#232B42"/>
+
+        <TextView
+            android:id="@+id/tvStudentSettingNotificationTitle"
+            android:fontFamily="@font/jostsemibold"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:text="Notifications"
+            android:textStyle="bold"
+            android:textSize="20sp"
+            android:textColor="#232B42"/>
+    </LinearLayout>
+
+</FrameLayout>

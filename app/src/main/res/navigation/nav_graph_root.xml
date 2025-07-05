@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph_root"
+    app:startDestination="@id/loginFragment">
+
+    <fragment
+        android:id="@+id/loginFragment"
+        android:name="vn.edu.fpt.zentryapp.auth.ui.LoginFragment"
+        android:label="Login">
+        <action
+            android:id="@+id/action_login_to_selectMethod"
+            app:destination="@id/forgotPasswordSelectMethodFragment" />
+        <!-- action đăng nhập thành công → Student -->
+        <action
+            android:id="@+id/action_login_to_student"
+            app:destination="@id/nav_graph_student"
+            app:popUpTo="@id/nav_graph_root"
+            app:popUpToInclusive="true" />
+
+        <!-- action đăng nhập thành công → Lecturer -->
+        <action
+            android:id="@+id/action_login_to_lecturer"
+            app:destination="@id/nav_graph_lecturer"
+            app:popUpTo="@id/nav_graph_root"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/forgotPasswordSelectMethodFragment"
+        android:name="vn.edu.fpt.zentryapp.auth.ui.ForgotPasswordSelectMethodFragment"
+        android:label="Select Method">
+        <action
+            android:id="@+id/action_selectMethod_to_verifyCode"
+            app:destination="@id/forgotPasswordVerifyCodeFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/forgotPasswordVerifyCodeFragment"
+        android:name="vn.edu.fpt.zentryapp.auth.ui.ForgotPasswordVerifyCodeFragment"
+        android:label="Verify Code">
+        <action
+            android:id="@+id/action_verifyCode_to_createPassword"
+            app:destination="@id/createNewPasswordFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/createNewPasswordFragment"
+        android:name="vn.edu.fpt.zentryapp.auth.ui.CreateNewPasswordFragment"
+        android:label="Create New Password">
+        <action
+            android:id="@+id/action_createPassword_to_success"
+            app:destination="@id/passwordResetSuccessFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/passwordResetSuccessFragment"
+        android:name="vn.edu.fpt.zentryapp.auth.ui.PasswordResetSuccessFragment"
+        android:label="Reset Success"/>
+
+    <action
+        android:id="@+id/action_global_logout"
+        app:destination="@id/loginFragment"
+        app:popUpTo="@id/nav_graph_root"
+        app:popUpToInclusive="true" />
+
+    <include app:graph="@navigation/nav_graph_student" />
+
+    <include app:graph="@navigation/nav_graph_lecturer" />
+
+</navigation>

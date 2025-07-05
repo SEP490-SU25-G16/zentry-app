@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Trạng thái bật -->
+    <item android:color="#A5D6A7" android:state_checked="true" /> <!-- xanh nhạt hơn track -->
+    <!-- Trạng thái tắt -->
+    <item android:color="#EEEEEE" />
+</selector>

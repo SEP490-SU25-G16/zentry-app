@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/svSettingRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F5F9FF"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:id="@+id/llSettingContent"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Profile Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardSettingProfile"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardCornerRadius="16dp"
+            app:strokeColor="#FFFFFF"
+            app:cardBackgroundColor="#FFFFFF"
+            app:cardElevation="4dp">
+
+            <LinearLayout
+                android:id="@+id/llSettingProfileContent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp"
+                android:gravity="center_horizontal">
+
+                <!-- Avatar + Edit Overlay -->
+                <FrameLayout
+                    android:id="@+id/flSettingAvatarContainer"
+                    android:layout_width="96dp"
+                    android:layout_height="96dp">
+
+                    <ImageView
+                        android:id="@+id/ivSettingAvatar"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/ic_notification"
+                        android:background="@drawable/circle_border_blue" />
+                </FrameLayout>
+
+                <!-- Name & Email -->
+                <TextView
+                    android:id="@+id/tvSettingName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="Harsha"
+                    android:fontFamily="@font/mulishextrabold"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="#232B42"/>
+
+                <TextView
+                    android:id="@+id/tvSettingEmail"
+                    android:fontFamily="@font/mulishbold"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="HarshaKumara98@gmail.com"
+                    android:textSize="14sp"
+                    android:textColor="#666666"/>
+
+                <!-- Divider -->
+                <View
+                    android:id="@+id/viewSettingDivider1"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginVertical="16dp"
+                    android:background="#E0E0E0"/>
+
+                <!-- Option: Profile -->
+                <LinearLayout
+                    android:id="@+id/llSettingRowProfile"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingVertical="12dp">
+
+                    <ImageView
+                        android:id="@+id/ivSettingProfileIcon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_profile"
+                        app:tint="#202244"/>
+
+                    <TextView
+                        android:id="@+id/tvSettingProfile"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:text="Profile"
+                        android:textSize="16sp"
+                        android:textColor="#202244"/>
+
+                    <ImageView
+                        android:id="@+id/ivSettingProfileArrow"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_arrow_right_detail"
+                        app:tint="#666666"/>
+                </LinearLayout>
+
+                <View
+                    android:id="@+id/viewSettingDivider2"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#E0E0E0"/>
+
+                <!-- Option: Notifications -->
+                <LinearLayout
+                    android:id="@+id/llSettingRowNotifications"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingVertical="12dp">
+
+                    <ImageView
+                        android:id="@+id/ivSettingNotificationIcon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_notification_setting"
+                        app:tint="#202244"/>
+
+                    <TextView
+                        android:id="@+id/tvSettingNotifications"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:text="Notifications"
+                        android:textSize="16sp"
+                        android:textColor="#202244"/>
+
+                    <ImageView
+                        android:id="@+id/ivSettingNotificationArrow"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_arrow_right_detail"
+                        app:tint="#666666"/>
+                </LinearLayout>
+
+                <View
+                    android:id="@+id/viewSettingDivider3"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#E0E0E0"/>
+
+                <!-- Option: Device -->
+                <LinearLayout
+                    android:id="@+id/llSettingRowDevice"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingVertical="12dp">
+
+                    <ImageView
+                        android:id="@+id/ivSettingDeviceIcon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_device"
+                        app:tint="#202244"/>
+
+                    <TextView
+                        android:id="@+id/tvSettingDevice"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:text="Device"
+                        android:textSize="16sp"
+                        android:textColor="#202244"/>
+
+                    <ImageView
+                        android:id="@+id/ivSettingDeviceArrow"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_arrow_right_detail"
+                        app:tint="#666666"/>
+                </LinearLayout>
+
+                <View
+                    android:id="@+id/viewSettingDivider4"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#E0E0E0"/>
+
+                <!-- Option: Logout -->
+                <LinearLayout
+                    android:id="@+id/llSettingRowLogout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingVertical="12dp">
+
+                    <ImageView
+                        android:id="@+id/ivSettingLogoutIcon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_logout"
+                        app:tint="#202244"/>
+
+                    <TextView
+                        android:id="@+id/tvSettingLogout"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:text="Logout"
+                        android:textSize="16sp"
+                        android:textColor="#202244"/>
+
+                    <ImageView
+                        android:id="@+id/ivSettingLogoutArrow"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_arrow_right_detail"
+                        app:tint="#666666"/>
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+</ScrollView>

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph_tab_schedule_lecturer"
+    app:startDestination="@id/lecturerScheduleFragment">
+
+    <!-- 1. Lecturer Schedule List -->
+    <fragment
+        android:id="@+id/lecturerScheduleFragment"
+        android:name="vn.edu.fpt.zentryapp.lecturer.ui.schedule.LecturerScheduleFragment"
+        android:label="Schedule"
+        tools:layout="@layout/fragment_lecturer_schedule">
+        <!-- Sang màn Calendar -->
+        <action
+            android:id="@+id/action_schedule_to_calendar"
+            app:destination="@id/lecturerScheduleCalendarFragment" />
+        <!-- Sang màn Class Detail -->
+        <action
+            android:id="@+id/action_schedule_to_classDetail"
+            app:destination="@id/lecturerClassDetailFragment" />
+    </fragment>
+
+    <!-- 2. Lecturer Schedule Calendar View -->
+    <fragment
+        android:id="@+id/lecturerScheduleCalendarFragment"
+        android:name="vn.edu.fpt.zentryapp.lecturer.ui.schedule.LecturerScheduleCalendarFragment"
+        android:label="Calendar"
+        tools:layout="@layout/fragment_lecturer_schedule_calendar">
+        <!-- Quay trở lại list -->
+        <action
+            android:id="@+id/action_calendar_to_schedule"
+            app:destination="@id/lecturerScheduleFragment"
+            app:popUpTo="@id/lecturerScheduleFragment"
+            app:popUpToInclusive="false" />
+    </fragment>
+
+    <!-- 3. Lecturer Class Detail -->
+    <fragment
+        android:id="@+id/lecturerClassDetailFragment"
+        android:name="vn.edu.fpt.zentryapp.lecturer.ui.schedule.LecturerScheduleClassDetailFragment"
+        android:label="Class Detail"
+        tools:layout="@layout/fragment_lecturer_schedule_class_detail">
+        <!-- Argument: classId -->
+        <argument
+            android:name="classId"
+            app:argType="long"
+            android:defaultValue="0" />
+        <!-- Quay trở lại list -->
+        <action
+            android:id="@+id/action_classDetail_to_schedule"
+            app:destination="@id/lecturerScheduleFragment"
+            app:popUpTo="@id/lecturerScheduleFragment"
+            app:popUpToInclusive="false" />
+    </fragment>
+
+</navigation>

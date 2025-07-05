@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/flStudentReportListSessionRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:background="#F5F9FF">
+
+    <!-- ScrollView chứa nội dung, lùi xuống dưới toolbar overlay -->
+    <ScrollView
+        android:id="@+id/svStudentReportListSessionContent"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="16dp"
+        android:paddingTop="?attr/actionBarSize"
+        android:background="@android:color/transparent">
+
+        <LinearLayout
+            android:id="@+id/llStudentReportListSessionContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Header Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardStudentReportListSessionHeader"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="48dp"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardBackgroundColor="#FFFFFF"
+                app:strokeColor="#FFFFFF"
+                app:cardElevation="4dp">
+
+                <LinearLayout
+                    android:id="@+id/llStudentReportListSessionHeaderContent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:id="@+id/tvStudentReportListSessionGrade"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Grade 07"
+                        android:textColor="#F57C00"
+                        android:textSize="14sp"
+                        android:textStyle="bold"/>
+
+                    <TextView
+                        android:id="@+id/tvStudentReportListSessionSubject"
+                        android:fontFamily="@font/jostsemibold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="Mathematics"
+                        android:textColor="#232B42"
+                        android:textSize="20sp"
+                        android:textStyle="bold"/>
+
+                    <TextView
+                        android:id="@+id/tvStudentReportListSessionCount"
+                        android:fontFamily="@font/mulishextrabold"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:layout_marginStart="8dp"
+                        android:text="12/20 Sessions"
+                        android:textSize="14sp"
+                        android:textColor="#202244"/>
+
+                    <TextView
+                        android:id="@+id/tvStudentReportListSessionLabel"
+                        android:fontFamily="@font/mulishextrabold"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:gravity="center"
+                        android:text="SESSION LIST"
+                        android:textColor="#202244"
+                        android:textSize="14sp"
+                        android:textStyle="bold"/>
+
+                    <View
+                        android:id="@+id/viewStudentReportListSessionDivider"
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginTop="8dp"
+                        android:background="#E0E0E0"/>
+
+                    <!-- Session Items -->
+                    <LinearLayout
+                        android:id="@+id/llStudentReportListSessionItems"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_marginTop="8dp">
+
+                        <!-- Session 1 -->
+                        <LinearLayout
+                            android:id="@+id/llStudentReportListSession1"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp">
+
+                            <LinearLayout
+                                android:id="@+id/llStudentReportListSession1Info"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/tvStudentReportListSession1Title"
+                                    android:fontFamily="@font/mulishextrabold"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Session - 1"
+                                    android:textColor="#232B42"
+                                    android:textSize="16sp"
+                                    android:textStyle="bold"/>
+
+                                <LinearLayout
+                                    android:id="@+id/llStudentReportListSession1Details"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:layout_marginTop="4dp">
+
+                                    <TextView
+                                        android:id="@+id/tvStudentReportListSession1Attendance"
+                                        android:fontFamily="@font/jostsemibold"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="Attended"
+                                        android:textSize="12sp"
+                                        android:textColor="#167F71"/>
+
+                                    <TextView
+                                        android:id="@+id/tvStudentReportListSession1Separator"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="16dp"
+                                        android:text="|"
+                                        android:textSize="12sp"
+                                        android:textColor="#CCCCCC"/>
+
+                                    <TextView
+                                        android:id="@+id/tvStudentReportListSession1Date"
+                                        android:fontFamily="@font/mulishextrabold"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="16dp"
+                                        android:text="01/01/2025"
+                                        android:textSize="12sp"
+                                        android:textColor="#979797"/>
+                                </LinearLayout>
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <View
+                            android:id="@+id/viewStudentReportListSession1Divider"
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:background="#949494"/>
+
+                        <!-- Session 2 -->
+                        <LinearLayout
+                            android:id="@+id/llStudentReportListSession2"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="12dp">
+
+                            <LinearLayout
+                                android:id="@+id/llStudentReportListSession2Info"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/tvStudentReportListSession2Title"
+                                    android:fontFamily="@font/mulishextrabold"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Session - 2"
+                                    android:textColor="#232B42"
+                                    android:textSize="16sp"
+                                    android:textStyle="bold"/>
+
+                                <LinearLayout
+                                    android:id="@+id/llStudentReportListSession2Details"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:layout_marginTop="4dp">
+
+                                    <TextView
+                                        android:id="@+id/tvStudentReportListSession2Attendance"
+                                        android:fontFamily="@font/jostsemibold"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="Absented"
+                                        android:textSize="12sp"
+                                        android:textColor="#FF001E"/>
+
+                                    <TextView
+                                        android:id="@+id/tvStudentReportListSession2Separator"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="16dp"
+                                        android:text="|"
+                                        android:textSize="12sp"
+                                        android:textColor="#CCCCCC"/>
+
+                                    <TextView
+                                        android:id="@+id/tvStudentReportListSession2Date"
+                                        android:fontFamily="@font/mulishextrabold"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="16dp"
+                                        android:text="02/01/2025"
+                                        android:textSize="12sp"
+                                        android:textColor="#979797"/>
+                                </LinearLayout>
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <View
+                            android:id="@+id/viewStudentReportListSession2Divider"
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:background="#949494"/>
+
+                        <!-- Additional sessions... -->
+
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Toolbar custom overlay -->
+    <LinearLayout
+        android:id="@+id/llStudentReportListSessionToolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:background="@android:color/transparent"
+        android:elevation="4dp">
+
+        <ImageView
+            android:id="@+id/ivStudentReportListSessionBack"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_arrow_back"
+            android:contentDescription="Back"
+            app:tint="#232B42" />
+
+        <TextView
+            android:id="@+id/tvStudentReportListSessionTitle"
+            android:fontFamily="@font/jostsemibold"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:text="My Report"
+            android:textColor="#232B42"
+            android:textSize="20sp"
+            android:textStyle="bold"/>
+    </LinearLayout>
+</FrameLayout>
