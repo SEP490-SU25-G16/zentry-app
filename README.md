@@ -2,49 +2,49 @@
 
 ## Introduction
 
-ZentryApp is an Android application designed for smart attendance tracking, tailored for both lecturers and students.
+ZentryApp is an Android application for smart attendance tracking, designed for both lecturers and students.
 
 ## Environment Requirements
 
-* **Java (Gradle JVM)**: 11.0.19 (check via `./gradlew -version`)
-* **Gradle Wrapper**: 8.11.1 (see `gradle/wrapper/gradle-wrapper.properties` for `distributionUrl=https\://services.gradle.org/distributions/gradle-8.11.1-bin.zip`)
-* **Android Gradle Plugin & Kotlin Plugin**: Refer to the `build.gradle` (project-level) or `gradle/libs.versions.toml` if using Version Catalog.
+* **Java JDK**: 11.0.19 (check via `java -version`)
+* **Gradle Wrapper**: 8.11.1 (see `gradle/wrapper/gradle-wrapper.properties` → `distributionUrl=https://services.gradle.org/distributions/gradle-8.11.1-bin.zip`)
+* **Android Gradle Plugin**: 7.4.2 (check `build.gradle` project-level)
+* **Kotlin Plugin**: 1.8.10 (check `build.gradle` project-level or `gradle/libs.versions.toml`)
 * **Android SDK**:
 
   * **compileSdk**: 35
   * **buildToolsVersion**: 35.x.x
   * **minSdkVersion**: 24
   * **targetSdkVersion**: 35
-* **Android Studio**: Arctic Fox or later
-* **Android SDK Location**:
+* **Android Studio**: Arctic Fox (2020.3.1) or later
+* **Gradle JDK (Runtime)**: JetBrains Runtime 21.x (check via **Settings > Build, Execution, Deployment > Build Tools > Gradle > Gradle JDK** or via `./gradlew -version` under *JVM* line)
 
-  * Create a `local.properties` file with:
+## Android SDK Setup
 
-    ```properties
-    sdk.dir=/path/to/Android/sdk
-    ```
-  * Or export an environment variable:
+1. Create a `local.properties` file in the project root (not committed) with:
 
-    ```bash
-    export ANDROID_SDK_ROOT=/path/to/Android/sdk
-    ```
+   ```properties
+   sdk.dir=/path/to/Android/sdk
+   ```
+2. Or set an environment variable before building:
+
+   ```bash
+   export ANDROID_SDK_ROOT=/path/to/Android/sdk
+   ```
 
 ## Installation
 
-1. **Clone the repository**
+1. **Clone the repository**:
 
    ```bash
    git clone https://github.com/SEP490-SU25-G16/zentry-app.git
    cd zentry-app
    ```
-2. \*\*Create \*\***`local.properties`** (if not already present) with the SDK path as above.
-3. **(Optional)** Install JDK 11 and configure system `JAVA_HOME`/`PATH` if you prefer a system JDK:
+2. **Ensure JDK is installed**:
 
-   ```bash
-   # Windows (PowerShell, run as Admin)
-   setx JAVA_HOME "C:\Program Files\Eclipse Adoptium\jdk-11.0.19.1-hotspot"
-   setx PATH "%JAVA_HOME%\bin;%PATH%"
-   ```
+   * Open a terminal and run `java -version` → should show `11.0.19`.
+   * Or see Gradle JVM version: `./gradlew -version` (JVM line).
+3. **Create or update `local.properties`** as described above.
 
 ## Project Configuration
 
@@ -61,7 +61,7 @@ ZentryApp is an Android application designed for smart attendance tracking, tail
       }
   }
   ```
-* **Plugins** (KTS syntax):
+* **Plugins** (Kotlin DSL):
 
   ```kotlin
   plugins {
@@ -72,22 +72,22 @@ ZentryApp is an Android application designed for smart attendance tracking, tail
 
 ## Build & Run
 
-1. **Build the project**:
+1. **Clean and build**:
 
    ```bash
    ./gradlew clean build
    ```
 2. **Open in Android Studio**:
 
-   * File > Open > select the `zentry-app` directory
-   * Choose the `app` module and click Run on an emulator or physical device.
+   * File > Open > choose the `zentry-app` folder
+   * Select the `app` module and click Run on an emulator or device
 
 ## Key Libraries
 
-* PinView 1.4.3
-* AndroidX Navigation (Fragment, UI)
-* AppCompat, Material, ConstraintLayout, Activity KTX
-* JUnit, Espresso for testing
+* **PinView**: 1.4.3
+* **AndroidX Navigation** (fragment, UI)
+* **AppCompat**, **Material**, **ConstraintLayout**, **Activity KTX**
+* **JUnit**, **Espresso** for testing
 
 ## Contact
 
