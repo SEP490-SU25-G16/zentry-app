@@ -34,6 +34,22 @@ android {
 }
 
 dependencies {
+
+    // Retrofit cho API calls
+    implementation ("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation ("com.squareup.retrofit2:converter-gson:2.9.0")
+
+    // Gson cho JSON parsing
+    implementation("com.google.code.gson:gson:2.10.1")
+
+    // OkHttp cho HTTP client
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    // Lombok
+    compileOnly("org.projectlombok:lombok:1.18.30")
+    annotationProcessor("org.projectlombok:lombok:1.18.30")
+
     implementation ("com.github.ChaosLeong:PinView:1.4.3")
     implementation (libs.navigation.fragment)
     implementation (libs.navigation.ui)
