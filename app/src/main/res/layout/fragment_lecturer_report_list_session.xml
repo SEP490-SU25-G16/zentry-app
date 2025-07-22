@@ -8,7 +8,7 @@
     android:fitsSystemWindows="true"
     android:background="#F5F9FF">
 
-    <!-- ScrollView chứa toàn bộ content, paddingTop để lùi xuống dưới toolbar -->
+    <!-- ScrollView chứa toàn bộ content -->
     <ScrollView
         android:id="@+id/svReportContent"
         android:layout_width="match_parent"
@@ -134,173 +134,24 @@
                         android:layout_marginTop="8dp"
                         android:background="#E0E0E0"/>
 
-                    <!-- Session Items -->
-                    <LinearLayout
-                        android:id="@+id/llReportSessionList"
+                    <!-- Loading Progress -->
+                    <ProgressBar
+                        android:id="@+id/progressLoading"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:layout_marginTop="32dp"
+                        android:visibility="gone" />
+
+                    <!-- Sessions RecyclerView -->
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvSessions"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:layout_marginTop="8dp">
+                        android:layout_marginTop="8dp"
+                        android:nestedScrollingEnabled="false"
+                        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
-                        <!-- Session 1 -->
-                        <LinearLayout
-                            android:id="@+id/llReportSession1"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical"
-                            android:paddingTop="12dp"
-                            android:paddingBottom="12dp">
-
-                            <LinearLayout
-                                android:id="@+id/llReportSession1Info"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:orientation="vertical">
-
-                                <TextView
-                                    android:id="@+id/tvReportSession1Title"
-                                    android:fontFamily="@font/mulishextrabold"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="Session - 1"
-                                    android:textColor="#232B42"
-                                    android:textSize="16sp"
-                                    android:textStyle="bold"/>
-
-                                <LinearLayout
-                                    android:id="@+id/llReportSession1Details"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:orientation="horizontal"
-                                    android:layout_marginTop="4dp">
-
-                                    <TextView
-                                        android:id="@+id/tvReportSession1Attendance"
-                                        android:fontFamily="@font/jostsemibold"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:text="18/21 - Attendance"
-                                        android:textSize="12sp"
-                                        android:textColor="#666666"/>
-
-                                    <TextView
-                                        android:id="@+id/tvReportSession1Separator"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginStart="16dp"
-                                        android:text="|"
-                                        android:textSize="12sp"
-                                        android:textColor="#CCCCCC"/>
-
-                                    <TextView
-                                        android:id="@+id/tvReportSession1Date"
-                                        android:fontFamily="@font/mulishextrabold"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginStart="16dp"
-                                        android:text="01/01/2025"
-                                        android:textSize="12sp"
-                                        android:textColor="#979797"/>
-                                </LinearLayout>
-                            </LinearLayout>
-
-                            <ImageView
-                                android:id="@+id/ivReportSession1Arrow"
-                                android:layout_width="24dp"
-                                android:layout_height="24dp"
-                                android:src="@drawable/ic_arrow_right_detail"
-                                app:tint="#0961F5" />
-                        </LinearLayout>
-
-                        <View
-                            android:id="@+id/viewReportSession1Divider"
-                            android:layout_width="match_parent"
-                            android:layout_height="1dp"
-                            android:background="#949494"/>
-
-                        <!-- Session 2 -->
-                        <LinearLayout
-                            android:id="@+id/llReportSession2"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical"
-                            android:paddingTop="12dp"
-                            android:paddingBottom="12dp">
-
-                            <LinearLayout
-                                android:id="@+id/llReportSession2Info"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:orientation="vertical">
-
-                                <TextView
-                                    android:id="@+id/tvReportSession2Title"
-                                    android:fontFamily="@font/mulishextrabold"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="Session - 2"
-                                    android:textColor="#232B42"
-                                    android:textSize="16sp"
-                                    android:textStyle="bold"/>
-
-                                <LinearLayout
-                                    android:id="@+id/llReportSession2Details"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:orientation="horizontal"
-                                    android:layout_marginTop="4dp">
-
-                                    <TextView
-                                        android:id="@+id/tvReportSession2Attendance"
-                                        android:fontFamily="@font/jostsemibold"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:text="18/21 - Attendance"
-                                        android:textSize="12sp"
-                                        android:textColor="#666666"/>
-
-                                    <TextView
-                                        android:id="@+id/tvReportSession2Separator"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginStart="16dp"
-                                        android:text="|"
-                                        android:textSize="12sp"
-                                        android:textColor="#CCCCCC"/>
-
-                                    <TextView
-                                        android:id="@+id/tvReportSession2Date"
-                                        android:fontFamily="@font/mulishextrabold"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:layout_marginStart="16dp"
-                                        android:text="02/01/2025"
-                                        android:textSize="12sp"
-                                        android:textColor="#666666"/>
-                                </LinearLayout>
-                            </LinearLayout>
-
-                            <ImageView
-                                android:id="@+id/ivReportSession2Arrow"
-                                android:layout_width="24dp"
-                                android:layout_height="24dp"
-                                android:src="@drawable/ic_arrow_right_detail"
-                                app:tint="#0961F5" />
-                        </LinearLayout>
-
-                        <View
-                            android:id="@+id/viewReportSession2Divider"
-                            android:layout_width="match_parent"
-                            android:layout_height="1dp"
-                            android:background="#949494"/>
-
-                        <!-- ... thêm các session khác tương tự ... -->
-
-                    </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

@@ -8,7 +8,7 @@
     android:fitsSystemWindows="true"
     android:background="#F5F9FF">
 
-    <!-- ScrollView chứa toàn bộ content, paddingTop để lùi xuống dưới toolbar -->
+    <!-- ScrollView chứa toàn bộ content -->
     <ScrollView
         android:id="@+id/svSessionDetailContent"
         android:layout_width="match_parent"
@@ -91,7 +91,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginStart="8dp"
-                                android:text="21 Students"
+                                android:text="32 Students"
                                 android:textSize="14sp"
                                 android:textColor="#202244"/>
                         </LinearLayout>
@@ -123,7 +123,20 @@
                         </LinearLayout>
                     </LinearLayout>
 
-                    <!-- Tabs -->
+                    <!-- Edit Time Warning -->
+                    <TextView
+                        android:id="@+id/tvEditTimeWarning"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="⚠️ Editing will be disabled after 24 hours"
+                        android:textColor="#FF9800"
+                        android:textSize="12sp"
+                        android:gravity="center"
+                        android:visibility="gone" />
+
+                    <!-- Final Attendance Tab -->
                     <TextView
                         android:id="@+id/tvSessionDetailFinalAttendance"
                         android:fontFamily="@font/jostsemibold"
@@ -146,7 +159,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:gravity="center"
-                        android:text="19/21 - Attendance"
+                        android:text="29/32 - Attendance"
                         android:textColor="#167F71"
                         android:textSize="14sp"
                         android:textStyle="bold" />
@@ -159,156 +172,23 @@
                         android:layout_marginVertical="8dp"
                         android:background="#E0E0E0" />
 
-                    <!-- Student List -->
-                    <LinearLayout
-                        android:id="@+id/llSessionDetailStudentList"
+                    <!-- Loading Progress -->
+                    <ProgressBar
+                        android:id="@+id/progressLoading"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:layout_marginTop="32dp"
+                        android:visibility="gone" />
+
+                    <!-- Students RecyclerView -->
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvStudents"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical">
+                        android:nestedScrollingEnabled="false"
+                        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
-                        <!-- Item 1 -->
-                        <LinearLayout
-                            android:id="@+id/llSessionDetailStudentItem1"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical"
-                            android:paddingVertical="12dp">
-
-                            <ImageView
-                                android:id="@+id/ivSessionDetailStudentAvatar1"
-                                android:layout_width="40dp"
-                                android:layout_height="40dp"
-                                android:src="@drawable/ic_notification"
-                                android:scaleType="centerCrop" />
-
-                            <LinearLayout
-                                android:id="@+id/llSessionDetailStudentInfo1"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:orientation="vertical"
-                                android:layout_marginStart="12dp">
-
-                                <TextView
-                                    android:id="@+id/tvSessionDetailStudentName1"
-                                    android:fontFamily="@font/jostsemibold"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="Tharidu"
-                                    android:textColor="#202244"
-                                    android:textSize="16sp"
-                                    android:textStyle="bold" />
-
-                                <TextView
-                                    android:id="@+id/tvSessionDetailStudentId1"
-                                    android:fontFamily="@font/mulishbold"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="ID: HS001324"
-                                    android:textSize="12sp"
-                                    android:textColor="#666666"
-                                    android:layout_marginTop="2dp" />
-                            </LinearLayout>
-
-                            <TextView
-                                android:id="@+id/tvSessionDetailStudentStatus1"
-                                android:fontFamily="@font/jostsemibold"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Absent"
-                                android:textColor="#E53935"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
-
-                            <ImageButton
-                                android:id="@+id/btnSessionDetailStudentEdit1"
-                                android:layout_width="36dp"
-                                android:layout_height="36dp"
-                                android:layout_marginStart="8dp"
-                                android:background="@drawable/circle_background"
-                                android:src="@drawable/ic_edit"
-                                android:scaleType="centerCrop"
-                                android:clipToOutline="true" />
-
-                        </LinearLayout>
-
-                        <View
-                            android:id="@+id/viewSessionDetailDivider1"
-                            android:layout_width="match_parent"
-                            android:layout_height="1dp"
-                            android:background="#E0E0E0" />
-
-                        <!-- Item 2 -->
-                        <LinearLayout
-                            android:id="@+id/llSessionDetailStudentItem2"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical"
-                            android:paddingVertical="12dp">
-
-                            <ImageView
-                                android:id="@+id/ivSessionDetailStudentAvatar2"
-                                android:layout_width="40dp"
-                                android:layout_height="40dp"
-                                android:src="@drawable/ic_notification"
-                                android:scaleType="centerCrop" />
-
-                            <LinearLayout
-                                android:id="@+id/llSessionDetailStudentInfo2"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:orientation="vertical"
-                                android:layout_marginStart="12dp">
-
-                                <TextView
-                                    android:id="@+id/tvSessionDetailStudentName2"
-                                    android:fontFamily="@font/mulishbold"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="Hasitha"
-                                    android:textColor="#232B42"
-                                    android:textSize="16sp"
-                                    android:textStyle="bold" />
-
-                                <TextView
-                                    android:id="@+id/tvSessionDetailStudentId2"
-                                    android:fontFamily="@font/mulishbold"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="ID: HS001034"
-                                    android:textSize="12sp"
-                                    android:textColor="#666666"
-                                    android:layout_marginTop="2dp" />
-                            </LinearLayout>
-
-                            <TextView
-                                android:id="@+id/tvSessionDetailStudentStatus2"
-                                android:fontFamily="@font/jostsemibold"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Attended"
-                                android:textColor="#388E3C"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
-
-                            <ImageButton
-                                android:id="@+id/btnSessionDetailStudentEdit2"
-                                android:layout_width="36dp"
-                                android:layout_height="36dp"
-                                android:layout_marginStart="8dp"
-                                android:background="@drawable/circle_background"
-                                android:src="@drawable/ic_edit"
-                                android:scaleType="centerCrop"
-                                android:clipToOutline="true" />
-
-                        </LinearLayout>
-
-                        <!-- thêm các Item khác tương tự... -->
-
-                    </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -341,7 +221,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
-            android:text="Session List"
+            android:text="Session Detail"
             android:textColor="#232B42"
             android:textSize="20sp"
             android:textStyle="bold"/>

@@ -43,7 +43,7 @@
                     android:fontFamily="@font/jostsemibold"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Hi, Harsha"
+                    android:text="Good Morning, Lecturer!"
                     android:textSize="20sp"
                     android:textStyle="bold"
                     android:textColor="#232B42" />
@@ -55,18 +55,29 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="Are you ready to teach Today? Let's begin."
+                    android:text="Here's your teaching sessions for today"
                     android:textColor="#666666"
                     android:textSize="14sp" />
             </LinearLayout>
 
             <ImageButton
-                android:id="@+id/btnHomeNotification"
+                android:id="@+id/btnNotification"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_notification" />
         </LinearLayout>
+
+        <!-- Date -->
+        <TextView
+            android:id="@+id/tvCurrentDate"
+            android:fontFamily="@font/jostsemibold"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Today, December 15, 2024"
+            android:textSize="14sp"
+            android:textColor="#666666"
+            android:layout_marginBottom="8dp" />
 
         <!-- Section Title -->
         <TextView
@@ -74,183 +85,29 @@
             android:fontFamily="@font/jostsemibold"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="My Classroom"
+            android:text="Today's Sessions"
             android:textSize="16sp"
             android:textStyle="bold"
             android:textColor="#232B42"
             android:layout_marginBottom="16dp" />
 
-        <!-- Card 1 -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardHomeClassroomMathematics"
+        <!-- Loading Progress -->
+        <ProgressBar
+            android:id="@+id/progressLoading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="32dp"
+            android:visibility="gone" />
+
+        <!-- Sessions RecyclerView -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvSessions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardCornerRadius="16dp"
-            app:cardBackgroundColor="#FFFFFF"
-            app:strokeColor="#FFFFFF"
-            app:cardElevation="4dp">
-
-            <LinearLayout
-                android:id="@+id/llHomeCardMathematics"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <ImageView
-                    android:id="@+id/ivHomeCardMathematicsImage"
-                    android:layout_gravity="center"
-                    android:layout_width="100dp"
-                    android:layout_height="100dp"
-                    android:padding="20dp"
-                    android:src="@drawable/ic_congratulations"
-                    android:scaleType="centerCrop"
-                    android:contentDescription="Mathematics" />
-
-                <LinearLayout
-                    android:id="@+id/llHomeCardMathematicsTexts"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:padding="12dp">
-
-                    <TextView
-                        android:id="@+id/tvHomeCardMathematicsTitle"
-                        android:fontFamily="@font/circularstdmedium500"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="MATHEMATICS (Tên môn)"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:textColor="#232B42" />
-
-                    <TextView
-                        android:id="@+id/tvHomeCardMathematicsTeacher"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="SE1753 (lớp) - DE-222"
-                        android:textSize="14sp"
-                        android:textColor="#666666"
-                        android:layout_marginTop="4dp" />
-
-                    <TextView
-                        android:id="@+id/tvHomeCardMathematicsAttendance"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="Attendance - 100%"
-                        android:textColor="#4C4B4B"
-                        android:textStyle="bold"
-                        android:textSize="12sp" />
-
-                    <TextView
-                        android:id="@+id/tvHomeCardMathematicsTask"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Task completed"
-                        android:textSize="12sp"
-                        android:textColor="#4C4B4B"
-                        android:textStyle="bold"
-                        android:layout_marginTop="8dp" />
-
-                    <ProgressBar
-                        android:id="@+id/pbHomeCardMathematicsProgress"
-                        style="?android:attr/progressBarStyleHorizontal"
-                        android:layout_width="match_parent"
-                        android:layout_height="8dp"
-                        android:layout_marginTop="4dp"
-                        android:progress="100"
-                        android:progressDrawable="@drawable/rounded_progressbar"
-                        android:progressTint="#0961F5" />
-                </LinearLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- Card 2 -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardHomeClassroomScience"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardCornerRadius="16dp"
-            app:cardBackgroundColor="#FFFFFF"
-            app:strokeColor="#FFFFFF"
-            app:cardElevation="4dp">
-
-            <LinearLayout
-                android:id="@+id/llHomeCardScience"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <ImageView
-                    android:id="@+id/ivHomeCardScienceImage"
-                    android:layout_gravity="center"
-                    android:layout_width="100dp"
-                    android:layout_height="100dp"
-                    android:contentDescription="Science"
-                    android:padding="20dp"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_congratulations" />
-
-                <LinearLayout
-                    android:id="@+id/llHomeCardScienceTexts"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:padding="12dp">
-
-                    <TextView
-                        android:id="@+id/tvHomeCardScienceTitle"
-                        android:fontFamily="@font/circularstdmedium500"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="SCIENCE"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:textColor="#232B42" />
-
-                    <TextView
-                        android:id="@+id/tvHomeCardScienceTeacher"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Tharidu Diwakara"
-                        android:textSize="14sp"
-                        android:textColor="#666666"
-                        android:layout_marginTop="4dp" />
-
-                    <TextView
-                        android:id="@+id/tvHomeCardScienceAttendance"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Attendance - 90%"
-                        android:textSize="12sp"
-                        android:textColor="#4C4B4B"
-                        android:textStyle="bold"
-                        android:layout_marginTop="8dp" />
-                    <TextView
-                        android:id="@+id/tvHomeCardScienceTask"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Task completed"
-                        android:textSize="12sp"
-                        android:textColor="#4C4B4B"
-                        android:textStyle="bold"
-                        android:layout_marginTop="8dp" />
-
-                    <ProgressBar
-                        android:id="@+id/pbHomeCardScienceProgress"
-                        android:progressDrawable="@drawable/rounded_progressbar"
-                        style="?android:attr/progressBarStyleHorizontal"
-                        android:layout_width="match_parent"
-                        android:layout_height="8dp"
-                        android:layout_marginTop="4dp"
-                        android:progress="90"
-                        android:progressTint="#0961F5" />
-                </LinearLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            android:nestedScrollingEnabled="false"
+            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
     </LinearLayout>
+
 </ScrollView>
