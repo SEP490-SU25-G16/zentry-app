@@ -14,13 +14,20 @@ import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import vn.edu.fpt.zentryapp.R;
+import vn.edu.fpt.zentryapp.auth.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentLoginBinding;
 
 public class LoginFragment extends Fragment {
 
     private FragmentLoginBinding binding;
+    private int logoClickCount = 0;
+    private static final int BYPASS_CLICK_COUNT = 5;
+    private static final String TEST_STUDENT_EMAIL = "test@student.com";
+    private static final String TEST_LECTURER_EMAIL = "test@fpt.edu.vn";
+    private static final String TEST_PASSWORD = "test123";
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -37,6 +44,16 @@ public class LoginFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         NavController navController = NavHostFragment.findNavController(this);
+
+        // Add a hidden bypass feature - tap the title 5 times to enable test accounts
+        binding.tvLoginTitle.setOnClickListener(v -> {
+            logoClickCount++;
+            if (logoClickCount == BYPASS_CLICK_COUNT) {
+                // Show test account options
+                showTestAccountOptions();
+                logoClickCount = 0;
+            }
+        });
 
         // Xử lý khi người dùng ấn "Forgot Password?"
         binding.tvLoginForgotPassword.setOnClickListener(v ->
@@ -63,15 +80,24 @@ public class LoginFragment extends Fragment {
                 return;
             }
 
-            // TODO: Gọi API xác thực người dùng thực tế
-            // Ở đây giả lập xác thực với mật khẩu "123456"
-            boolean loginSuccess = fakeAuthenticate(email, pwd);
+            // Check for test accounts
+            boolean isTestAccount = (TEST_STUDENT_EMAIL.equals(email) || TEST_LECTURER_EMAIL.equals(email)) 
+                                   && TEST_PASSWORD.equals(pwd);
+                                   
+            // Regular authentication for non-test accounts
+            boolean loginSuccess = isTestAccount || fakeAuthenticate(email, pwd);
 
             // Nếu đăng nhập thất bại, hiển thị lỗi
             if (!loginSuccess) {
                 binding.tvLoginPasswordError.setText("Email hoặc password không đúng");
                 binding.tvLoginPasswordError.setVisibility(View.VISIBLE);
                 return;
+            }
+
+            // Save mock token for test accounts
+            if (isTestAccount) {
+                AuthManager.getInstance(requireContext()).saveToken("test_token_123456");
+                AuthManager.getInstance(requireContext()).saveUserId("test_user_123");
             }
 
             // Phân biệt role người dùng theo email
@@ -110,6 +136,31 @@ public class LoginFragment extends Fragment {
                     }
                 }
         );
+    }
+
+    /**
+     * Show test account options dialog
+     */
+    private void showTestAccountOptions() {
+        final CharSequence[] items = {"Student Test Account", "Lecturer Test Account"};
+        
+        new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                .setTitle("Test Accounts")
+                .setItems(items, (dialog, which) -> {
+                    switch (which) {
+                        case 0: // Student
+                            binding.etLoginEmail.setText(TEST_STUDENT_EMAIL);
+                            binding.etLoginPassword.setText(TEST_PASSWORD);
+                            Toast.makeText(requireContext(), "Student test account loaded", Toast.LENGTH_SHORT).show();
+                            break;
+                        case 1: // Lecturer
+                            binding.etLoginEmail.setText(TEST_LECTURER_EMAIL);
+                            binding.etLoginPassword.setText(TEST_PASSWORD);
+                            Toast.makeText(requireContext(), "Lecturer test account loaded", Toast.LENGTH_SHORT).show();
+                            break;
+                    }
+                })
+                .show();
     }
 
     @Override

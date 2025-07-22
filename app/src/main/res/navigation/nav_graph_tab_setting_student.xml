@@ -100,4 +100,16 @@
             app:popUpTo="@id/studentSettingFragment"
             app:popUpToInclusive="true" />
     </fragment>
+    
+    <!-- 8. Verify Face ID -->
+    <fragment
+        android:id="@+id/studentSettingVerifyFaceIdFragment"
+        android:name="vn.edu.fpt.zentryapp.student.ui.setting.StudentSettingVerifyFaceIdFragment"
+        android:label="Verify Face ID">
+        <action
+            android:id="@+id/action_verifyFaceId_to_settings"
+            app:destination="@id/studentSettingFragment"
+            app:popUpTo="@id/studentSettingFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
 </navigation>

@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/flVerifyFaceIdRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:background="#F5F9FF">
+
+    <!-- Content chính với paddingTop để lùi xuống dưới toolbar overlay -->
+    <LinearLayout
+        android:id="@+id/llVerifyFaceIdContent"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:paddingTop="?attr/actionBarSize"
+        android:background="@android:color/transparent">
+
+        <!-- Status Text -->
+        <TextView
+            android:id="@+id/tvVerificationStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp"
+            android:gravity="center"
+            android:text="Ready to verify"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="#232B42"/>
+
+        <!-- Camera Container -->
+        <FrameLayout
+            android:id="@+id/flCameraContainer"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_circle_white">
+            
+            <!-- Camera view and overlay will be added here programmatically -->
+            
+        </FrameLayout>
+        
+        <!-- Instructions -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="4dp"
+            app:cardBackgroundColor="#CECFFE">
+            
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+                
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Instructions"
+                    android:textStyle="bold"
+                    android:textSize="18sp"
+                    android:textColor="#232B42"/>
+                
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="1. Position your face in the center\n2. Ensure good lighting\n3. Look directly at the camera\n4. Keep a neutral expression"
+                    android:textColor="#232B42"/>
+                
+            </LinearLayout>
+            
+        </androidx.cardview.widget.CardView>
+        
+        <!-- Verify Button -->
+        <Button
+            android:id="@+id/btnVerifyFaceId"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Verify Face ID"
+            android:textAllCaps="false"
+            android:textSize="16sp"
+            android:padding="12dp"
+            android:background="@drawable/bg_button_primary"
+            android:textColor="#FFFFFF"/>
+        
+        <!-- Progress Bar -->
+        <ProgressBar
+            android:id="@+id/progressBarVerifyFaceId"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="16dp"
+            android:visibility="gone"/>
+        
+    </LinearLayout>
+    
+    <!-- Toolbar overlay -->
+    <LinearLayout
+        android:id="@+id/llVerifyFaceIdToolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#FFFFFF"
+        android:elevation="4dp">
+        
+        <ImageView
+            android:id="@+id/ivBack"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="12dp"
+            android:src="@drawable/ic_arrow_back"
+            app:tint="#232B42"/>
+        
+        <TextView
+            android:id="@+id/tvVerifyFaceIdTitle"
+            android:fontFamily="@font/jostsemibold"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:text="Verify Face ID"
+            android:textStyle="bold"
+            android:textSize="20sp"
+            android:textColor="#232B42"/>
+    </LinearLayout>
+</FrameLayout> 
