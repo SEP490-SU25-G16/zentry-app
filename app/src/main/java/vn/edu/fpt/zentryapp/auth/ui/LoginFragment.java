@@ -39,22 +39,47 @@ public class LoginFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-
+        navController = NavHostFragment.findNavController(this);
+        // Check if user is already logged in
+        AuthManager authManager = AuthManager.getInstance(requireContext());
+        if (authManager.isLoggedIn()) {
+            // User đã login, navigate to appropriate screen based on role
+            navigateToMainScreen(authManager);
+            return; // Exit early, không cần setup UI
+        }
         // Initialize ViewModel
         loginViewModel = new ViewModelProvider(this).get(LoginViewModel.class);
 
         // Initialize dependencies
-        AuthManager authManager = AuthManager.getInstance(requireContext());
         loginViewModel.init(
                 ApiClient.getClient(requireContext()).create(AuthService.class),
                 authManager
         );
 
-        navController = NavHostFragment.findNavController(this);
-
         setupClickListeners();
         observeViewModel();
         setupBackPressHandler();
+    }
+
+    /**
+     * Navigate to main screen based on user role
+     */
+    private void navigateToMainScreen(AuthManager authManager) {
+        String userRole = authManager.getCurrentUserRole();
+        boolean isLecturer = "Lecturer".equalsIgnoreCase(userRole);
+
+        // Determine navigation destination
+        int actionId = isLecturer
+                ? R.id.action_login_to_lecturer
+                : R.id.action_login_to_student;
+
+        // Create NavOptions to clear back stack
+        NavOptions navOptions = new NavOptions.Builder()
+                .setPopUpTo(R.id.nav_graph_root, true)
+                .build();
+
+        // Navigate to appropriate screen
+        navController.navigate(actionId, null, navOptions);
     }
 
     private void setupClickListeners() {
