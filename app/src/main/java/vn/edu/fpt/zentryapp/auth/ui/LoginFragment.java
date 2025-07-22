@@ -6,6 +6,7 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.navigation.NavController;
 import androidx.navigation.NavOptions;
 import androidx.navigation.fragment.NavHostFragment;
@@ -14,122 +15,145 @@ import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Toast;
 
 import vn.edu.fpt.zentryapp.R;
-import vn.edu.fpt.zentryapp.auth.AuthManager;
+import vn.edu.fpt.zentryapp.auth.client.ApiClient;
+import vn.edu.fpt.zentryapp.auth.client.AuthManager;
+import vn.edu.fpt.zentryapp.auth.services.AuthService;
 import vn.edu.fpt.zentryapp.databinding.FragmentLoginBinding;
 
 public class LoginFragment extends Fragment {
 
     private FragmentLoginBinding binding;
-    private int logoClickCount = 0;
-    private static final int BYPASS_CLICK_COUNT = 5;
-    private static final String TEST_STUDENT_EMAIL = "test@student.com";
-    private static final String TEST_LECTURER_EMAIL = "test@fpt.edu.vn";
-    private static final String TEST_PASSWORD = "test123";
+    private LoginViewModel loginViewModel;
+    private NavController navController;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        // Inflate layout và binding view
         binding = FragmentLoginBinding.inflate(inflater, container, false);
         return binding.getRoot();
     }
 
     @Override
-    public void onViewCreated(@NonNull View view,
-                              @Nullable Bundle savedInstanceState) {
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        NavController navController = NavHostFragment.findNavController(this);
+        // Initialize ViewModel
+        loginViewModel = new ViewModelProvider(this).get(LoginViewModel.class);
 
-        // Add a hidden bypass feature - tap the title 5 times to enable test accounts
-        binding.tvLoginTitle.setOnClickListener(v -> {
-            logoClickCount++;
-            if (logoClickCount == BYPASS_CLICK_COUNT) {
-                // Show test account options
-                showTestAccountOptions();
-                logoClickCount = 0;
-            }
-        });
+        // Initialize dependencies
+        AuthManager authManager = new AuthManager(requireContext());
+        loginViewModel.init(
+                ApiClient.getClient(requireContext()).create(AuthService.class),
+                authManager
+        );
 
-        // Xử lý khi người dùng ấn "Forgot Password?"
+        navController = NavHostFragment.findNavController(this);
+
+        setupClickListeners();
+        observeViewModel();
+        setupBackPressHandler();
+    }
+
+    private void setupClickListeners() {
+        // Forgot Password
         binding.tvLoginForgotPassword.setOnClickListener(v ->
                 navController.navigate(R.id.action_login_to_selectMethod)
         );
 
-        // Xử lý khi người dùng ấn nút "Sign In"
+        // Sign In Button
         binding.btnLoginSignIn.setOnClickListener(v -> {
-            // Ẩn thông báo lỗi cũ
-            binding.tvLoginPasswordError.setVisibility(View.GONE);
-
-            // Lấy dữ liệu email và password người dùng nhập
             String email = binding.etLoginEmail.getText() != null
                     ? binding.etLoginEmail.getText().toString().trim()
                     : "";
-            String pwd = binding.etLoginPassword.getText() != null
+            String password = binding.etLoginPassword.getText() != null
                     ? binding.etLoginPassword.getText().toString()
                     : "";
 
-            // Validate email và password không được để trống
-            if (TextUtils.isEmpty(email) || TextUtils.isEmpty(pwd)) {
-                binding.tvLoginPasswordError.setText("Email và password không được để trống");
-                binding.tvLoginPasswordError.setVisibility(View.VISIBLE);
-                return;
-            }
-
-            // Check for test accounts
-            boolean isTestAccount = (TEST_STUDENT_EMAIL.equals(email) || TEST_LECTURER_EMAIL.equals(email)) 
-                                   && TEST_PASSWORD.equals(pwd);
-                                   
-            // Regular authentication for non-test accounts
-            boolean loginSuccess = isTestAccount || fakeAuthenticate(email, pwd);
-
-            // Nếu đăng nhập thất bại, hiển thị lỗi
-            if (!loginSuccess) {
-                binding.tvLoginPasswordError.setText("Email hoặc password không đúng");
-                binding.tvLoginPasswordError.setVisibility(View.VISIBLE);
-                return;
-            }
-
-            // Save mock token for test accounts
-            if (isTestAccount) {
-                AuthManager.getInstance(requireContext()).saveToken("test_token_123456");
-                AuthManager.getInstance(requireContext()).saveUserId("test_user_123");
-            }
-
-            // Phân biệt role người dùng theo email
-            boolean isLecturer = email.endsWith("@fpt.edu.vn");
-            int actionId = isLecturer
-                    ? R.id.action_login_to_lecturer
-                    : R.id.action_login_to_student;
-
-            // Tạo NavOptions để clear toàn bộ back stack trước khi navigate
-            NavOptions navOptions = new NavOptions.Builder()
-                    .setPopUpTo(R.id.nav_graph_root, true) // Xóa toàn bộ stack đến nav_graph_root (bao gồm nó)
-                    .build();
-
-            // Điều hướng sang màn hình tương ứng với role
-            navController.navigate(actionId, null, navOptions);
+            loginViewModel.login(email, password);
         });
 
-        // Xử lý Google Sign-In (chưa implement)
+        // Google Sign In (placeholder)
         binding.btnLoginGoogle.setOnClickListener(v -> {
-            // TODO: Khởi chạy flow Google Sign-In
+            // TODO: Implement Google Sign-In
+        });
+    }
+
+    private void observeViewModel() {
+        // Observe loading state
+        loginViewModel.isLoading().observe(getViewLifecycleOwner(), isLoading -> {
+            binding.btnLoginSignIn.setEnabled(!isLoading);
+
+            if (isLoading) {
+                binding.btnLoginSignIn.setText("Signing in...");
+            } else {
+                binding.btnLoginSignIn.setText("Sign In");
+            }
         });
 
-        // Đăng ký callback xử lý nút back hệ thống
+        // Observe general error messages
+        loginViewModel.errorMessage().observe(getViewLifecycleOwner(), errorMessage -> {
+            if (errorMessage != null) {
+                binding.tvLoginPasswordError.setText(errorMessage);
+                binding.tvLoginPasswordError.setVisibility(View.VISIBLE);
+            } else {
+                binding.tvLoginPasswordError.setVisibility(View.GONE);
+            }
+        });
+
+        // Observe email validation errors
+        loginViewModel.emailError().observe(getViewLifecycleOwner(), emailError -> {
+            if (emailError != null) {
+                binding.tilLoginEmail.setError(emailError);
+            } else {
+                binding.tilLoginEmail.setError(null);
+            }
+        });
+
+        // Observe password validation errors
+        loginViewModel.passwordError().observe(getViewLifecycleOwner(), passwordError -> {
+            if (passwordError != null) {
+                binding.tilLoginPassword.setError(passwordError);
+            } else {
+                binding.tilLoginPassword.setError(null);
+            }
+        });
+
+        // Observe login success
+        loginViewModel.loginSuccess().observe(getViewLifecycleOwner(), loginSuccess -> {
+            if (loginSuccess != null) {
+                handleLoginSuccess(loginSuccess);
+            }
+        });
+    }
+
+    private void handleLoginSuccess(LoginViewModel.LoginSuccess loginSuccess) {
+        // Determine navigation destination
+        int actionId = loginSuccess.isLecturer()
+                ? R.id.action_login_to_lecturer
+                : R.id.action_login_to_student;
+
+        // Create NavOptions to clear back stack
+        NavOptions navOptions = new NavOptions.Builder()
+                .setPopUpTo(R.id.nav_graph_root, true)
+                .build();
+
+        // Navigate to appropriate screen
+        navController.navigate(actionId, null, navOptions);
+    }
+
+    private void setupBackPressHandler() {
         requireActivity().getOnBackPressedDispatcher().addCallback(
                 getViewLifecycleOwner(),
                 new OnBackPressedCallback(true) {
                     @Override
                     public void handleOnBackPressed() {
                         if (navController.popBackStack()) {
-                            // Đã pop thành công fragment trước đó
+                            // Successfully popped previous fragment
                         } else {
-                            // Nếu không còn fragment nào để pop, gọi back mặc định (thoát app hoặc activity)
+                            // No more fragments to pop, exit app or activity
                             setEnabled(false);
                             requireActivity().onBackPressed();
                         }
@@ -138,45 +162,9 @@ public class LoginFragment extends Fragment {
         );
     }
 
-    /**
-     * Show test account options dialog
-     */
-    private void showTestAccountOptions() {
-        final CharSequence[] items = {"Student Test Account", "Lecturer Test Account"};
-        
-        new androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                .setTitle("Test Accounts")
-                .setItems(items, (dialog, which) -> {
-                    switch (which) {
-                        case 0: // Student
-                            binding.etLoginEmail.setText(TEST_STUDENT_EMAIL);
-                            binding.etLoginPassword.setText(TEST_PASSWORD);
-                            Toast.makeText(requireContext(), "Student test account loaded", Toast.LENGTH_SHORT).show();
-                            break;
-                        case 1: // Lecturer
-                            binding.etLoginEmail.setText(TEST_LECTURER_EMAIL);
-                            binding.etLoginPassword.setText(TEST_PASSWORD);
-                            Toast.makeText(requireContext(), "Lecturer test account loaded", Toast.LENGTH_SHORT).show();
-                            break;
-                    }
-                })
-                .show();
-    }
-
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        // Giải phóng binding để tránh leak bộ nhớ
         binding = null;
-    }
-
-    /**
-     * Hàm giả lập xác thực người dùng, chỉ dùng demo.
-     * @param email Email người dùng nhập
-     * @param password Password người dùng nhập
-     * @return true nếu password đúng "123456", false nếu sai
-     */
-    private boolean fakeAuthenticate(String email, String password) {
-        return "123456".equals(password);
     }
 }

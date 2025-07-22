@@ -133,17 +133,26 @@
                         android:fontFamily="@font/mulishextrabold"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Mathematics Grade - 07"
+                        android:text="Tên môn học trong ngày"
                         android:textSize="16sp"
                         android:textStyle="bold"
                         android:textColor="#232B42" />
+                    <TextView
+                        android:id="@+id/tvScheduleRoom"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="SE1753 (Room) - Tên phòng DE221"
+                        android:textSize="14sp"
+                        android:textColor="#666666"
+                        android:layout_marginTop="4dp" />
 
                     <TextView
                         android:id="@+id/tvScheduleClassTime1"
                         android:fontFamily="@font/mulishbold"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Saturday 7:30 - 9:30 pm"
+                        android:text="Saturday 12/2 7:30 - 9:30 pm"
                         android:textSize="14sp"
                         android:textColor="#666666"
                         android:layout_marginTop="4dp" />

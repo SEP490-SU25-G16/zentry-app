@@ -121,7 +121,7 @@
                         android:fontFamily="@font/circularstdmedium500"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="MATHEMATICS"
+                        android:text="Tên mon hoc"
                         android:textSize="16sp"
                         android:textStyle="bold"
                         android:textColor="#232B42" />
@@ -130,7 +130,7 @@
                         android:id="@+id/tvStudentHomeClass1Teacher"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Gayan Iddamalgoda"
+                        android:text="Lop - Room - Giang Vien"
                         android:textSize="14sp"
                         android:textColor="#666666"
                         android:layout_marginTop="4dp" />
@@ -140,7 +140,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:text="Attendance - 100%"
+                        android:text="Ti le attendance la bao nhieu 100%"
                         android:textColor="#4C4B4B"
                         android:textStyle="bold"
                         android:textSize="12sp" />
@@ -149,7 +149,7 @@
                         android:id="@+id/tvStudentHomeClass1Task"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Task completed"
+                        android:text="Task completed (tien do bai giang)"
                         android:textSize="12sp"
                         android:textColor="#4C4B4B"
                         android:textStyle="bold"

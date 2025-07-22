@@ -121,7 +121,7 @@
                         android:fontFamily="@font/circularstdmedium500"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="MATHEMATICS"
+                        android:text="Tên môn học"
                         android:textSize="16sp"
                         android:textStyle="bold"
                         android:textColor="#232B42" />
@@ -130,20 +130,10 @@
                         android:id="@+id/tvHomeCardMathematicsTeacher"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Gayan Iddamalgoda"
+                        android:text="Lớp - Phòng"
                         android:textSize="14sp"
                         android:textColor="#666666"
                         android:layout_marginTop="4dp" />
-
-                    <TextView
-                        android:id="@+id/tvHomeCardMathematicsAttendance"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="Attendance - 100%"
-                        android:textColor="#4C4B4B"
-                        android:textStyle="bold"
-                        android:textSize="12sp" />
 
                     <TextView
                         android:id="@+id/tvHomeCardMathematicsTask"
@@ -207,7 +197,7 @@
                         android:fontFamily="@font/circularstdmedium500"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="SCIENCE"
+                        android:text="Tên môn học"
                         android:textSize="16sp"
                         android:textStyle="bold"
                         android:textColor="#232B42" />
@@ -216,20 +206,10 @@
                         android:id="@+id/tvHomeCardScienceTeacher"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Tharidu Diwakara"
+                        android:text="Lớp"
                         android:textSize="14sp"
                         android:textColor="#666666"
                         android:layout_marginTop="4dp" />
-
-                    <TextView
-                        android:id="@+id/tvHomeCardScienceAttendance"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Attendance - 90%"
-                        android:textSize="12sp"
-                        android:textColor="#4C4B4B"
-                        android:textStyle="bold"
-                        android:layout_marginTop="8dp" />
 
                     <TextView
                         android:id="@+id/tvHomeCardScienceTask"
