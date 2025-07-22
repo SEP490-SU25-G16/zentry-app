@@ -9,4 +9,7 @@ import vn.edu.fpt.zentryapp.auth.models.TokenResponse;
 public interface AuthService {
     @POST("api/auth/sign-in")
     Call<TokenResponse> login(@Body LoginRequest request);
+
+    // additional send mail, verify code (User nhập OTP → API verify thành công → Trả về verificationToken),
+    // resetPassword
 }

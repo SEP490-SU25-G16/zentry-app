@@ -107,9 +107,12 @@ public class ForgotPasswordSelectMethodFragment extends Fragment {
                 // Show success message
                 Toast.makeText(requireContext(), success.getMessage(), Toast.LENGTH_LONG).show();
 
+                // Pass email to next screen via Bundle
+                Bundle args = new Bundle();
+                args.putString("email", success.getEmail());
                 // Navigate to verify code screen
                 // TODO: Pass email to next screen if needed
-                navController.navigate(R.id.action_selectMethod_to_verifyCode);
+                navController.navigate(R.id.action_selectMethod_to_verifyCode, args);
             }
         });
     }
