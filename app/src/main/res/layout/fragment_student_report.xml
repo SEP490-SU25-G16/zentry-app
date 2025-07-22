@@ -133,7 +133,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:text="Attendance - 100%"
+                        android:text="Attend"
                         android:textColor="#4C4B4B"
                         android:textStyle="bold"
                         android:textSize="12sp" />
@@ -218,7 +218,7 @@
                         android:id="@+id/tvStudentReportClass2Attendance"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Attendance - 90%"
+                        android:text="Absent"
                         android:textSize="12sp"
                         android:textColor="#4C4B4B"
                         android:textStyle="bold"

@@ -44,10 +44,7 @@ public class StudentReportFragment extends Fragment {
 
         // TODO: Xử lý click các card lớp học khác nếu có
 
-        // TODO: Xử lý click nút thông báo nếu cần
-        binding.btnStudentReportNotification.setOnClickListener(v -> {
-            // TODO: Mở màn hình hoặc dialog thông báo
-        });
+
     }
 
     @Override
