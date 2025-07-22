@@ -22,8 +22,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
-import vn.edu.fpt.zentryapp.R;
-import vn.edu.fpt.zentryapp.auth.AuthManager;
+import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentSettingUpdateFaceIdBinding;
 import vn.edu.fpt.zentryapp.student.data.service.FaceIdService;
 import vn.edu.fpt.zentryapp.student.ui.components.CameraView;
@@ -182,7 +181,7 @@ public class StudentSettingUpdateFaceIdFragment extends Fragment {
     
     private void updateFaceId(Bitmap faceBitmap) {
         // Get user ID from auth manager
-        String userId = AuthManager.getInstance(requireContext()).getUserId();
+        String userId = AuthManager.getInstance(requireContext()).getCurrentUserId();
         
         // Update face ID
         faceIdService.updateFaceId(faceBitmap, userId, new FaceIdService.FaceIdCallback() {

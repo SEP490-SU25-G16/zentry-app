@@ -44,7 +44,7 @@ public class LoginFragment extends Fragment {
         loginViewModel = new ViewModelProvider(this).get(LoginViewModel.class);
 
         // Initialize dependencies
-        AuthManager authManager = new AuthManager(requireContext());
+        AuthManager authManager = AuthManager.getInstance(requireContext());
         loginViewModel.init(
                 ApiClient.getClient(requireContext()).create(AuthService.class),
                 authManager

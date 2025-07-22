@@ -21,7 +21,7 @@ import android.view.ViewGroup;
 import android.widget.Toast;
 
 import vn.edu.fpt.zentryapp.R;
-import vn.edu.fpt.zentryapp.auth.AuthManager;
+import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentSettingVerifyFaceIdBinding;
 import vn.edu.fpt.zentryapp.student.data.service.FaceIdService;
 import vn.edu.fpt.zentryapp.student.ui.components.CameraView;
@@ -168,7 +168,7 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment {
     
     private void verifyFaceId(Bitmap faceBitmap) {
         // Get user ID from auth manager
-        String userId = AuthManager.getInstance(requireContext()).getUserId();
+        String userId = AuthManager.getInstance(requireContext()).getCurrentUserId();
         
         // Verify face ID
         faceIdService.verifyFaceId(faceBitmap, userId, new FaceIdService.FaceIdCallback() {

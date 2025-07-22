@@ -10,12 +10,23 @@ public class AuthManager {
     private static final String ACCESS_TOKEN = "access_token";
     private static final String USER_INFO = "user_info";
 
+    private static AuthManager instance;
     private final SharedPreferences sharedPreferences;
     private final Gson gson;
 
-    public AuthManager(Context context) {
-        this.sharedPreferences = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+    // Private constructor để ngăn tạo instance từ bên ngoài
+    private AuthManager(Context context) {
+        this.sharedPreferences = context.getApplicationContext()
+                .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
         this.gson = new Gson();
+    }
+
+    // Singleton getInstance method
+    public static synchronized AuthManager getInstance(Context context) {
+        if (instance == null) {
+            instance = new AuthManager(context);
+        }
+        return instance;
     }
 
     // Lưu token và user info (chỉ lưu, chưa dùng để auth)
@@ -44,4 +55,19 @@ public class AuthManager {
         sharedPreferences.edit().clear().apply();
     }
 
+    // Helper methods để lấy thông tin user
+    public String getCurrentUserId() {
+        UserInfo userInfo = getUserInfo();
+        return userInfo != null ? userInfo.getId() : null;
+    }
+
+    public String getCurrentUserEmail() {
+        UserInfo userInfo = getUserInfo();
+        return userInfo != null ? userInfo.getEmail() : null;
+    }
+
+    public String getCurrentUserRole() {
+        UserInfo userInfo = getUserInfo();
+        return userInfo != null ? userInfo.getRole() : null;
+    }
 }

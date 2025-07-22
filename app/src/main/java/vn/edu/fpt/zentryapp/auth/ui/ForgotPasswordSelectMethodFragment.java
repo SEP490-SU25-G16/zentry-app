@@ -44,7 +44,7 @@ public class ForgotPasswordSelectMethodFragment extends Fragment {
         viewModel = new ViewModelProvider(this).get(ForgotPasswordSelectMethodViewModel.class);
 
         // Initialize dependencies
-        AuthManager authManager = new AuthManager(requireContext());
+        AuthManager authManager = AuthManager.getInstance(requireContext());
         // Send mail api chỗ auth
         viewModel.init(
                 ApiClient.getClient(requireContext()).create(AuthService.class),

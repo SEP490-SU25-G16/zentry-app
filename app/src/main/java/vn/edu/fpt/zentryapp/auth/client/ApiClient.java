@@ -13,7 +13,7 @@ public class ApiClient {
 
     public static Retrofit getClient(Context context) {
         if (retrofit == null) {
-            AuthManager authManager = new AuthManager(context);
+            AuthManager authManager = AuthManager.getInstance(context);
 
             HttpLoggingInterceptor logging = new HttpLoggingInterceptor();
             logging.setLevel(HttpLoggingInterceptor.Level.BODY);

@@ -20,8 +20,8 @@ import okhttp3.RequestBody;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
-import vn.edu.fpt.zentryapp.auth.AuthManager;
-import vn.edu.fpt.zentryapp.auth.retrofit.RetrofitClient;
+import vn.edu.fpt.zentryapp.auth.client.ApiClient;
+import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.student.data.api.FaceIdApi;
 import vn.edu.fpt.zentryapp.student.data.model.response.FaceIdResponse;
 
@@ -48,7 +48,7 @@ public class FaceIdService {
         this.faceDetector = new FaceDetector(context);
         this.faceEmbedding = new FaceEmbedding(context);
         this.faceSpoofDetector = new FaceSpoofDetector(context);
-        this.faceIdApi = RetrofitClient.getClient(AuthManager.getInstance(context).getToken()).create(FaceIdApi.class);
+        this.faceIdApi = ApiClient.getClient(context).create(FaceIdApi.class);
         this.executor = Executors.newSingleThreadExecutor();
         this.mainHandler = new Handler(Looper.getMainLooper());
     }
