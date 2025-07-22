@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/nav_graph_tab_home_student">
+    android:id="@+id/nav_graph_tab_home_student"
+    app:startDestination="@id/studentHomeFragment">
+
+    <fragment
+        android:id="@+id/studentHomeFragment"
+        android:name="vn.edu.fpt.zentryapp.student.ui.home.StudentHomeFragment"
+        android:label="Student Home" />
 
 </navigation>

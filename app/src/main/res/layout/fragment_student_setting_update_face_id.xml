@@ -8,7 +8,7 @@
     android:fitsSystemWindows="true"
     android:background="#F5F9FF">
 
-    <!-- 1) Content chính, paddingTop để lùi xuống dưới toolbar overlay -->
+    <!-- Content chính, paddingTop để lùi xuống dưới toolbar overlay -->
     <LinearLayout
         android:id="@+id/faceIdContent"
         android:layout_width="match_parent"
@@ -21,8 +21,7 @@
         <!-- Avatar & Update Time (centered) -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
+            android:layout_height="wrap_content"
             android:gravity="center_horizontal"
             android:orientation="vertical">
 
@@ -31,73 +30,120 @@
                 android:id="@+id/ivFaceAvatar"
                 android:layout_width="140dp"
                 android:layout_height="140dp"
-                android:layout_marginTop="48dp"
+                android:layout_marginTop="16dp"
                 android:background="@drawable/bg_circle_white"
                 android:elevation="4dp"
                 android:scaleType="centerCrop"
                 android:src="@drawable/ic_notification" />
 
-            <!-- Last update -->
+            <!-- Last Update Time -->
             <TextView
                 android:id="@+id/tvLastUpdate"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:layout_marginBottom="16dp"
-                android:gravity="center"
-                android:fontFamily="@font/mulishbold"
+                android:layout_marginTop="8dp"
                 android:text="Last update: JAN 27, 2025   /   11:45"
                 android:textColor="#232B42"
                 android:textSize="14sp" />
-
-            <!-- Update Button -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnUpdateFace"
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginBottom="24dp"
-                android:text="Update"
-                android:fontFamily="@font/jostextrabold"
-                android:textAllCaps="false"
-                android:textColor="#FFFFFF"
-                android:textStyle="bold"
-                android:textSize="17sp"
-                android:elevation="6dp"
-                app:backgroundTint="#AEACF5"
-                app:cornerRadius="28dp"/>
         </LinearLayout>
+
+        <!-- Camera Container -->
+        <FrameLayout
+            android:id="@+id/flCameraContainer"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_circle_white">
+            
+            <!-- Camera view and overlay will be added here programmatically -->
+            
+        </FrameLayout>
+
+        <!-- Instructions -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="4dp"
+            app:cardBackgroundColor="#CECFFE">
+            
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+                
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Instructions"
+                    android:textStyle="bold"
+                    android:textSize="18sp"
+                    android:textColor="#232B42"/>
+                
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="1. Position your face in the center\n2. Ensure good lighting\n3. Remove glasses or face coverings\n4. Keep a neutral expression"
+                    android:textColor="#232B42"/>
+                
+            </LinearLayout>
+            
+        </androidx.cardview.widget.CardView>
+
+        <!-- Update Button -->
+        <Button
+            android:id="@+id/btnUpdateFace"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Update Face ID"
+            android:textAllCaps="false"
+            android:textSize="16sp"
+            android:padding="12dp"
+            android:background="@drawable/bg_button_primary"
+            android:textColor="#FFFFFF"/>
+            
+        <!-- Progress Bar -->
+        <ProgressBar
+            android:id="@+id/progressBarUpdateFaceId"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="16dp"
+            android:visibility="gone"/>
     </LinearLayout>
 
-    <!-- 2) Toolbar custom overlay -->
+    <!-- Toolbar overlay -->
     <LinearLayout
-        android:id="@+id/customToolbarFaceId"
+        android:id="@+id/faceIdToolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:background="@android:color/transparent"
+        android:background="#FFFFFF"
         android:elevation="4dp">
 
         <ImageView
             android:id="@+id/ivBack"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="12dp"
             android:src="@drawable/ic_arrow_back"
-            android:contentDescription="Back"
             app:tint="#232B42"/>
 
         <TextView
-            android:fontFamily="@font/jostsemibold"
-
             android:id="@+id/tvTitle"
+            android:fontFamily="@font/jostsemibold"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
-            android:text="Face ID"
-            android:textSize="20sp"
+            android:text="Update Face ID"
             android:textStyle="bold"
+            android:textSize="20sp"
             android:textColor="#232B42"/>
     </LinearLayout>
 </FrameLayout>

@@ -18,95 +18,102 @@
         android:paddingTop="?attr/actionBarSize"
         android:background="@android:color/transparent">
 
-        <!-- Centered Card Message -->
-        <LinearLayout
-            android:id="@+id/llStudentSettingRegisterFaceIdMessageContainer"
+        <!-- Camera Container -->
+        <FrameLayout
+            android:id="@+id/flStudentSettingRegisterFaceIdCameraContainer"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical">
-
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardStudentSettingRegisterFaceIdMessage"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_circle_white">
+            
+            <!-- Camera view and overlay will be added here programmatically -->
+            
+        </FrameLayout>
+        
+        <!-- Instructions -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="4dp"
+            app:cardBackgroundColor="#CECFFE">
+            
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardCornerRadius="24dp"
-                app:cardElevation="6dp"
-                android:layout_margin="16dp"
-                android:backgroundTint="#CECFFE">
-
-                <LinearLayout
-                    android:id="@+id/llStudentSettingRegisterFaceIdCardContent"
+                android:orientation="vertical"
+                android:padding="16dp">
+                
+                <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center_horizontal"
-                    android:padding="24dp">
-
-                    <TextView
-                        android:id="@+id/tvStudentSettingRegisterFaceIdMessage"
-                        android:fontFamily="@font/jostextrabold"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="center"
-                        android:text="Face ID have not registered.\nRegister now."
-                        android:textAlignment="center"
-                        android:textColor="#FFFFFF"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:layout_marginBottom="18dp"/>
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnStudentSettingRegisterFaceId"
-                        android:layout_width="wrap_content"
-                        android:layout_height="44dp"
-                        android:minWidth="120dp"
-                        android:fontFamily="@font/jostextrabold"
-                        android:text="Register"
-                        android:textAllCaps="false"
-                        android:textColor="#FFFFFF"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:elevation="4dp"
-                        app:backgroundTint="#AEACF5"
-                        app:cornerRadius="22dp"
-                        app:icon="@drawable/ic_help"
-                        app:iconTint="#FFFFFF"
-                        app:iconPadding="6dp"
-                        app:iconGravity="textStart"/>
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-        </LinearLayout>
+                    android:text="Instructions"
+                    android:textStyle="bold"
+                    android:textSize="18sp"
+                    android:textColor="#232B42"/>
+                
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="1. Position your face in the center\n2. Ensure good lighting\n3. Remove glasses or face coverings\n4. Keep a neutral expression"
+                    android:textColor="#232B42"/>
+                
+            </LinearLayout>
+            
+        </androidx.cardview.widget.CardView>
+        
+        <!-- Register Button -->
+        <Button
+            android:id="@+id/btnStudentSettingRegisterFaceId"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Register Face ID"
+            android:textAllCaps="false"
+            android:textSize="16sp"
+            android:padding="12dp"
+            android:background="@drawable/bg_button_primary"
+            android:textColor="#FFFFFF"/>
+        
+        <!-- Progress Bar -->
+        <ProgressBar
+            android:id="@+id/progressBarRegisterFaceId"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="16dp"
+            android:visibility="gone"/>
+        
     </LinearLayout>
-
-    <!-- Toolbar custom overlay -->
+    
+    <!-- Toolbar overlay -->
     <LinearLayout
         android:id="@+id/llStudentSettingRegisterFaceIdToolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:background="@android:color/transparent"
+        android:background="#FFFFFF"
         android:elevation="4dp">
-
+        
         <ImageView
             android:id="@+id/ivStudentSettingRegisterFaceIdBack"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="12dp"
             android:src="@drawable/ic_arrow_back"
-            android:contentDescription="Back"
             app:tint="#232B42"/>
-
+        
         <TextView
             android:id="@+id/tvStudentSettingRegisterFaceIdTitle"
             android:fontFamily="@font/jostsemibold"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
-            android:text="Face ID"
+            android:text="Register Face ID"
             android:textStyle="bold"
             android:textSize="20sp"
             android:textColor="#232B42"/>
