@@ -1,68 +1,79 @@
 package vn.edu.fpt.zentryapp.lecturer.ui.schedule;
 
 import android.os.Bundle;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.navigation.NavController;
+import androidx.navigation.fragment.NavHostFragment;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
 
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Toast;
 
 import com.google.android.material.tabs.TabLayoutMediator;
 
-import vn.edu.fpt.zentryapp.R;
+import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentLecturerScheduleClassDetailBinding;
+import vn.edu.fpt.zentryapp.lecturer.ui.schedule.tabs.AttendanceHistoryFragment;
+import vn.edu.fpt.zentryapp.lecturer.ui.schedule.tabs.FinalAttendanceFragment;
 
 public class LecturerScheduleClassDetailFragment extends Fragment {
 
     private FragmentLecturerScheduleClassDetailBinding binding;
-    private long classId;
+    private LecturerScheduleClassDetailViewModel viewModel;
+    private NavController navController;
+    private String sessionId;
+
+    private AttendanceHistoryFragment historyFragment;
+    private FinalAttendanceFragment attendanceFragment;
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        // Inflate layout và binding view
         binding = FragmentLecturerScheduleClassDetailBinding.inflate(inflater, container, false);
         return binding.getRoot();
     }
 
     @Override
-    public void onViewCreated(@NonNull View view,
-                              @Nullable Bundle savedInstanceState) {
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Lấy classId từ argument nếu có
-        if (getArguments() != null) {
-            classId = getArguments().getLong("classId", 0L);
-        }
+        navController = NavHostFragment.findNavController(this);
 
-        // Xử lý nút back toolbar, gọi back của Activity
-        binding.ivScheduleClassDetailBack.setOnClickListener(v -> requireActivity().onBackPressed());
+        // Get sessionId from arguments
+        sessionId = getArguments() != null ? getArguments().getString("sessionId", "") : "SESSION_001";
 
-        // Hiển thị thông tin header lớp học (ví dụ tạm thời)
-        binding.tvScheduleClassDetailGrade.setText("Grade " + classId);
-        binding.tvScheduleClassDetailSubject.setText("Mathematics");
+        // Initialize ViewModel
+        viewModel = new ViewModelProvider(this).get(LecturerScheduleClassDetailViewModel.class);
+        AuthManager authManager = AuthManager.getInstance(requireContext());
+        viewModel.init(authManager, sessionId);
 
-        // Thiết lập ViewPager2 với 2 tab: "Info" và "Students"
-        String[] tabTitles = new String[]{"Info", "Students"};
+        setupViewPager();
+        setupClickListeners();
+        observeViewModel();
+    }
+
+    private void setupViewPager() {
+        String[] tabTitles = {"History", "Final Attendance"};
+
         binding.viewPagerScheduleClassDetail.setAdapter(new FragmentStateAdapter(this) {
             @NonNull
             @Override
             public Fragment createFragment(int position) {
-                // TODO: Trả về fragment tương ứng, truyền classId nếu cần
                 switch (position) {
                     case 0:
-                        // Ví dụ: return ClassInfoFragment.newInstance(classId);
-                        return new Fragment(); // Thay bằng fragment thực tế
+                        historyFragment = AttendanceHistoryFragment.newInstance(sessionId);
+                        return historyFragment;
                     case 1:
-                        // Ví dụ: return ClassStudentsFragment.newInstance(classId);
-                        return new Fragment(); // Thay bằng fragment thực tế
+                        attendanceFragment = FinalAttendanceFragment.newInstance(sessionId);
+                        return attendanceFragment;
                     default:
                         return new Fragment();
                 }
@@ -74,21 +85,43 @@ public class LecturerScheduleClassDetailFragment extends Fragment {
             }
         });
 
-        // Kết nối TabLayout và ViewPager2
         new TabLayoutMediator(binding.tabLayoutScheduleClassDetail, binding.viewPagerScheduleClassDetail,
                 (tab, pos) -> tab.setText(tabTitles[pos])
         ).attach();
+    }
 
-        // Xử lý nút Add để thêm mới (ví dụ mở dialog hoặc màn hình mới)
+    private void setupClickListeners() {
+        binding.ivScheduleClassDetailBack.setOnClickListener(v -> navController.navigateUp());
+
         binding.btnScheduleClassDetailAdd.setOnClickListener(v -> {
-            // TODO: Thực hiện hành động thêm mới phù hợp
-            Toast.makeText(requireContext(), "Add button clicked", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "Add new round", Toast.LENGTH_SHORT).show();
         });
 
-        // Xử lý nút thông báo (chưa implement)
         binding.btnScheduleClassDetailNotification.setOnClickListener(v -> {
-            // TODO: Mở màn hình hoặc dialog thông báo
-            Toast.makeText(requireContext(), "Notification button clicked", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "Notifications", Toast.LENGTH_SHORT).show();
+        });
+    }
+
+    private void observeViewModel() {
+        viewModel.sessionInfo().observe(getViewLifecycleOwner(), sessionInfo -> {
+            if (sessionInfo != null) {
+                binding.tvScheduleClassDetailGrade.setText(sessionInfo.getClassDisplay());
+                binding.tvScheduleClassDetailSubject.setText(sessionInfo.getCourseDisplay());
+                binding.tvScheduleClassDetailStudentCount.setText(sessionInfo.getStudentCountDisplay());
+                binding.tvScheduleClassDetailDuration.setText(sessionInfo.getDurationDisplay());
+            }
+        });
+
+        viewModel.attendanceRounds().observe(getViewLifecycleOwner(), rounds -> {
+            if (rounds != null && historyFragment != null) {
+                historyFragment.updateRoundHistory(rounds);
+            }
+        });
+
+        viewModel.finalAttendance().observe(getViewLifecycleOwner(), finalAttendance -> {
+            if (finalAttendance != null && attendanceFragment != null) {
+                attendanceFragment.updateFinalAttendance(finalAttendance);
+            }
         });
     }
 

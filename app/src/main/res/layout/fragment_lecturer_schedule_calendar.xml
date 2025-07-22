@@ -8,7 +8,7 @@
     android:fitsSystemWindows="true"
     android:background="#F5F9FF">
 
-    <!-- ScrollView chứa toàn bộ content, paddingTop để lùi xuống dưới toolbar -->
+    <!-- ScrollView chứa toàn bộ content -->
     <ScrollView
         android:id="@+id/svScheduleCalendarContent"
         android:layout_width="match_parent"
@@ -41,11 +41,9 @@
                     android:weekSeparatorLineColor="@android:color/transparent"
                     android:focusedMonthDateColor="#FFFFFF"
                     android:unfocusedMonthDateColor="#E0E0E0"
-                    android:selectedWeekBackgroundColor="#CAE0FF"
-                    android:weekDayTextAppearance="@style/CalendarWeekDay"
-                    android:dateTextAppearance="@style/CalendarDate"
-                   />
+                    android:selectedWeekBackgroundColor="#CAE0FF" />
             </com.google.android.material.card.MaterialCardView>
+
 
             <!-- Timeline Section -->
             <LinearLayout
@@ -55,110 +53,62 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <!-- Item 1 -->
+                <!-- Section Title -->
+                <TextView
+                    android:id="@+id/tvTimelineTitle"
+                    android:fontFamily="@font/jostsemibold"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Schedule"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="#232B42"
+                    android:layout_marginBottom="16dp" />
+
+                <!-- Loading Progress -->
+                <ProgressBar
+                    android:id="@+id/progressLoading"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginVertical="32dp"
+                    android:visibility="gone" />
+
+                <!-- No Sessions Message -->
                 <LinearLayout
-                    android:id="@+id/llScheduleCalendarItem1"
+                    android:id="@+id/llNoSessions"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <LinearLayout
-                        android:id="@+id/llScheduleCalendarItem1Indicator"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:gravity="center_horizontal">
-
-                        <View
-                            android:id="@+id/viewScheduleCalendarItem1Circle"
-                            android:layout_width="8dp"
-                            android:layout_height="8dp"
-                            android:background="@drawable/circle_pink" />
-                        <View
-                            android:id="@+id/viewScheduleCalendarItem1Line"
-                            android:layout_width="2dp"
-                            android:layout_height="40dp"
-                            android:background="#FF4081" />
-                    </LinearLayout>
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="32dp"
+                    android:visibility="gone">
 
                     <TextView
-                        android:id="@+id/tvScheduleCalendarItem1Time"
+                        android:fontFamily="@font/jostsemibold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="No sessions scheduled"
+                        android:textSize="16sp"
+                        android:textColor="#666666" />
+
+                    <TextView
                         android:fontFamily="@font/poppinslight"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp"
-                        android:text="08:00"
+                        android:text="Enjoy your free day!"
                         android:textSize="14sp"
-                        android:textColor="#877878" />
-
-                    <TextView
-                        android:id="@+id/tvScheduleCalendarItem1Description"
-                        android:fontFamily="@font/poppinslight"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="24dp"
-                        android:text="Math Class: Grade 07"
-                        android:textSize="14sp"
-                        android:textColor="#877878" />
+                        android:textColor="#999999"
+                        android:layout_marginTop="8dp" />
                 </LinearLayout>
 
-                <!-- Item 2 -->
-                <LinearLayout
-                    android:id="@+id/llScheduleCalendarItem2"
+                <!-- Sessions RecyclerView -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvSessions"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <LinearLayout
-                        android:id="@+id/llScheduleCalendarItem2Indicator"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:gravity="center_horizontal">
-
-                        <View
-                            android:id="@+id/viewScheduleCalendarItem2Circle"
-                            android:layout_width="8dp"
-                            android:layout_height="8dp"
-                            android:background="@drawable/circle_pink" />
-                        <View
-                            android:id="@+id/viewScheduleCalendarItem2Line"
-                            android:layout_width="2dp"
-                            android:layout_height="40dp"
-                            android:background="#FF4081" />
-                    </LinearLayout>
-
-                    <TextView
-                        android:id="@+id/tvScheduleCalendarItem2Time"
-                        android:fontFamily="@font/poppinslight"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp"
-                        android:text="09:30"
-                        android:textSize="14sp"
-                        android:textColor="#877878" />
-
-                    <TextView
-                        android:id="@+id/tvScheduleCalendarItem2Description"
-                        android:fontFamily="@font/poppinslight"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="24dp"
-                        android:text="Meeting at office"
-                        android:textSize="14sp"
-                        android:textColor="#877878" />
-                </LinearLayout>
-
-                <!-- Divider end of timeline -->
-                <View
-                    android:id="@+id/viewScheduleCalendarDivider"
-                    android:layout_width="2dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginStart="4dp"
-                    android:layout_marginTop="16dp"
-                    android:background="#E0E0E0" />
+                    android:nestedScrollingEnabled="false"
+                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
             </LinearLayout>
         </LinearLayout>

@@ -1,71 +1,118 @@
 package vn.edu.fpt.zentryapp.lecturer.ui.schedule;
 
-import android.os.Bundle;
 
+import android.os.Bundle;
+import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.navigation.NavController;
 import androidx.navigation.fragment.NavHostFragment;
-
+import androidx.recyclerview.widget.LinearLayoutManager;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
-import vn.edu.fpt.zentryapp.R;
+import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentLecturerScheduleCalendarBinding;
+import vn.edu.fpt.zentryapp.lecturer.adapter.CalendarSessionAdapter;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.CalendarSession;
 
-public class LecturerScheduleCalendarFragment extends Fragment {
+public class LecturerScheduleCalendarFragment extends Fragment implements CalendarSessionAdapter.OnSessionClickListener {
 
     private FragmentLecturerScheduleCalendarBinding binding;
+    private LecturerScheduleCalendarViewModel viewModel;
+    private CalendarSessionAdapter sessionAdapter;
+    private NavController navController;
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        // Inflate layout và binding view
         binding = FragmentLecturerScheduleCalendarBinding.inflate(inflater, container, false);
         return binding.getRoot();
     }
 
     @Override
-    public void onViewCreated(@NonNull View view,
-                              @Nullable Bundle savedInstanceState) {
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        NavController navController = NavHostFragment.findNavController(this);
+        navController = NavHostFragment.findNavController(this);
 
-        // Xử lý nút back toolbar, gọi back của Activity
-        binding.ivScheduleCalendarBack.setOnClickListener(v -> requireActivity().onBackPressed());
+        // Initialize ViewModel
+        viewModel = new ViewModelProvider(this).get(LecturerScheduleCalendarViewModel.class);
+        AuthManager authManager = AuthManager.getInstance(requireContext());
+        viewModel.init(authManager);
 
-        // Lắng nghe sự kiện thay đổi ngày trên CalendarView
-        binding.calendarView.setOnDateChangeListener((calendarView, year, month, dayOfMonth) -> {
-            // TODO: Xử lý khi người dùng chọn ngày mới
-            // Ví dụ: gọi API hoặc truy vấn dữ liệu nội bộ để lấy lịch sự kiện ngày được chọn
-            // Sau đó cập nhật danh sách timeline sự kiện dưới lịch
-
-            // Ví dụ giả lập cập nhật timeline (cần thay bằng dữ liệu thực tế)
-            updateTimelineForDate(year, month, dayOfMonth);
-        });
-
-        // TODO: Khởi tạo danh sách timeline sự kiện cho ngày hiện tại (hoặc ngày mặc định)
-        // Có thể lấy ngày hiện tại từ Calendar hoặc hệ thống
-        // updateTimelineForDate(currentYear, currentMonth, currentDay);
+        setupRecyclerView();
+        setupCalendarListener();
+        setupClickListeners();
+        observeViewModel();
     }
 
-    /**
-     * Hàm cập nhật danh sách timeline sự kiện theo ngày được chọn
-     * @param year năm
-     * @param month tháng (0-based, 0 = January)
-     * @param dayOfMonth ngày trong tháng
-     */
-    private void updateTimelineForDate(int year, int month, int dayOfMonth) {
-        // TODO: Xóa hoặc cập nhật UI timeline sự kiện theo dữ liệu mới
+    private void setupRecyclerView() {
+        sessionAdapter = new CalendarSessionAdapter();
+        sessionAdapter.setOnSessionClickListener(this);
 
-        // Ví dụ: binding.tvScheduleCalendarItem1Time.setText("08:00");
-        // binding.tvScheduleCalendarItem1Description.setText("Math Class: Grade 07");
-        // ... cập nhật các item khác hoặc hiển thị danh sách động nếu cần
+        binding.rvSessions.setLayoutManager(new LinearLayoutManager(requireContext()));
+        binding.rvSessions.setAdapter(sessionAdapter);
+    }
+
+    private void setupCalendarListener() {
+        // Listen for date selection changes
+        binding.calendarView.setOnDateChangeListener((calendarView, year, month, dayOfMonth) -> {
+            // Load sessions for selected date
+            viewModel.loadSessionsForDate(year, month, dayOfMonth);
+        });
+    }
+
+    private void setupClickListeners() {
+        // Back button
+        binding.ivScheduleCalendarBack.setOnClickListener(v -> navController.navigateUp());
+    }
+
+    private void observeViewModel() {
+        // Observe loading state
+        viewModel.isLoading().observe(getViewLifecycleOwner(), isLoading -> {
+            binding.progressLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+        });
+
+        // Observe sessions
+        viewModel.sessions().observe(getViewLifecycleOwner(), sessions -> {
+            if (sessions != null) {
+                sessionAdapter.setSessions(sessions);
+            }
+        });
+
+
+        // Observe has sessions for date
+        viewModel.hasSessionsForDate().observe(getViewLifecycleOwner(), hasSessions -> {
+            if (hasSessions != null) {
+                binding.rvSessions.setVisibility(hasSessions ? View.VISIBLE : View.GONE);
+                binding.llNoSessions.setVisibility(hasSessions ? View.GONE : View.VISIBLE);
+            }
+        });
+
+        // Observe errors
+        viewModel.errorMessage().observe(getViewLifecycleOwner(), error -> {
+            if (error != null) {
+                Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    @Override
+    public void onSessionClick(CalendarSession session) {
+        Toast.makeText(requireContext(),
+                "Session: " + session.getCourseName() + " at " + session.getStartTimeDisplay(),
+                Toast.LENGTH_SHORT).show();
+
+        // TODO: Navigate to session detail if needed
+        // Bundle args = new Bundle();
+        // args.putString("sessionId", session.getSessionId());
+        // navController.navigate(R.id.action_calendar_to_sessionDetail, args);
     }
 
     @Override

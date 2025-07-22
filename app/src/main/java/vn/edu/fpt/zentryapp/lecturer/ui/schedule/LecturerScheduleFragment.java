@@ -1,73 +1,166 @@
 package vn.edu.fpt.zentryapp.lecturer.ui.schedule;
 
 import android.os.Bundle;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.navigation.NavController;
 import androidx.navigation.fragment.NavHostFragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
 
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
 import vn.edu.fpt.zentryapp.R;
+import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentLecturerScheduleBinding;
+import vn.edu.fpt.zentryapp.lecturer.adapter.ScheduleSessionAdapter;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.ScheduleSession;
 
-public class LecturerScheduleFragment extends Fragment {
+public class LecturerScheduleFragment extends Fragment implements ScheduleSessionAdapter.OnSessionActionListener {
 
     private FragmentLecturerScheduleBinding binding;
+    private LecturerScheduleViewModel viewModel;
+    private ScheduleSessionAdapter sessionAdapter;
+    private NavController navController;
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        // Inflate layout và binding view
         binding = FragmentLecturerScheduleBinding.inflate(inflater, container, false);
         return binding.getRoot();
     }
 
     @Override
-    public void onViewCreated(@NonNull View view,
-                              @Nullable Bundle savedInstanceState) {
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        NavController navController = NavHostFragment.findNavController(this);
 
-        // Xử lý click nút Calendar để điều hướng sang màn hình lịch
+        navController = NavHostFragment.findNavController(this);
+
+        // Initialize ViewModel
+        viewModel = new ViewModelProvider(this).get(LecturerScheduleViewModel.class);
+        AuthManager authManager = AuthManager.getInstance(requireContext());
+        viewModel.init(authManager);
+
+        setupRecyclerView();
+        setupClickListeners();
+        observeViewModel();
+    }
+
+    private void setupRecyclerView() {
+        sessionAdapter = new ScheduleSessionAdapter();
+        sessionAdapter.setOnSessionActionListener(this);
+
+        binding.rvSessions.setLayoutManager(new LinearLayoutManager(requireContext()));
+        binding.rvSessions.setAdapter(sessionAdapter);
+    }
+
+    private void setupClickListeners() {
+        // Calendar navigation
         binding.tvScheduleCalendar.setOnClickListener(v ->
                 navController.navigate(R.id.action_schedule_to_calendar)
         );
 
-        // Xử lý click card lớp học 1 để điều hướng sang chi tiết lớp học với classId = 1
-        binding.cardScheduleClass1.setOnClickListener(v -> {
-            Bundle args = new Bundle();
-            args.putLong("classId", 1L);
-            navController.navigate(R.id.action_schedule_to_classDetail, args);
-        });
-
-        // Xử lý click card lớp học 2 để điều hướng sang chi tiết lớp học với classId = 2
-        binding.cardScheduleClass2.setOnClickListener(v -> {
-            Bundle args = new Bundle();
-            args.putLong("classId", 2L);
-            navController.navigate(R.id.action_schedule_to_classDetail, args);
-        });
-
-        // TODO: Xử lý nút Start Instant Class (hiện tại chưa implement)
-        binding.btnScheduleStartClass.setOnClickListener(v -> {
-            // TODO: Thực hiện bắt đầu lớp học ngay lập tức
-        });
-
-        // TODO: Xử lý nút See All (hiện tại chưa implement)
+        // See all classes
         binding.tvScheduleSeeAll.setOnClickListener(v -> {
-            // TODO: Hiển thị danh sách đầy đủ các lớp học
+            Toast.makeText(requireContext(), "See all classes feature", Toast.LENGTH_SHORT).show();
+            // TODO: Navigate to full schedule view
         });
 
-        // TODO: Xử lý nút thông báo nếu cần
+        // Notification button
         binding.btnScheduleNotification.setOnClickListener(v -> {
-            // TODO: Mở màn hình hoặc dialog thông báo
+            Toast.makeText(requireContext(), "Notifications", Toast.LENGTH_SHORT).show();
+            // TODO: Navigate to notifications
         });
+    }
+
+    private void observeViewModel() {
+        // Observe loading state
+        viewModel.isLoading().observe(getViewLifecycleOwner(), isLoading -> {
+            binding.progressLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+        });
+
+        // Observe sessions
+        viewModel.todaySessions().observe(getViewLifecycleOwner(), sessions -> {
+            if (sessions != null) {
+                sessionAdapter.setSessions(sessions);
+            }
+        });
+
+        // Observe greeting
+        viewModel.greeting().observe(getViewLifecycleOwner(), greeting -> {
+            if (greeting != null) {
+                binding.tvScheduleGreeting.setText(greeting);
+            }
+        });
+
+        // Observe current date
+        viewModel.currentDate().observe(getViewLifecycleOwner(), date -> {
+            if (date != null) {
+                binding.tvCurrentDate.setText("Today, " + date);
+            }
+        });
+
+        // Observe user profile
+        viewModel.userProfile().observe(getViewLifecycleOwner(), profile -> {
+            if (profile != null) {
+                // Update avatar
+                binding.ivScheduleAvatar.setImageResource(R.drawable.ic_launcher_foreground);
+            }
+        });
+
+        // Observe errors
+        viewModel.errorMessage().observe(getViewLifecycleOwner(), error -> {
+            if (error != null) {
+                Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    @Override
+    public void onSessionClick(ScheduleSession session) {
+        if (session.isCanViewDetail()) {
+            Toast.makeText(requireContext(),
+                    "Opening session detail: " + session.getCourseName(), Toast.LENGTH_SHORT).show();
+
+            // Navigate to session detail
+            Bundle args = new Bundle();
+            args.putString("sessionId", session.getSessionId());
+            args.putString("courseCode", session.getCourseCode());
+            args.putString("courseName", session.getCourseName());
+            args.putString("className", session.getClassName());
+
+            // Navigate to existing session detail screen
+            navController.navigate(R.id.action_schedule_to_classDetail, args);
+        } else {
+            Toast.makeText(requireContext(),
+                    "Session detail not available yet", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    public void onStartInstantClick(ScheduleSession session) {
+        if (session.isCanStartInstant()) {
+            // Handle start instant class
+            viewModel.startInstantClass(session);
+
+            Toast.makeText(requireContext(),
+                    "Starting instant class: " + session.getCourseName(), Toast.LENGTH_SHORT).show();
+
+            // TODO: Navigate to teaching interface or attendance screen
+            // Bundle args = new Bundle();
+            // args.putString("sessionId", session.getSessionId());
+            // navController.navigate(R.id.action_schedule_to_instantClass, args);
+        } else {
+            Toast.makeText(requireContext(),
+                    "Cannot start this session at the moment", Toast.LENGTH_SHORT).show();
+        }
     }
 
     @Override
