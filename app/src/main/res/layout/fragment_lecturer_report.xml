@@ -120,7 +120,7 @@
                         android:fontFamily="@font/circularstdmedium500"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="MATHEMATICS"
+                        android:text="MATHEMATICS (Tên môn)"
                         android:textSize="16sp"
                         android:textStyle="bold"
                         android:textColor="#232B42" />
@@ -129,7 +129,7 @@
                         android:id="@+id/tvHomeCardMathematicsTeacher"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Gayan Iddamalgoda"
+                        android:text="SE1753 (lớp) - DE-222"
                         android:textSize="14sp"
                         android:textColor="#666666"
                         android:layout_marginTop="4dp" />
