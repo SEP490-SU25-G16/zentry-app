@@ -13,6 +13,7 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
+        <!-- Header -->
         <LinearLayout
             android:id="@+id/llStudentScheduleHeader"
             android:layout_width="match_parent"
@@ -42,7 +43,7 @@
                     android:fontFamily="@font/jostsemibold"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Hi, Harsha"
+                    android:text="Hi, Student"
                     android:textSize="20sp"
                     android:textStyle="bold"
                     android:textColor="#232B42" />
@@ -53,7 +54,7 @@
                     android:textStyle="bold"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Are you ready to teach Today? Let's begin."
+                    android:text="Ready for today's classes?"
                     android:textSize="14sp"
                     android:textColor="#666666"
                     android:layout_marginTop="4dp" />
@@ -67,6 +68,15 @@
                 android:layout_gravity="center"
                 android:src="@drawable/ic_notification" />
         </LinearLayout>
+
+        <!-- Loading Progress -->
+        <ProgressBar
+            android:id="@+id/progressLoading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginVertical="16dp"
+            android:visibility="gone" />
 
         <!-- Section Title with Calendar -->
         <LinearLayout
@@ -96,122 +106,46 @@
                 android:text="CALENDAR"
                 android:textSize="14sp"
                 android:textStyle="bold"
-                android:textColor="#0961F5" />
+                android:textColor="#0961F5"
+                android:foreground="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:padding="8dp" />
         </LinearLayout>
 
-        <!-- Class Card 1 -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardStudentScheduleClass1"
+        <!-- Schedules RecyclerView -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvSchedules"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp"
-            app:cardBackgroundColor="@color/card_bg_selector">
+            android:nestedScrollingEnabled="false" />
 
-            <LinearLayout
-                android:id="@+id/llStudentScheduleClass1"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:padding="16dp"
-                android:gravity="center_vertical">
-
-                <LinearLayout
-                    android:id="@+id/llStudentScheduleClass1Texts"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/tvStudentScheduleClassName1"
-                        android:fontFamily="@font/mulishextrabold"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Mathematics Grade - 07"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:textColor="#232B42" />
-
-                    <TextView
-                        android:id="@+id/tvStudentScheduleClassTime1"
-                        android:fontFamily="@font/mulishbold"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Saturday 7:30 - 9:30 pm"
-                        android:textSize="14sp"
-                        android:textColor="#666666"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
-
-                <ImageView
-                    android:id="@+id/ivStudentScheduleChevron1"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:src="@drawable/ic_arrow_right_detail"
-                    app:tint="#0961F5" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- Class Card 2 -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardStudentScheduleClass2"
+        <!-- Empty State -->
+        <LinearLayout
+            android:id="@+id/layoutEmptyState"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:clickable="true"
-            android:focusable="true"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp"
-            app:cardBackgroundColor="@color/card_bg_selector">
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="32dp"
+            android:visibility="gone">
 
-            <LinearLayout
-                android:id="@+id/llStudentScheduleClass2"
-                android:layout_width="match_parent"
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:padding="16dp"
-                android:gravity="center_vertical">
+                android:text="No classes scheduled"
+                android:textSize="16sp"
+                android:textColor="#666666" />
 
-                <LinearLayout
-                    android:id="@+id/llStudentScheduleClass2Texts"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Your class schedule will appear here"
+                android:textSize="14sp"
+                android:textColor="#999999"
+                android:layout_marginTop="8dp" />
 
-                    <TextView
-                        android:id="@+id/tvStudentScheduleClassName2"
-                        android:fontFamily="@font/mulishextrabold"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Mathematics Grade - 08"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:textColor="#232B42" />
-
-                    <TextView
-                        android:id="@+id/tvStudentScheduleClassTime2"
-                        android:fontFamily="@font/mulishbold"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Saturday 10:00 - 12:00 pm"
-                        android:textSize="14sp"
-                        android:textColor="#666666"
-                        android:layout_marginTop="4dp" />
-                </LinearLayout>
-
-                <ImageView
-                    android:id="@+id/ivStudentScheduleChevron2"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:src="@drawable/ic_arrow_right_detail"
-                    app:tint="#0961F5" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
 
         <!-- See All -->
         <TextView
@@ -223,6 +157,11 @@
             android:textColor="#0961F5"
             android:textSize="12sp"
             android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="16dp"/>
+            android:layout_marginTop="16dp"
+            android:padding="8dp"
+            android:foreground="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true" />
+
     </LinearLayout>
 </ScrollView>

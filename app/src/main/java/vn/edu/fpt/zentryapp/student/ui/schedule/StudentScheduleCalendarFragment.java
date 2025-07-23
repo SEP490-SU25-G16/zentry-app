@@ -1,28 +1,37 @@
 package vn.edu.fpt.zentryapp.student.ui.schedule;
 
 import android.os.Bundle;
+import android.util.Log;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.LinearLayoutManager;
 
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
 import vn.edu.fpt.zentryapp.R;
+import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentScheduleCalendarBinding;
+import vn.edu.fpt.zentryapp.student.adapter.CalendarEventAdapter;
+import vn.edu.fpt.zentryapp.student.data.model.response.CalendarEvent;
 
-public class StudentScheduleCalendarFragment extends Fragment {
+public class StudentScheduleCalendarFragment extends Fragment implements CalendarEventAdapter.OnEventClickListener {
 
     private FragmentStudentScheduleCalendarBinding binding;
+    private StudentScheduleCalendarViewModel viewModel;
+    private CalendarEventAdapter eventAdapter;
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        // Inflate layout và binding view
         binding = FragmentStudentScheduleCalendarBinding.inflate(inflater, container, false);
         return binding.getRoot();
     }
@@ -32,36 +41,83 @@ public class StudentScheduleCalendarFragment extends Fragment {
                               @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Xử lý nút back toolbar, gọi back của Activity
-        binding.ivStudentScheduleCalendarBack.setOnClickListener(v -> requireActivity().onBackPressed());
+        // Initialize ViewModel
+        viewModel = new ViewModelProvider(this).get(StudentScheduleCalendarViewModel.class);
+        AuthManager authManager = AuthManager.getInstance(requireContext());
+        viewModel.init(authManager);
 
-        // Lắng nghe sự kiện thay đổi ngày trên CalendarView
-        binding.calendarView.setOnDateChangeListener((calendarView, year, month, dayOfMonth) -> {
-            // TODO: Xử lý khi người dùng chọn ngày mới
-            // Ví dụ: gọi API hoặc truy vấn dữ liệu nội bộ để lấy lịch sự kiện ngày được chọn
-            // Sau đó cập nhật danh sách timeline sự kiện dưới lịch
-
-            // Ví dụ giả lập cập nhật timeline (cần thay bằng dữ liệu thực tế)
-            updateTimelineForDate(year, month, dayOfMonth);
-        });
-
-        // TODO: Khởi tạo danh sách timeline sự kiện cho ngày hiện tại (hoặc ngày mặc định)
-        // Có thể lấy ngày hiện tại từ Calendar hoặc hệ thống
-        // updateTimelineForDate(currentYear, currentMonth, currentDay);
+        setupRecyclerView();
+        setupCalendar();
+        setupToolbar();
+        observeViewModel();
     }
 
-    /**
-     * Hàm cập nhật danh sách timeline sự kiện theo ngày được chọn
-     * @param year năm
-     * @param month tháng (0-based, 0 = January)
-     * @param dayOfMonth ngày trong tháng
-     */
-    private void updateTimelineForDate(int year, int month, int dayOfMonth) {
-        // TODO: Xóa hoặc cập nhật UI timeline sự kiện theo dữ liệu mới
+    private void setupRecyclerView() {
+        eventAdapter = new CalendarEventAdapter();
+        eventAdapter.setOnEventClickListener(this);
 
-        // Ví dụ: binding.tvStudentScheduleCalendarItem1Time.setText("08:00");
-        // binding.tvStudentScheduleCalendarItem1Description.setText("Math Class: Grade 07");
-        // ... cập nhật các item khác hoặc hiển thị danh sách động nếu cần
+        binding.rvEvents.setLayoutManager(new LinearLayoutManager(requireContext()));
+        binding.rvEvents.setAdapter(eventAdapter);
+    }
+
+    private void setupCalendar() {
+        binding.calendarView.setOnDateChangeListener((calendarView, year, month, dayOfMonth) -> {
+            viewModel.loadEventsForDate(year, month, dayOfMonth);
+        });
+    }
+
+    private void setupToolbar() {
+        binding.ivStudentScheduleCalendarBack.setOnClickListener(v ->
+                requireActivity().onBackPressed());
+    }
+
+    private void observeViewModel() {
+        viewModel.isLoading().observe(getViewLifecycleOwner(), isLoading -> {
+            binding.progressLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+        });
+
+        viewModel.events().observe(getViewLifecycleOwner(), events -> {
+            if (events != null) {
+                eventAdapter.setEvents(events);
+
+                boolean isEmpty = events.isEmpty();
+                binding.rvEvents.setVisibility(isEmpty ? View.GONE : View.VISIBLE);
+                binding.layoutEmptyState.setVisibility(isEmpty ? View.VISIBLE : View.GONE);
+            }
+        });
+
+        viewModel.successMessage().observe(getViewLifecycleOwner(), message -> {
+            if (message != null) {
+                Log.d("CalendarFragment", message);
+            }
+        });
+
+        viewModel.errorMessage().observe(getViewLifecycleOwner(), error -> {
+            if (error != null) {
+                Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
+
+                if (error.contains("network") || error.contains("connection")) {
+                    showRetryDialog();
+                }
+            }
+        });
+    }
+
+    private void showRetryDialog() {
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Connection Error")
+                .setMessage("Unable to load events. Would you like to retry?")
+                .setPositiveButton("Retry", (dialog, which) -> {
+                    viewModel.loadEventsForToday();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    @Override
+    public void onEventClick(CalendarEvent event) {
+        Toast.makeText(requireContext(), "Clicked: " + event.getTitle(), Toast.LENGTH_SHORT).show();
+        viewModel.onEventClicked(event);
     }
 
     @Override

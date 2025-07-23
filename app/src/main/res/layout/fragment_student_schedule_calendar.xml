@@ -8,7 +8,6 @@
     android:fitsSystemWindows="true"
     android:background="#F5F9FF">
 
-    <!-- ScrollView chứa toàn bộ content, đẩy xuống dưới toolbar overlay -->
     <ScrollView
         android:id="@+id/svStudentScheduleCalendarContent"
         android:layout_width="match_parent"
@@ -43,9 +42,17 @@
                     android:unfocusedMonthDateColor="#E0E0E0"
                     android:selectedWeekBackgroundColor="#CAE0FF"
                     android:weekDayTextAppearance="@style/CalendarWeekDay"
-                    android:dateTextAppearance="@style/CalendarDate"
-                    />
+                    android:dateTextAppearance="@style/CalendarDate" />
             </com.google.android.material.card.MaterialCardView>
+
+            <!-- Loading Progress -->
+            <ProgressBar
+                android:id="@+id/progressLoading"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginVertical="16dp"
+                android:visibility="gone" />
 
             <!-- Timeline Section -->
             <LinearLayout
@@ -55,111 +62,39 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <!-- Item 1 -->
-                <LinearLayout
-                    android:id="@+id/llStudentScheduleCalendarItem1"
+                <!-- Events RecyclerView -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvEvents"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
+                    android:nestedScrollingEnabled="false" />
 
-                    <LinearLayout
-                        android:id="@+id/llStudentScheduleCalendarItem1Indicator"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:gravity="center_horizontal">
-
-                        <View
-                            android:id="@+id/viewStudentScheduleCalendarItem1Circle"
-                            android:layout_width="8dp"
-                            android:layout_height="8dp"
-                            android:background="@drawable/circle_pink" />
-                        <View
-                            android:id="@+id/viewStudentScheduleCalendarItem1Line"
-                            android:layout_width="2dp"
-                            android:layout_height="40dp"
-                            android:background="#FF4081" />
-                    </LinearLayout>
-
-                    <TextView
-                        android:id="@+id/tvStudentScheduleCalendarItem1Time"
-                        android:fontFamily="@font/poppinslight"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp"
-                        android:text="08:00"
-                        android:textSize="14sp"
-                        android:textColor="#232B42" />
-
-                    <TextView
-                        android:id="@+id/tvStudentScheduleCalendarItem1Description"
-                        android:fontFamily="@font/poppinslight"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="24dp"
-                        android:text="Math Class: Grade 07"
-                        android:textSize="14sp"
-                        android:textColor="#666666" />
-                </LinearLayout>
-
-                <!-- Item 2 -->
+                <!-- Empty State -->
                 <LinearLayout
-                    android:id="@+id/llStudentScheduleCalendarItem2"
+                    android:id="@+id/layoutEmptyState"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginTop="16dp">
-
-                    <LinearLayout
-                        android:id="@+id/llStudentScheduleCalendarItem2Indicator"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:gravity="center_horizontal">
-
-                        <View
-                            android:id="@+id/viewStudentScheduleCalendarItem2Circle"
-                            android:layout_width="8dp"
-                            android:layout_height="8dp"
-                            android:background="@drawable/circle_pink" />
-                        <View
-                            android:id="@+id/viewStudentScheduleCalendarItem2Line"
-                            android:layout_width="2dp"
-                            android:layout_height="40dp"
-                            android:background="#FF4081" />
-                    </LinearLayout>
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="32dp"
+                    android:visibility="gone">
 
                     <TextView
-                        android:id="@+id/tvStudentScheduleCalendarItem2Time"
-                        android:fontFamily="@font/poppinslight"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp"
-                        android:text="09:30"
-                        android:textSize="14sp"
-                        android:textColor="#232B42" />
-
-                    <TextView
-                        android:id="@+id/tvStudentScheduleCalendarItem2Description"
-                        android:fontFamily="@font/poppinslight"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="24dp"
-                        android:text="Meeting at office"
-                        android:textSize="14sp"
+                        android:text="No events scheduled"
+                        android:textSize="16sp"
                         android:textColor="#666666" />
-                </LinearLayout>
 
-                <!-- Divider end of timeline -->
-                <View
-                    android:id="@+id/viewStudentScheduleCalendarDivider"
-                    android:layout_width="2dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginStart="4dp"
-                    android:layout_marginTop="16dp"
-                    android:background="#E0E0E0" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Select a date to view events"
+                        android:textSize="14sp"
+                        android:textColor="#999999"
+                        android:layout_marginTop="8dp" />
+
+                </LinearLayout>
 
             </LinearLayout>
         </LinearLayout>

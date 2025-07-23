@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingVertical="8dp"
+    android:foreground="?android:attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true">
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal">
+
+        <View
+            android:id="@+id/viewEventCircle"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:background="@drawable/circle_pink" />
+
+        <View
+            android:id="@+id/viewEventLine"
+            android:layout_width="2dp"
+            android:layout_height="40dp"
+            android:background="#FF4081" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvEventTime"
+        android:fontFamily="@font/poppinslight"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:text="08:00"
+        android:textSize="14sp"
+        android:textColor="#232B42"
+        android:minWidth="60dp" />
+
+    <TextView
+        android:id="@+id/tvEventDescription"
+        android:fontFamily="@font/poppinslight"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="24dp"
+        android:text="Math Class: Grade 07"
+        android:textSize="14sp"
+        android:textColor="#666666" />
+
+</LinearLayout>
