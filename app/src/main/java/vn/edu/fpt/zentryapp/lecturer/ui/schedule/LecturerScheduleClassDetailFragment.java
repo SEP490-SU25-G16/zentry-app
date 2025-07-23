@@ -108,7 +108,6 @@ public class LecturerScheduleClassDetailFragment extends Fragment {
                 binding.tvScheduleClassDetailGrade.setText(sessionInfo.getClassDisplay());
                 binding.tvScheduleClassDetailSubject.setText(sessionInfo.getCourseDisplay());
                 binding.tvScheduleClassDetailStudentCount.setText(sessionInfo.getStudentCountDisplay());
-                binding.tvScheduleClassDetailDuration.setText(sessionInfo.getDurationDisplay());
             }
         });
 

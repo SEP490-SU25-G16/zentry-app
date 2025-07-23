@@ -70,8 +70,6 @@ public class CourseAdapter extends RecyclerView.Adapter<CourseAdapter.CourseView
             binding.tvCourseClassInfo.setText(course.getClassInfo());
             binding.tvCourseTaskSummary.setText(course.getTaskSummary());
             binding.pbCourseProgress.setProgress(course.getProgressPercentage());
-            // Set course icon based on subject (you can customize this)
-            // binding.ivCourseIcon.setImageResource(getCourseIcon(course.getCode()));
         }
     }
 }

@@ -28,11 +28,11 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="48dp"
-                app:cardBackgroundColor="#FFFFFF"
-                app:strokeColor="#FFFFFF"
                 android:padding="0dp"
+                app:cardBackgroundColor="#FFFFFF"
                 app:cardCornerRadius="16dp"
-                app:cardElevation="4dp">
+                app:cardElevation="4dp"
+                app:strokeColor="#FFFFFF">
 
                 <LinearLayout
                     android:id="@+id/llScheduleClassDetailHeaderContent"
@@ -58,9 +58,9 @@
 
                             <TextView
                                 android:id="@+id/tvScheduleClassDetailGrade"
-                                android:fontFamily="@font/mulishbold"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:fontFamily="@font/mulishbold"
                                 android:text="Tên lớp"
                                 android:textColor="#F57C00"
                                 android:textSize="14sp"
@@ -68,10 +68,10 @@
 
                             <TextView
                                 android:id="@+id/tvScheduleClassDetailSubject"
-                                android:fontFamily="@font/jostsemibold"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="4dp"
+                                android:fontFamily="@font/jostsemibold"
                                 android:text="Tên môn học"
                                 android:textColor="#232B42"
                                 android:textSize="20sp"
@@ -97,9 +97,8 @@
 
                         <LinearLayout
                             android:id="@+id/llScheduleClassDetailStudents"
-                            android:layout_width="0dp"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
                             android:gravity="center_vertical"
                             android:orientation="horizontal">
 
@@ -112,10 +111,10 @@
 
                             <TextView
                                 android:id="@+id/tvScheduleClassDetailStudentCount"
-                                android:fontFamily="@font/mulishextrabold"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginStart="8dp"
+                                android:fontFamily="@font/mulishextrabold"
                                 android:text="21 Students"
                                 android:textColor="#202244"
                                 android:textSize="14sp" />
@@ -123,31 +122,23 @@
 
                         <LinearLayout
                             android:id="@+id/llScheduleClassDetailDurationContainer"
-                            android:layout_width="0dp"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
+                            android:layout_marginStart="16dp"
                             android:gravity="center_vertical"
                             android:orientation="horizontal">
 
                             <TextView
                                 android:id="@+id/tvScheduleClassDetailDurationLabel"
-                                android:fontFamily="@font/mulishextrabold"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:fontFamily="@font/mulishextrabold"
                                 android:text="Duration 2h30"
                                 android:textColor="#202244"
                                 android:textSize="14sp" />
                         </LinearLayout>
-
-                        <TextView
-                            android:id="@+id/tvScheduleClassDetailDuration"
-                            android:fontFamily="@font/mulishextrabold"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="00:14:50"
-                            android:textColor="#979797"
-                            android:textSize="14sp" />
                     </LinearLayout>
+
 
                     <!-- Tabs + ViewPager -->
                     <com.google.android.material.tabs.TabLayout
@@ -193,10 +184,10 @@
 
         <TextView
             android:id="@+id/tvScheduleClassDetailTitle"
-            android:fontFamily="@font/jostsemibold"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
+            android:fontFamily="@font/jostsemibold"
             android:text="My Classes"
             android:textColor="#232B42"
             android:textSize="20sp"

@@ -1,67 +1,83 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:gravity="center_vertical"
-    android:paddingVertical="12dp">
-
-    <ImageView
-        android:id="@+id/ivStudentAvatar"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:src="@drawable/ic_student"
-        android:scaleType="centerCrop"
-        android:background="@drawable/circle_background" />
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginBottom="12dp"
+    app:cardBackgroundColor="#FFFFFF"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="6dp"
+    app:strokeWidth="0dp">
 
     <LinearLayout
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:layout_marginStart="12dp">
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="12dp">
 
-        <TextView
-            android:id="@+id/tvStudentName"
-            android:fontFamily="@font/jostsemibold"
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvStudentName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="@font/jostsemibold"
+                android:maxLines="1"
+                android:text="Student Name"
+                android:textColor="#1A1D29"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvStudentId"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:fontFamily="@font/mulishbold"
+                android:text="ID: ST001324"
+                android:textColor="#6B7280"
+                android:textSize="13sp" />
+
+        </LinearLayout>
+
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Student Name"
-            android:textColor="#202244"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:gravity="end"
+            android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/tvStudentId"
-            android:fontFamily="@font/mulishbold"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="ID: ST001324"
-            android:textSize="12sp"
-            android:textColor="#666666"
-            android:layout_marginTop="2dp" />
+            <TextView
+                android:id="@+id/tvStudentStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/jostsemibold"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="6dp"
+                android:text="Attended"
+                android:textColor="#059669"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <ImageButton
+                android:id="@+id/btnStudentEdit"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_gravity="center"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/circle_background"
+                android:clipToOutline="true"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_edit" />
+
+        </LinearLayout>
+
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/tvStudentStatus"
-        android:fontFamily="@font/jostsemibold"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Attended"
-        android:textColor="#388E3C"
-        android:textSize="14sp"
-        android:textStyle="bold" />
-
-    <ImageButton
-        android:id="@+id/btnStudentEdit"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:layout_marginStart="8dp"
-        android:background="@drawable/circle_background"
-        android:src="@drawable/ic_edit"
-        android:scaleType="centerCrop"
-        android:clipToOutline="true" />
-
-</LinearLayout>
+</com.google.android.material.card.MaterialCardView>
