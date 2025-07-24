@@ -98,7 +98,7 @@ public class ClassHistoryFragment extends Fragment implements ClassHistoryAdapte
 
     @Override
     public void onSessionClick(ClassSession session) {
-        Toast.makeText(requireContext(), "Clicked: " + session.getTitle(), Toast.LENGTH_SHORT).show();
+      //  Toast.makeText(requireContext(), "Clicked: " + session.getTitle(), Toast.LENGTH_SHORT).show();
         viewModel.onSessionClicked(session);
     }
 

@@ -63,13 +63,6 @@ public class SessionDetailAdapter extends RecyclerView.Adapter<SessionDetailAdap
                 }
             });
 
-            // Set click listener for arrow
-            binding.ivSessionArrow.setOnClickListener(v -> {
-                int position = getAdapterPosition();
-                if (position != RecyclerView.NO_POSITION && listener != null) {
-                    listener.onSessionDetailClick(sessions.get(position));
-                }
-            });
         }
 
         public void bind(SessionDetail session) {
@@ -85,21 +78,21 @@ public class SessionDetailAdapter extends RecyclerView.Adapter<SessionDetailAdap
             switch (status) {
                 case "COMPLETED":
                     binding.tvSessionDate.setTextColor(0xFF666666);
-                    binding.ivSessionArrow.setVisibility(View.VISIBLE);
+                //    binding.ivSessionArrow.setVisibility(View.VISIBLE);
                     break;
                 case "ONGOING":
                     binding.tvSessionDate.setTextColor(0xFFFF9800); // Orange
-                    binding.ivSessionArrow.setVisibility(View.VISIBLE);
+                 //   binding.ivSessionArrow.setVisibility(View.VISIBLE);
                     break;
                 case "UPCOMING":
                     binding.tvSessionDate.setTextColor(0xFF2196F3); // Blue
                     binding.tvSessionAttendance.setText("Not started");
-                    binding.ivSessionArrow.setVisibility(View.GONE);
+                  //  binding.ivSessionArrow.setVisibility(View.GONE);
                     break;
                 case "CANCELLED":
                     binding.tvSessionDate.setTextColor(0xFFE53935); // Red
                     binding.tvSessionAttendance.setText("Cancelled");
-                    binding.ivSessionArrow.setVisibility(View.GONE);
+                 //F   binding.ivSessionArrow.setVisibility(View.GONE);
                     break;
             }
         }

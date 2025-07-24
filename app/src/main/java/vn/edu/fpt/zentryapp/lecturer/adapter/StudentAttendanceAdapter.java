@@ -81,9 +81,6 @@ public class StudentAttendanceAdapter extends RecyclerView.Adapter<StudentAttend
             binding.tvStudentStatus.setText(student.getAttendanceStatus());
             binding.tvStudentStatus.setTextColor(student.getAttendanceStatusColor());
 
-            // Set avatar (placeholder for now)
-            binding.ivStudentAvatar.setImageResource(R.drawable.ic_student);
-
             // Enable/disable edit button based on time constraint
             binding.btnStudentEdit.setEnabled(canEditAttendance);
             binding.btnStudentEdit.setAlpha(canEditAttendance ? 1.0f : 0.5f);

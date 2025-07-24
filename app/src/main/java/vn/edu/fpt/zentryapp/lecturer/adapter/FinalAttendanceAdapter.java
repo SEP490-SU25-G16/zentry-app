@@ -70,8 +70,6 @@ public class FinalAttendanceAdapter extends RecyclerView.Adapter<FinalAttendance
             binding.tvAttendanceStatus.setTextColor(student.getAttendanceStatusColor());
             binding.tvAttendanceRatio.setText(student.getAttendanceRatio());
 
-            // Set avatar placeholder
-            binding.ivStudentAvatar.setImageResource(R.drawable.ic_student);
         }
     }
 }
