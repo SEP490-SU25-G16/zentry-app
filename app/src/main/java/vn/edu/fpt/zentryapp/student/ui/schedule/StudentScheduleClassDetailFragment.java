@@ -10,6 +10,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
+import androidx.viewpager2.widget.ViewPager2;
 
 import android.view.LayoutInflater;
 import android.view.View;
@@ -66,7 +67,7 @@ public class StudentScheduleClassDetailFragment extends Fragment {
     private void setupViewPager() {
         String[] tabTitles = new String[]{"History", "Final Attendance"};
 
-        binding.viewPagerStudentScheduleClassDetail.setAdapter(new FragmentStateAdapter(this) {
+        FragmentStateAdapter adapter = new FragmentStateAdapter(this) {
             @NonNull
             @Override
             public Fragment createFragment(int position) {
@@ -84,14 +85,27 @@ public class StudentScheduleClassDetailFragment extends Fragment {
             public int getItemCount() {
                 return tabTitles.length;
             }
-        });
+        };
+
+        binding.viewPagerStudentScheduleClassDetail.setAdapter(adapter);
 
         // Connect TabLayout with ViewPager2
         new TabLayoutMediator(binding.tabLayoutStudentScheduleClassDetail,
                 binding.viewPagerStudentScheduleClassDetail,
                 (tab, pos) -> tab.setText(tabTitles[pos])
         ).attach();
+
+        // Thêm listener để cập nhật chiều cao khi chuyển tab
+        binding.viewPagerStudentScheduleClassDetail.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+            @Override
+            public void onPageSelected(int position) {
+                super.onPageSelected(position);
+                // Request layout lại để tính toán chiều cao mới
+                binding.viewPagerStudentScheduleClassDetail.requestLayout();
+            }
+        });
     }
+
 
     private void setupClickListeners() {
 

@@ -59,15 +59,15 @@ public class FinalAttendanceFragment extends Fragment {
     }
 
     private void setupClickListener() {
-        binding.cardMyAttendance.setOnClickListener(v -> {
-            Toast.makeText(requireContext(), "Attendance details", Toast.LENGTH_SHORT).show();
-        });
+//        binding.cardMyAttendance.setOnClickListener(v -> {
+//            Toast.makeText(requireContext(), "Attendance details", Toast.LENGTH_SHORT).show();
+//        });
     }
 
     @SuppressLint("SetTextI18n")
     private void observeViewModel() {
         viewModel.isLoading().observe(getViewLifecycleOwner(), isLoading -> {
-            binding.progressLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+            //   binding.progressLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
         });
 
         viewModel.myAttendance().observe(getViewLifecycleOwner(), attendance -> {

@@ -70,16 +70,16 @@ public class ClassHistoryFragment extends Fragment implements ClassHistoryAdapte
 
     private void observeViewModel() {
         viewModel.isLoading().observe(getViewLifecycleOwner(), isLoading -> {
-            binding.progressLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+           // binding.progressLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
         });
 
         viewModel.sessions().observe(getViewLifecycleOwner(), sessions -> {
             if (sessions != null) {
                 historyAdapter.setSessions(sessions);
 
-                boolean isEmpty = sessions.isEmpty();
-                binding.rvHistory.setVisibility(isEmpty ? View.GONE : View.VISIBLE);
-                binding.layoutEmptyState.setVisibility(isEmpty ? View.VISIBLE : View.GONE);
+//                boolean isEmpty = sessions.isEmpty();
+//                binding.rvHistory.setVisibility(isEmpty ? View.GONE : View.VISIBLE);
+//                binding.layoutEmptyState.setVisibility(isEmpty ? View.VISIBLE : View.GONE);
             }
         });
 
