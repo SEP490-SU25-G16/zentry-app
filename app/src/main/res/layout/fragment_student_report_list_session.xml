@@ -1,176 +1,161 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/flStudentReportListSessionRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true"
-    android:background="#F5F9FF">
+    android:background="#F5F9FF"
+    android:fitsSystemWindows="true">
 
-    <ScrollView
+    <LinearLayout
         android:id="@+id/svStudentReportListSessionContent"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:background="@android:color/transparent"
+        android:orientation="vertical"
         android:padding="16dp"
-        android:paddingTop="?attr/actionBarSize"
-        android:background="@android:color/transparent">
-
-        <LinearLayout
-            android:id="@+id/llStudentReportListSessionContainer"
+        android:paddingTop="?attr/actionBarSize">
+        <!-- Header Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardStudentReportListSessionHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:layout_marginTop="48dp"
+            android:layout_marginBottom="16dp"
+            app:cardBackgroundColor="#FFFFFF"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="4dp"
+            app:strokeColor="#FFFFFF">
 
-            <!-- Header Card -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardStudentReportListSessionHeader"
+            <LinearLayout
+                android:id="@+id/llStudentReportListSessionHeaderContent"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="48dp"
-                android:layout_marginBottom="16dp"
-                app:cardCornerRadius="16dp"
-                app:cardBackgroundColor="#FFFFFF"
-                app:strokeColor="#FFFFFF"
-                app:cardElevation="4dp">
+                android:orientation="vertical"
+                android:padding="16dp">
 
-                <LinearLayout
-                    android:id="@+id/llStudentReportListSessionHeaderContent"
+                <TextView
+                    android:id="@+id/tvStudentReportListSessionGrade"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/mulishbold"
+                    android:text="Grade 07"
+                    android:textColor="#F57C00"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvStudentReportListSessionSubject"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:fontFamily="@font/jostsemibold"
+                    android:text="Mathematics"
+                    android:textColor="#232B42"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvStudentReportListSessionCount"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:fontFamily="@font/mulishextrabold"
+                    android:gravity="center"
+                    android:text="12/20 Sessions"
+                    android:textColor="#202244"
+                    android:textSize="14sp" />
+
+                <!-- Loading Progress -->
+                <ProgressBar
+                    android:id="@+id/progressLoading"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginVertical="16dp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tvStudentReportListSessionLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:fontFamily="@font/mulishextrabold"
+                    android:gravity="center"
+                    android:text="SESSION LIST"
+                    android:textColor="#202244"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <!-- Sessions RecyclerView -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvSessions"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:nestedScrollingEnabled="false" />
+
+                <!-- Empty State -->
+                <LinearLayout
+                    android:id="@+id/layoutEmptyState"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="16dp">
+                    android:padding="32dp"
+                    android:visibility="gone">
 
                     <TextView
-                        android:id="@+id/tvStudentReportListSessionGrade"
-                        android:fontFamily="@font/mulishbold"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Grade 07"
-                        android:textColor="#F57C00"
-                        android:textSize="14sp"
-                        android:textStyle="bold"/>
+                        android:text="No sessions found"
+                        android:textColor="#666666"
+                        android:textSize="16sp" />
 
                     <TextView
-                        android:id="@+id/tvStudentReportListSessionSubject"
-                        android:fontFamily="@font/jostsemibold"
                         android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="Mathematics"
-                        android:textColor="#232B42"
-                        android:textSize="20sp"
-                        android:textStyle="bold"/>
-
-                    <TextView
-                        android:id="@+id/tvStudentReportListSessionCount"
-                        android:fontFamily="@font/mulishextrabold"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="center"
-                        android:layout_marginStart="8dp"
-                        android:text="12/20 Sessions"
-                        android:textSize="14sp"
-                        android:textColor="#202244"/>
-
-                    <!-- Loading Progress -->
-                    <ProgressBar
-                        android:id="@+id/progressLoading"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center"
-                        android:layout_marginVertical="16dp"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/tvStudentReportListSessionLabel"
-                        android:fontFamily="@font/mulishextrabold"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp"
-                        android:gravity="center"
-                        android:text="SESSION LIST"
-                        android:textColor="#202244"
-                        android:textSize="14sp"
-                        android:textStyle="bold"/>
-
-                    <View
-                        android:id="@+id/viewStudentReportListSessionDivider"
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginTop="8dp"
-                        android:background="#E0E0E0"/>
-
-                    <!-- Sessions RecyclerView -->
-                    <androidx.recyclerview.widget.RecyclerView
-                        android:id="@+id/rvSessions"
-                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:nestedScrollingEnabled="false" />
-
-                    <!-- Empty State -->
-                    <LinearLayout
-                        android:id="@+id/layoutEmptyState"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:gravity="center"
-                        android:padding="32dp"
-                        android:visibility="gone">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="No sessions found"
-                            android:textSize="16sp"
-                            android:textColor="#666666" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Session data will appear here"
-                            android:textSize="14sp"
-                            android:textColor="#999999"
-                            android:layout_marginTop="8dp" />
-
-                    </LinearLayout>
+                        android:text="Session data will appear here"
+                        android:textColor="#999999"
+                        android:textSize="14sp" />
 
                 </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
 
-        </LinearLayout>
-    </ScrollView>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
 
     <!-- Toolbar custom overlay -->
     <LinearLayout
         android:id="@+id/llStudentReportListSessionToolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
         android:background="@android:color/transparent"
-        android:elevation="4dp">
+        android:elevation="4dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
 
         <ImageView
             android:id="@+id/ivStudentReportListSessionBack"
             android:layout_width="24dp"
             android:layout_height="24dp"
-            android:src="@drawable/ic_arrow_back"
             android:contentDescription="Back"
+            android:src="@drawable/ic_arrow_back"
             app:tint="#232B42" />
 
         <TextView
             android:id="@+id/tvStudentReportListSessionTitle"
-            android:fontFamily="@font/jostsemibold"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
+            android:fontFamily="@font/jostsemibold"
             android:text="My Report"
             android:textColor="#232B42"
             android:textSize="20sp"
-            android:textStyle="bold"/>
+            android:textStyle="bold" />
     </LinearLayout>
 </FrameLayout>

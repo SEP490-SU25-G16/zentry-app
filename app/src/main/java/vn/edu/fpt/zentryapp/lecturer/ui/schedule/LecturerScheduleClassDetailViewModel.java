@@ -25,6 +25,21 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
     private final MutableLiveData<List<AttendanceRound>> _attendanceRounds = new MutableLiveData<>();
     private final MutableLiveData<List<FinalAttendance>> _finalAttendance = new MutableLiveData<>();
     private final MutableLiveData<String> _errorMessage = new MutableLiveData<>();
+    private final MutableLiveData<Boolean> _canAddRound = new MutableLiveData<>(true);
+
+    public LiveData<Boolean> canAddRound() {
+        return _canAddRound;
+    }
+
+    private boolean isSessionCompleted(SessionDetailInfoRound sessionInfo) {
+        if (sessionInfo == null) return false;
+
+        String status = sessionInfo.getStatus();
+        return "COMPLETED".equals(status) ||
+                "FINISHED".equals(status) ||
+                "ENDED".equals(status);
+    }
+
 
     public LiveData<Boolean> isLoading() {
         return _isLoading;
@@ -63,6 +78,10 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
         new Handler().postDelayed(() -> {
             SessionDetailInfoRound sessionInfo = generateSessionInfo();
             _sessionInfo.setValue(sessionInfo);
+
+            // Cập nhật trạng thái có thể thêm round
+            boolean canAdd = !isSessionCompleted(sessionInfo);
+            _canAddRound.setValue(canAdd);
         }, 500);
     }
 

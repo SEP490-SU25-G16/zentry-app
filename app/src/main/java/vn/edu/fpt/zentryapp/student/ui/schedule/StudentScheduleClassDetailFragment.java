@@ -94,11 +94,6 @@ public class StudentScheduleClassDetailFragment extends Fragment {
     }
 
     private void setupClickListeners() {
-        // Add button click
-        binding.btnStudentScheduleClassDetailAdd.setOnClickListener(v -> {
-            Toast.makeText(requireContext(), "Add new item", Toast.LENGTH_SHORT).show();
-            viewModel.onAddClicked();
-        });
 
         // Notification button click
         binding.btnStudentScheduleClassDetailNotification.setOnClickListener(v -> {
@@ -120,8 +115,6 @@ public class StudentScheduleClassDetailFragment extends Fragment {
                 binding.tvStudentScheduleClassDetailGrade.setText(classDetail.getGrade());
                 binding.tvStudentScheduleClassDetailSubject.setText(classDetail.getSubject());
                 binding.tvStudentScheduleClassDetailDurationLabel.setText(classDetail.getDuration());
-                binding.tvStudentScheduleClassDetailDuration.setText(classDetail.getTimeRemaining());
-
                 Log.d("ClassDetail", "Class loaded: " + classDetail.getSubject() + " - " + classDetail.getGrade());
             }
         });

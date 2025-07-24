@@ -71,10 +71,7 @@ public class LecturerSettingFragment extends Fragment {
             showLogoutConfirmationDialog();
         });
 
-        // Avatar click (for future profile picture update)
-        binding.ivSettingAvatar.setOnClickListener(v -> {
-            Toast.makeText(requireContext(), "Avatar update coming soon", Toast.LENGTH_SHORT).show();
-        });
+
     }
 
     private void observeViewModel() {
@@ -117,9 +114,6 @@ public class LecturerSettingFragment extends Fragment {
     private void updateUserProfileUI(LecturerSettingViewModel.UserProfile profile) {
         binding.tvSettingName.setText(profile.getDisplayName());
         binding.tvSettingEmail.setText(profile.getDisplayEmail());
-
-        // Set default avatar (in the future, load from URL if available)
-        binding.ivSettingAvatar.setImageResource(R.drawable.ic_launcher_foreground);
 
         // Log user info for debugging
         android.util.Log.d("LecturerSetting",

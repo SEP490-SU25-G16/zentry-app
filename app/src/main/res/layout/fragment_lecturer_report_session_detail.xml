@@ -148,16 +148,24 @@
                 <!-- Attendance Count -->
                 <TextView
                     android:id="@+id/tvSessionDetailAttendanceCount"
-                    android:fontFamily="@font/jostsemibold"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
+                    android:layout_height="20dp"
                     android:layout_marginTop="8dp"
+                    android:fontFamily="@font/jostsemibold"
                     android:gravity="center"
                     android:text="29/32 - Attendance"
                     android:textColor="#167F71"
                     android:textSize="14sp"
                     android:textStyle="bold" />
 
+                <!-- Students RecyclerView - Takes remaining space -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvStudents"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:layout_marginTop="8dp"
+                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
                 <!-- Loading Progress -->
                 <ProgressBar
@@ -170,16 +178,6 @@
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-
-        <!-- Students RecyclerView - Takes remaining space -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvStudents"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:layout_marginTop="8dp"
-            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
-
     </LinearLayout>
 
     <!-- Toolbar custom overlay -->

@@ -92,7 +92,6 @@ public class StudentReportFragment extends Fragment implements StudentReportAdap
 
         viewModel.userProfile().observe(getViewLifecycleOwner(), profile -> {
             if (profile != null) {
-                binding.ivStudentReportAvatar.setImageResource(R.drawable.ic_launcher_foreground);
                 Log.d("StudentReport", "User loaded: " + profile.getName() + " (" + profile.getRole() + ")");
             }
         });

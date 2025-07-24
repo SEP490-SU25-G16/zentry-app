@@ -33,21 +33,6 @@
                 android:padding="24dp"
                 android:gravity="center_horizontal">
 
-                <!-- Avatar + Edit Overlay -->
-                <FrameLayout
-                    android:id="@+id/flStudentSettingAvatarContainer"
-                    android:layout_width="96dp"
-                    android:layout_height="96dp">
-
-                    <ImageView
-                        android:id="@+id/ivStudentSettingAvatar"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/ic_notification"
-                        android:background="@drawable/circle_border_blue" />
-                </FrameLayout>
-
                 <!-- Name & Email -->
                 <TextView
                     android:id="@+id/tvStudentSettingName"

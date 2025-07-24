@@ -70,11 +70,11 @@ public class StudentScheduleFragment extends Fragment implements ScheduleAdapter
                 navController.navigate(R.id.action_studentSchedule_to_calendar)
         );
 
-        // See All click
-        binding.tvStudentScheduleSeeAll.setOnClickListener(v -> {
-            Toast.makeText(requireContext(), "See All clicked", Toast.LENGTH_SHORT).show();
-            // TODO: Navigate to full schedule list
-        });
+//        // See All click
+//        binding.tvStudentScheduleSeeAll.setOnClickListener(v -> {
+//            Toast.makeText(requireContext(), "See All clicked", Toast.LENGTH_SHORT).show();
+//            // TODO: Navigate to full schedule list
+//        });
 
         // Notification click
         binding.btnStudentScheduleNotification.setOnClickListener(v -> {
@@ -95,7 +95,6 @@ public class StudentScheduleFragment extends Fragment implements ScheduleAdapter
                 boolean isEmpty = schedules.isEmpty();
                 binding.rvSchedules.setVisibility(isEmpty ? View.GONE : View.VISIBLE);
                 binding.layoutEmptyState.setVisibility(isEmpty ? View.VISIBLE : View.GONE);
-                binding.tvStudentScheduleSeeAll.setVisibility(isEmpty ? View.GONE : View.VISIBLE);
             }
         });
 

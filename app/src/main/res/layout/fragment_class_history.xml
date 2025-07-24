@@ -18,16 +18,15 @@
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvHistory"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:nestedScrollingEnabled="false" />
+        android:layout_height="match_parent" />
 
     <!-- Empty State -->
     <LinearLayout
         android:id="@+id/layoutEmptyState"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
         android:gravity="center"
+        android:orientation="vertical"
         android:padding="32dp"
         android:visibility="gone">
 
@@ -35,16 +34,16 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="No session history found"
-            android:textSize="16sp"
-            android:textColor="#666666" />
+            android:textColor="#666666"
+            android:textSize="16sp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
             android:text="Session history will appear here"
-            android:textSize="14sp"
             android:textColor="#999999"
-            android:layout_marginTop="8dp" />
+            android:textSize="14sp" />
 
     </LinearLayout>
 

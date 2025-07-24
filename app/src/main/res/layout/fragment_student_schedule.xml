@@ -22,21 +22,13 @@
             android:gravity="center_vertical"
             android:layout_marginBottom="24dp">
 
-            <ImageView
-                android:id="@+id/ivStudentScheduleAvatar"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:src="@drawable/ic_launcher_foreground"
-                android:scaleType="centerCrop"
-                android:background="@drawable/circle_background" />
-
             <LinearLayout
                 android:id="@+id/llStudentScheduleGreetingTexts"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:orientation="vertical"
-                android:layout_marginStart="12dp">
+>
 
                 <TextView
                     android:id="@+id/tvStudentScheduleGreeting"
@@ -146,22 +138,6 @@
                 android:layout_marginTop="8dp" />
 
         </LinearLayout>
-
-        <!-- See All -->
-        <TextView
-            android:id="@+id/tvStudentScheduleSeeAll"
-            android:fontFamily="@font/mulishextrabold"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="SEE ALL"
-            android:textColor="#0961F5"
-            android:textSize="12sp"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginTop="16dp"
-            android:padding="8dp"
-            android:foreground="?attr/selectableItemBackgroundBorderless"
-            android:clickable="true"
-            android:focusable="true" />
 
     </LinearLayout>
 </ScrollView>

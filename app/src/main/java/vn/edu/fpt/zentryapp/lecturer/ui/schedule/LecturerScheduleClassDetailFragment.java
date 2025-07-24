@@ -110,6 +110,10 @@ public class LecturerScheduleClassDetailFragment extends Fragment {
                 binding.tvScheduleClassDetailStudentCount.setText(sessionInfo.getStudentCountDisplay());
             }
         });
+        // Observer riêng cho button visibility
+        viewModel.canAddRound().observe(getViewLifecycleOwner(), canAdd -> {
+            binding.btnScheduleClassDetailAdd.setVisibility(canAdd ? View.VISIBLE : View.GONE);
+        });
 
         viewModel.attendanceRounds().observe(getViewLifecycleOwner(), rounds -> {
             if (rounds != null && historyFragment != null) {

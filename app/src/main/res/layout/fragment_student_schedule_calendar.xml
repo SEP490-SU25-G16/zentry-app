@@ -1,134 +1,127 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/flStudentScheduleCalendarRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true"
-    android:background="#F5F9FF">
+    android:background="#F5F9FF"
+    android:fitsSystemWindows="true">
 
-    <ScrollView
+    <LinearLayout
+        android:layout_marginTop="56dp"
         android:id="@+id/svStudentScheduleCalendarContent"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:background="@android:color/transparent"
+        android:orientation="vertical"
         android:padding="16dp"
-        android:paddingTop="?attr/actionBarSize"
-        android:background="@android:color/transparent">
+        android:paddingTop="?attr/actionBarSize">
 
-        <LinearLayout
-            android:id="@+id/llStudentScheduleCalendarContainer"
+
+        <!-- Calendar Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardStudentScheduleCalendar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="48dp"
-            android:orientation="vertical">
+            android:layout_margin="16dp"
+            app:cardBackgroundColor="#A3BBFF"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="0dp">
 
-            <!-- Calendar Card -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardStudentScheduleCalendar"
+            <CalendarView
+                android:id="@+id/calendarView"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_margin="16dp"
-                app:cardCornerRadius="24dp"
-                app:cardElevation="0dp"
-                app:cardBackgroundColor="#A3BBFF">
+                android:dateTextAppearance="@style/CalendarDate"
+                android:focusedMonthDateColor="#FFFFFF"
+                android:selectedWeekBackgroundColor="#CAE0FF"
+                android:unfocusedMonthDateColor="#E0E0E0"
+                android:weekDayTextAppearance="@style/CalendarWeekDay"
+                android:weekSeparatorLineColor="@android:color/transparent" />
+        </com.google.android.material.card.MaterialCardView>
 
-                <CalendarView
-                    android:id="@+id/calendarView"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:weekSeparatorLineColor="@android:color/transparent"
-                    android:focusedMonthDateColor="#FFFFFF"
-                    android:unfocusedMonthDateColor="#E0E0E0"
-                    android:selectedWeekBackgroundColor="#CAE0FF"
-                    android:weekDayTextAppearance="@style/CalendarWeekDay"
-                    android:dateTextAppearance="@style/CalendarDate" />
-            </com.google.android.material.card.MaterialCardView>
+        <!-- Loading Progress -->
+        <ProgressBar
+            android:id="@+id/progressLoading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginVertical="16dp"
+            android:visibility="gone" />
 
-            <!-- Loading Progress -->
-            <ProgressBar
-                android:id="@+id/progressLoading"
-                android:layout_width="wrap_content"
+        <!-- Timeline Section -->
+        <LinearLayout
+            android:id="@+id/llStudentScheduleCalendarTimeline"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- Events RecyclerView -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvEvents"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:layout_marginVertical="16dp"
-                android:visibility="gone" />
+                android:nestedScrollingEnabled="false" />
 
-            <!-- Timeline Section -->
+            <!-- Empty State -->
             <LinearLayout
-                android:id="@+id/llStudentScheduleCalendarTimeline"
+                android:id="@+id/layoutEmptyState"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:gravity="center"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:padding="32dp"
+                android:visibility="gone">
 
-                <!-- Events RecyclerView -->
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/rvEvents"
-                    android:layout_width="match_parent"
+                <TextView
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:nestedScrollingEnabled="false" />
+                    android:text="No events scheduled"
+                    android:textColor="#666666"
+                    android:textSize="16sp" />
 
-                <!-- Empty State -->
-                <LinearLayout
-                    android:id="@+id/layoutEmptyState"
-                    android:layout_width="match_parent"
+                <TextView
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:padding="32dp"
-                    android:visibility="gone">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="No events scheduled"
-                        android:textSize="16sp"
-                        android:textColor="#666666" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Select a date to view events"
-                        android:textSize="14sp"
-                        android:textColor="#999999"
-                        android:layout_marginTop="8dp" />
-
-                </LinearLayout>
+                    android:layout_marginTop="8dp"
+                    android:text="Select a date to view events"
+                    android:textColor="#999999"
+                    android:textSize="14sp" />
 
             </LinearLayout>
-        </LinearLayout>
-    </ScrollView>
 
+        </LinearLayout>
+    </LinearLayout>
     <!-- Toolbar custom overlay -->
     <LinearLayout
         android:id="@+id/llStudentScheduleCalendarToolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
         android:background="@android:color/transparent"
-        android:elevation="4dp">
+        android:elevation="4dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
 
         <ImageView
             android:id="@+id/ivStudentScheduleCalendarBack"
             android:layout_width="24dp"
             android:layout_height="24dp"
-            android:src="@drawable/ic_arrow_back"
             android:contentDescription="Back"
+            android:src="@drawable/ic_arrow_back"
             app:tint="#232B42" />
 
         <TextView
             android:id="@+id/tvStudentScheduleCalendarTitle"
-            android:fontFamily="@font/jostsemibold"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
+            android:fontFamily="@font/jostsemibold"
             android:text="My Classes"
+            android:textColor="#232B42"
             android:textSize="20sp"
-            android:textStyle="bold"
-            android:textColor="#232B42" />
+            android:textStyle="bold" />
     </LinearLayout>
 </FrameLayout>

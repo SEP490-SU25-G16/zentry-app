@@ -19,10 +19,21 @@ public class ClassHistoryViewModel extends ViewModel {
     private final MutableLiveData<String> _errorMessage = new MutableLiveData<>();
     private final MutableLiveData<String> _successMessage = new MutableLiveData<>();
 
-    public LiveData<Boolean> isLoading() { return _isLoading; }
-    public LiveData<List<ClassSession>> sessions() { return _sessions; }
-    public LiveData<String> errorMessage() { return _errorMessage; }
-    public LiveData<String> successMessage() { return _successMessage; }
+    public LiveData<Boolean> isLoading() {
+        return _isLoading;
+    }
+
+    public LiveData<List<ClassSession>> sessions() {
+        return _sessions;
+    }
+
+    public LiveData<String> errorMessage() {
+        return _errorMessage;
+    }
+
+    public LiveData<String> successMessage() {
+        return _successMessage;
+    }
 
     private AuthManager authManager;
 
@@ -51,14 +62,14 @@ public class ClassHistoryViewModel extends ViewModel {
     private List<ClassSession> generateMockSessions() {
         List<ClassSession> sessions = new ArrayList<>();
 
-        sessions.add(new ClassSession("S001", "Session 1", "2024-01-15", "08:00 - 10:30",
-                "Completed"));
-        sessions.add(new ClassSession("S002", "Session 2", "2024-01-17", "08:00 - 10:30",
-                "Completed"));
-        sessions.add(new ClassSession("S003", "Session 3", "2024-01-19", "08:00 - 10:30",
-                "Cancelled"));
-        sessions.add(new ClassSession("S004", "Session 4", "2024-01-22", "08:00 - 10:30",
-                "Completed"));
+        sessions.add(new ClassSession("R001", "Round 1", "8:50",
+                "Attended"));
+        sessions.add(new ClassSession("R002", "Round 2", "8:50",
+                "Attended"));
+        sessions.add(new ClassSession("R003", "Round 3", "8:50",
+                "Attended"));
+        sessions.add(new ClassSession("R004", "Round 4", "8:50",
+                "Attended"));
 
         return sessions;
     }

@@ -10,7 +10,6 @@ public class ClassSession {
     private final String sessionNumber;
     private final String date;
     private final String myAttendanceStatus; // "Present", "Absent", "Late"
-    private final String topic;
 
     public int getAttendanceColor() {
         switch (myAttendanceStatus.toLowerCase()) {
