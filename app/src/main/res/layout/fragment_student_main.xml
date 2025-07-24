@@ -1,33 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:background="#F5F9FF">
 
+    <!-- Fragment Container chiếm toàn bộ không gian -->
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/student_nav_host_fragment"
         android:name="androidx.navigation.fragment.NavHostFragment"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_height="match_parent"
+        android:paddingBottom="56dp"
+        android:clipToPadding="false" />
 
+    <!-- BottomNav nằm dưới cùng, overlay lên fragment -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_navigation_student"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:layout_margin="16dp"
+        android:layout_alignParentBottom="true"
         android:background="@drawable/bg_bottom_nav"
-        android:paddingTop="4dp"
-        android:paddingBottom="4dp"
+        android:elevation="8dp"
         app:itemBackground="@drawable/nav_item_bg_selector"
         app:itemHorizontalTranslationEnabled="false"
         app:itemIconSize="24dp"
+        app:itemActiveIndicatorStyle="@null"
         app:itemIconTint="@color/nav_item_color_state"
         app:itemRippleColor="@android:color/transparent"
         app:itemTextColor="@color/nav_item_color_state"
         app:labelVisibilityMode="labeled"
-        app:menu="@menu/bottom_nav_menu_lecturer" />
+        app:menu="@menu/bottom_nav_menu_student" />
 
-</LinearLayout>
+</RelativeLayout>

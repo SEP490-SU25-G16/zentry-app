@@ -12,9 +12,11 @@ import androidx.navigation.NavOptions;
 import androidx.navigation.fragment.NavHostFragment;
 
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.ApiClient;
@@ -151,19 +153,35 @@ public class LoginFragment extends Fragment {
     }
 
     private void handleLoginSuccess(LoginViewModel.LoginSuccess loginSuccess) {
-        // Determine navigation destination
-        int actionId = loginSuccess.isLecturer()
-                ? R.id.action_login_to_lecturer
-                : R.id.action_login_to_student;
+        Log.d("LoginFragment", "handleLoginSuccess thanh cong " + loginSuccess.getRole());
 
-        // Create NavOptions to clear back stack
-        NavOptions navOptions = new NavOptions.Builder()
-                .setPopUpTo(R.id.nav_graph_root, true)
-                .build();
+        try {
+            // Clear any existing back stack và navigate
+            if (loginSuccess.isLecturer()) {
+                navController.navigate(R.id.action_login_to_lecturer);
+            } else {
+                navController.navigate(R.id.action_login_to_student);
+            }
 
-        // Navigate to appropriate screen
-        navController.navigate(actionId, null, navOptions);
+            Log.d("LoginFragment", "Navigation successful to " + loginSuccess.getRole());
+
+        } catch (Exception e) {
+            Log.e("LoginFragment", "Navigation error: " + e.getMessage(), e);
+
+            // Fallback: Use direct navigation
+            try {
+                if (loginSuccess.isLecturer()) {
+                    navController.navigate(R.id.nav_graph_lecturer);
+                } else {
+                    navController.navigate(R.id.nav_graph_student);
+                }
+            } catch (Exception fallbackError) {
+                Log.e("LoginFragment", "Fallback navigation failed: " + fallbackError.getMessage(), fallbackError);
+                Toast.makeText(requireContext(), "Navigation error", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
+
 
     private void setupBackPressHandler() {
         requireActivity().getOnBackPressedDispatcher().addCallback(
