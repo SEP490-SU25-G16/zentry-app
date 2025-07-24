@@ -1,95 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/svHomeRoot"
+    android:id="@+id/llHomeRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#F5F9FF"
+    android:orientation="vertical"
     android:padding="16dp">
 
+    <!-- Header - Fixed at top -->
     <LinearLayout
-        android:id="@+id/llHomeContent"
+        android:id="@+id/llHomeHeader"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:gravity="center_vertical"
         android:orientation="vertical">
 
-        <!-- Header -->
-        <LinearLayout
-            android:id="@+id/llHomeHeader"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <ImageView
-                android:id="@+id/ivHomeAvatar"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="@drawable/circle_background"
-                android:scaleType="centerCrop"
-                android:src="@drawable/ic_launcher_foreground" />
-
-            <LinearLayout
-                android:id="@+id/llHomeGreetingTexts"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/tvHomeGreeting"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="@font/jostsemibold"
-                    android:text="Good Morning, Lecturer!"
-                    android:textColor="#232B42"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvHomeSubGreeting"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:fontFamily="@font/jostsemibold"
-                    android:text="Are you ready to teach Today? Let's begin."
-                    android:textColor="#666666"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-
-        </LinearLayout>
-
-        <!-- Section Title -->
         <TextView
-            android:id="@+id/tvHomeSectionTitle"
+            android:id="@+id/tvHomeGreeting"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
             android:fontFamily="@font/jostsemibold"
-            android:text="My Classroom"
+            android:text="Good Morning, Lecturer!"
             android:textColor="#232B42"
-            android:textSize="16sp"
+            android:textSize="20sp"
             android:textStyle="bold" />
 
-        <!-- Loading Progress -->
-        <ProgressBar
-            android:id="@+id/progressLoading"
+        <TextView
+            android:id="@+id/tvHomeSubGreeting"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginTop="32dp"
-            android:visibility="gone" />
-
-        <!-- Courses RecyclerView -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvCourses"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:nestedScrollingEnabled="false"
-            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+            android:layout_marginTop="4dp"
+            android:fontFamily="@font/jostsemibold"
+            android:text="Are you ready to teach Today? Let's begin."
+            android:textColor="#666666"
+            android:textSize="14sp"
+            android:textStyle="bold" />
 
     </LinearLayout>
-</ScrollView>
+
+
+    <!-- Section Title -->
+    <TextView
+        android:id="@+id/tvHomeSectionTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:fontFamily="@font/jostsemibold"
+        android:text="My Classroom"
+        android:textColor="#232B42"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <!-- Loading Progress -->
+    <ProgressBar
+        android:id="@+id/progressLoading"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginTop="32dp"
+        android:visibility="gone" />
+
+    <!-- Courses RecyclerView - Takes remaining space -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvCourses"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+
+</LinearLayout>

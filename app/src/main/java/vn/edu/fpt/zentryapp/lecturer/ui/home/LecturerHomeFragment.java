@@ -82,22 +82,8 @@ public class LecturerHomeFragment extends Fragment implements CourseAdapter.OnCo
                     // Greeting sẽ được update từ ViewModel, nhưng có thể customize thêm ở đây
                 }
 
-                // Update avatar (nếu có URL từ profile)
-                // Glide.with(this)
-                //     .load(profile.getAvatarUrl())
-                //     .placeholder(R.drawable.ic_launcher_foreground)
-                //     .circleCrop()
-                //     .into(binding.ivHomeAvatar);
-
-                // Set default avatar for now
-                binding.ivHomeAvatar.setImageResource(R.drawable.ic_launcher_foreground);
-
-                // Log user info for debugging
-                Log.d("LecturerHome",
-                        "User loaded: " + profile.getName() + " (" + profile.getRole() + ")");
             }
         });
-
 
         // Observe errors
         viewModel.errorMessage().observe(getViewLifecycleOwner(), error -> {

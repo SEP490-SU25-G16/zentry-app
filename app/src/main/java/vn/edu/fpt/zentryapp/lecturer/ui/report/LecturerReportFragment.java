@@ -99,17 +99,13 @@ public class LecturerReportFragment extends Fragment implements SessionAdapter.O
         // Observe current date
         viewModel.currentDate().observe(getViewLifecycleOwner(), date -> {
             if (date != null) {
-                binding.tvCurrentDate.setText("Today, " + date);
+//                binding.tvCurrentDate.setText("Today, " + date);
             }
         });
 
         // Observe user profile
         viewModel.userProfile().observe(getViewLifecycleOwner(), profile -> {
             if (profile != null) {
-                // Update avatar
-                binding.ivHomeAvatar.setImageResource(R.drawable.ic_launcher_foreground);
-
-                // Log user info
                 android.util.Log.d("LecturerReport",
                         "User loaded: " + profile.getName() + " (" + profile.getRole() + ")");
             }

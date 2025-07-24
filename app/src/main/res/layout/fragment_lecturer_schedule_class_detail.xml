@@ -7,179 +7,174 @@
     android:background="#F5F9FF"
     android:fitsSystemWindows="true">
 
-    <!-- ScrollView với paddingTop để lùi xuống dưới toolbar cố định -->
-    <ScrollView
-        android:id="@+id/svScheduleClassDetailContent"
+    <!-- Nội dung chính -->
+    <LinearLayout
+        android:id="@+id/llScheduleClassDetailContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@android:color/transparent"
+        android:orientation="vertical"
         android:padding="16dp"
         android:paddingTop="?attr/actionBarSize">
 
-        <LinearLayout
-            android:id="@+id/llScheduleClassDetailContainer"
+        <!-- Header Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardScheduleClassDetailHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:layout_marginTop="48dp"
+            app:cardBackgroundColor="#FFFFFF"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="4dp"
+            app:strokeColor="#FFFFFF">
 
-            <!-- Class Header Card -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardScheduleClassDetailHeader"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="48dp"
-                android:padding="0dp"
-                app:cardBackgroundColor="#FFFFFF"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="4dp"
-                app:strokeColor="#FFFFFF">
+                android:orientation="vertical"
+                android:padding="16dp">
 
+                <!-- Grade/Subject + Add button -->
                 <LinearLayout
-                    android:id="@+id/llScheduleClassDetailHeaderContent"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
 
-                    <!-- Header row: Grade/Subject + Add button -->
                     <LinearLayout
-                        android:id="@+id/llScheduleClassDetailHeaderRow"
-                        android:layout_width="match_parent"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
+                        android:layout_weight="1"
+                        android:orientation="vertical">
 
-                        <LinearLayout
-                            android:id="@+id/llScheduleClassDetailGradeSubject"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:id="@+id/tvScheduleClassDetailGrade"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:fontFamily="@font/mulishbold"
-                                android:text="Tên lớp"
-                                android:textColor="#F57C00"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:id="@+id/tvScheduleClassDetailSubject"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
-                                android:fontFamily="@font/jostsemibold"
-                                android:text="Tên môn học"
-                                android:textColor="#232B42"
-                                android:textSize="20sp"
-                                android:textStyle="bold" />
-                        </LinearLayout>
-
-                        <com.google.android.material.imageview.ShapeableImageView
-                            android:id="@+id/btnScheduleClassDetailAdd"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:background="@drawable/circle_background"
-                            android:contentDescription="Add"
-                            android:src="@drawable/ic_add" />
-                    </LinearLayout>
-
-                    <!-- Stats row -->
-                    <LinearLayout
-                        android:id="@+id/llScheduleClassDetailStats"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:orientation="horizontal">
-
-                        <LinearLayout
-                            android:id="@+id/llScheduleClassDetailStudents"
+                        <TextView
+                            android:id="@+id/tvScheduleClassDetailGrade"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
+                            android:fontFamily="@font/mulishbold"
+                            android:text="Tên lớp"
+                            android:textColor="#F57C00"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
 
-                            <ImageView
-                                android:id="@+id/ivScheduleClassDetailStudentIcon"
-                                android:layout_width="16dp"
-                                android:layout_height="16dp"
-                                android:src="@drawable/ic_student"
-                                app:tint="#202244" />
-
-                            <TextView
-                                android:id="@+id/tvScheduleClassDetailStudentCount"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:fontFamily="@font/mulishextrabold"
-                                android:text="21 Students"
-                                android:textColor="#202244"
-                                android:textSize="14sp" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:id="@+id/llScheduleClassDetailDurationContainer"
+                        <TextView
+                            android:id="@+id/tvScheduleClassDetailSubject"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="16dp"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
-
-                            <TextView
-                                android:id="@+id/tvScheduleClassDetailDurationLabel"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:fontFamily="@font/mulishextrabold"
-                                android:text="Duration 2h30"
-                                android:textColor="#202244"
-                                android:textSize="14sp" />
-                        </LinearLayout>
+                            android:layout_marginTop="4dp"
+                            android:fontFamily="@font/jostsemibold"
+                            android:text="Tên môn học"
+                            android:textColor="#232B42"
+                            android:textSize="20sp"
+                            android:textStyle="bold" />
                     </LinearLayout>
 
-
-                    <!-- Tabs + ViewPager -->
-                    <com.google.android.material.tabs.TabLayout
-                        android:id="@+id/tabLayoutScheduleClassDetail"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp"
-                        app:tabIndicatorColor="#0961F5"
-                        app:tabSelectedTextColor="#232B42"
-                        app:tabTextColor="#666666" />
-
-                    <androidx.viewpager2.widget.ViewPager2
-                        android:id="@+id/viewPagerScheduleClassDetail"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:layout_marginBottom="8dp" />
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/btnScheduleClassDetailAdd"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:src="@drawable/ic_add"
+                        android:background="@drawable/circle_background"
+                        android:contentDescription="Add" />
                 </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
 
-        </LinearLayout>
-    </ScrollView>
+                <!-- Stats -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_student"
+                            app:tint="#202244" />
+
+                        <TextView
+                            android:id="@+id/tvScheduleClassDetailStudentCount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:fontFamily="@font/mulishextrabold"
+                            android:text="21 Students"
+                            android:textColor="#202244"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginStart="16dp">
+
+                        <TextView
+                            android:id="@+id/tvScheduleClassDetailDurationLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/mulishextrabold"
+                            android:text="Duration 2h30"
+                            android:textColor="#202244"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Tabs -->
+                <com.google.android.material.tabs.TabLayout
+                    android:id="@+id/tabLayoutScheduleClassDetail"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="@android:color/transparent"
+                    app:tabIndicatorColor="#0961F5"
+                    app:tabIndicatorHeight="3dp"
+                    app:tabIndicatorFullWidth="false"
+                    app:tabIndicatorAnimationMode="elastic"
+                    app:tabSelectedTextColor="#232B42"
+                    app:tabTextColor="#666666"
+                    app:tabRippleColor="#E3F2FD"
+                    app:tabTextAppearance="@style/TextAppearance.AppCompat.Body2"
+                    android:textAllCaps="false" />
+
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ViewPager2 chiếm hết khoảng trống còn lại -->
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/viewPagerScheduleClassDetail"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp" />
+
+    </LinearLayout>
 
     <!-- Toolbar custom overlay -->
     <LinearLayout
         android:id="@+id/llScheduleClassDetailToolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="@android:color/transparent"
-        android:elevation="4dp"
-        android:gravity="center_vertical"
         android:orientation="horizontal"
+        android:gravity="center_vertical"
         android:paddingStart="16dp"
-        android:paddingEnd="16dp">
+        android:paddingEnd="16dp"
+        android:background="@android:color/transparent"
+        android:elevation="4dp">
 
         <ImageView
             android:id="@+id/ivScheduleClassDetailBack"
             android:layout_width="24dp"
             android:layout_height="24dp"
-            android:contentDescription="Back"
             android:src="@drawable/ic_arrow_back"
+            android:contentDescription="Back"
             app:tint="#232B42" />
 
         <TextView
@@ -205,4 +200,5 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_notification" />
     </LinearLayout>
+
 </FrameLayout>

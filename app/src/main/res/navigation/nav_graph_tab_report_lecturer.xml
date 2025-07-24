@@ -24,24 +24,15 @@
         tools:layout="@layout/fragment_lecturer_report_list_session">
         <action
             android:id="@+id/action_listSession_to_sessionDetail"
-            app:destination="@id/lecturerReportSessionDetailFragment">
-            <argument
-                android:name="sessionId"
-                app:argType="long"
-                android:defaultValue="0L" />
-        </action>
+            app:destination="@id/lecturerReportSessionDetailFragment" />
     </fragment>
 
-    <!-- 3. Single Session Detail -->
+    <!-- 3. Single Session Detail (Không còn arguments) -->
     <fragment
         android:id="@+id/lecturerReportSessionDetailFragment"
         android:name="vn.edu.fpt.zentryapp.lecturer.ui.report.LecturerReportSessionDetailFragment"
         android:label="Session Detail"
         tools:layout="@layout/fragment_lecturer_report_session_detail">
-        <argument
-            android:name="sessionId"
-            app:argType="long"
-            android:defaultValue="0L" />
         <action
             android:id="@+id/action_sessionDetail_to_listSession"
             app:destination="@id/lecturerReportListSessionFragment"

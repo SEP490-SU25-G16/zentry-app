@@ -68,16 +68,16 @@ public class LecturerScheduleFragment extends Fragment implements ScheduleSessio
         );
 
         // See all classes
-        binding.tvScheduleSeeAll.setOnClickListener(v -> {
-            Toast.makeText(requireContext(), "See all classes feature", Toast.LENGTH_SHORT).show();
-            // TODO: Navigate to full schedule view
-        });
+//        binding.tvScheduleSeeAll.setOnClickListener(v -> {
+//            Toast.makeText(requireContext(), "See all classes feature", Toast.LENGTH_SHORT).show();
+//            // TODO: Navigate to full schedule view
+//        });
 
         // Notification button
-        binding.btnScheduleNotification.setOnClickListener(v -> {
-            Toast.makeText(requireContext(), "Notifications", Toast.LENGTH_SHORT).show();
-            // TODO: Navigate to notifications
-        });
+//        binding.btnScheduleNotification.setOnClickListener(v -> {
+//            Toast.makeText(requireContext(), "Notifications", Toast.LENGTH_SHORT).show();
+//            // TODO: Navigate to notifications
+//        });
     }
 
     private void observeViewModel() {
@@ -103,7 +103,7 @@ public class LecturerScheduleFragment extends Fragment implements ScheduleSessio
         // Observe current date
         viewModel.currentDate().observe(getViewLifecycleOwner(), date -> {
             if (date != null) {
-                binding.tvCurrentDate.setText("Today, " + date);
+               // binding.tvCurrentDate.setText("Today, " + date);
             }
         });
 
@@ -111,7 +111,7 @@ public class LecturerScheduleFragment extends Fragment implements ScheduleSessio
         viewModel.userProfile().observe(getViewLifecycleOwner(), profile -> {
             if (profile != null) {
                 // Update avatar
-                binding.ivScheduleAvatar.setImageResource(R.drawable.ic_launcher_foreground);
+                // binding.ivScheduleAvatar.setImageResource(R.drawable.ic_launcher_foreground);
             }
         });
 
