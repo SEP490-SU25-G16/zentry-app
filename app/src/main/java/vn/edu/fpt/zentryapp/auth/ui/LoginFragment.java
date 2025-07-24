@@ -100,10 +100,6 @@ public class LoginFragment extends Fragment {
             loginViewModel.login(email, password);
         });
 
-        // Google Sign In (placeholder)
-        binding.btnLoginGoogle.setOnClickListener(v -> {
-            // TODO: Implement Google Sign-In
-        });
     }
 
     private void observeViewModel() {

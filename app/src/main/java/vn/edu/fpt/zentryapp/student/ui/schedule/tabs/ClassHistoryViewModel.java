@@ -52,13 +52,13 @@ public class ClassHistoryViewModel extends ViewModel {
         List<ClassSession> sessions = new ArrayList<>();
 
         sessions.add(new ClassSession("S001", "Session 1", "2024-01-15", "08:00 - 10:30",
-                "Completed", 23, 25, "Introduction to Algebra"));
+                "Completed"));
         sessions.add(new ClassSession("S002", "Session 2", "2024-01-17", "08:00 - 10:30",
-                "Completed", 24, 25, "Linear Equations"));
+                "Completed"));
         sessions.add(new ClassSession("S003", "Session 3", "2024-01-19", "08:00 - 10:30",
-                "Cancelled", 0, 25, "Quadratic Functions"));
+                "Cancelled"));
         sessions.add(new ClassSession("S004", "Session 4", "2024-01-22", "08:00 - 10:30",
-                "Completed", 22, 25, "Graphing Functions"));
+                "Completed"));
 
         return sessions;
     }

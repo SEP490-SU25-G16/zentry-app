@@ -113,8 +113,7 @@ public class StudentScheduleFragment extends Fragment implements ScheduleAdapter
 
         viewModel.userProfile().observe(getViewLifecycleOwner(), profile -> {
             if (profile != null) {
-                binding.ivStudentScheduleAvatar.setImageResource(R.drawable.ic_launcher_foreground);
-                Log.d("StudentSchedule", "User loaded: " + profile.getName() + " (" + profile.getRole() + ")");
+
             }
         });
 

@@ -1,22 +1,16 @@
 package vn.edu.fpt.zentryapp.student.data.model.response;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @Getter
+@AllArgsConstructor
 public class ClassSession {
     private final String id;
     private final String sessionNumber;
     private final String date;
     private final String myAttendanceStatus; // "Present", "Absent", "Late"
     private final String topic;
-
-    public ClassSession(String id, String sessionNumber, String date, String myAttendanceStatus, String topic) {
-        this.id = id;
-        this.sessionNumber = sessionNumber;
-        this.date = date;
-        this.myAttendanceStatus = myAttendanceStatus;
-        this.topic = topic;
-    }
 
     public int getAttendanceColor() {
         switch (myAttendanceStatus.toLowerCase()) {

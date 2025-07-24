@@ -1,5 +1,6 @@
 package vn.edu.fpt.zentryapp.student.ui.schedule.tabs;
 
+import android.annotation.SuppressLint;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -63,6 +64,7 @@ public class FinalAttendanceFragment extends Fragment {
         });
     }
 
+    @SuppressLint("SetTextI18n")
     private void observeViewModel() {
         viewModel.isLoading().observe(getViewLifecycleOwner(), isLoading -> {
             binding.progressLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
@@ -70,7 +72,7 @@ public class FinalAttendanceFragment extends Fragment {
 
         viewModel.myAttendance().observe(getViewLifecycleOwner(), attendance -> {
             if (attendance != null) {
-                binding.tvTotalSessions.setText("Total Sessions: " + attendance.getTotalSessions());
+                binding.tvTotalRounds.setText("Total Rounds: " + attendance.getTotalSessions());
                 binding.tvAttendedSessions.setText("Attended: " + attendance.getAttendedSessions());
                 binding.tvAbsentSessions.setText("Absent: " + attendance.getAbsentSessions());
                 binding.tvAttendancePercentage.setText(String.format("%.1f%%", attendance.getAttendancePercentage()));

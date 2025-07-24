@@ -1,5 +1,6 @@
 package vn.edu.fpt.zentryapp.auth.ui;
 
+import android.os.Handler;
 import android.text.TextUtils;
 import android.util.Patterns;
 
@@ -15,6 +16,7 @@ import retrofit2.Response;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.auth.models.LoginRequest;
 import vn.edu.fpt.zentryapp.auth.models.TokenResponse;
+import vn.edu.fpt.zentryapp.auth.models.UserInfo;
 import vn.edu.fpt.zentryapp.auth.services.AuthService;
 
 public class LoginViewModel extends ViewModel {
@@ -32,6 +34,12 @@ public class LoginViewModel extends ViewModel {
     public LiveData<String> passwordError() { return _passwordError; }
     private AuthService authService;
     private AuthManager authManager;
+    // Fake accounts for testing
+    private static final String LECTURER_EMAIL = "lecturer@fpt.edu.vn";
+    private static final String LECTURER_PASSWORD = "123456";
+    private static final String STUDENT_EMAIL = "student@fpt.edu.vn";
+    private static final String STUDENT_PASSWORD = "123456";
+
     public void init(AuthService authService, AuthManager authManager) {
         this.authService = authService;
         this.authManager = authManager;
@@ -49,7 +57,81 @@ public class LoginViewModel extends ViewModel {
         // Show loading
         _isLoading.setValue(true);
 
-        performRealLogin(email, password);
+        // Check if using fake accounts first
+        if (isFakeAccount(email, password)) {
+            performFakeLogin(email, password);
+        } else {
+            performRealLogin(email, password);
+        }
+    }
+    /**
+     * Check if email/password combination is a fake test account
+     */
+    private boolean isFakeAccount(String email, String password) {
+        return (LECTURER_EMAIL.equalsIgnoreCase(email) && LECTURER_PASSWORD.equals(password)) ||
+                (STUDENT_EMAIL.equalsIgnoreCase(email) && STUDENT_PASSWORD.equals(password));
+    }
+
+    /**
+     * Perform fake login with simulated delay
+     */
+    private void performFakeLogin(String email, String password) {
+        // Simulate network delay
+        new Handler().postDelayed(() -> {
+            try {
+                TokenResponse fakeResponse = generateFakeTokenResponse(email);
+
+                // Save auth data
+                authManager.saveAuthData(fakeResponse.getToken(), fakeResponse.getUserInfo());
+
+                // Determine navigation based on role
+                String role = fakeResponse.getUserInfo().getRole();
+                boolean isLecturer = "Lecturer".equalsIgnoreCase(role);
+
+                _loginSuccess.setValue(new LoginSuccess(
+                        fakeResponse.getUserInfo().getEmail(),
+                        role,
+                        isLecturer
+                ));
+
+            } catch (Exception e) {
+                _errorMessage.setValue("Lỗi fake login: " + e.getMessage());
+            } finally {
+                _isLoading.setValue(false);
+            }
+        }, 1500); // 1.5 second delay to simulate real network call
+    }
+
+    /**
+     * Generate fake token response based on email
+     */
+    private TokenResponse generateFakeTokenResponse(String email) {
+        UserInfo userInfo;
+        String token;
+
+        if (LECTURER_EMAIL.equalsIgnoreCase(email)) {
+            // Fake Lecturer Account
+            userInfo = new UserInfo(
+                    "LEC001",
+                    LECTURER_EMAIL,
+                    "Lecturer"
+            );
+            token = "fake_lecturer_token_" + System.currentTimeMillis();
+
+        } else if (STUDENT_EMAIL.equalsIgnoreCase(email)) {
+            // Fake Student Account
+            userInfo = new UserInfo(
+                    "STU001",
+                    STUDENT_EMAIL,
+                    "Student"
+            );
+            token = "fake_student_token_" + System.currentTimeMillis();
+
+        } else {
+            throw new IllegalArgumentException("Unknown fake account");
+        }
+
+        return new TokenResponse(token, userInfo);
     }
 
     private boolean validateInput(String email, String password) {
