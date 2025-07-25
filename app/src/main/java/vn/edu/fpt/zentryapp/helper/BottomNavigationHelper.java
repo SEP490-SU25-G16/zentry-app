@@ -44,11 +44,21 @@ public class BottomNavigationHelper {
         int itemId = item.getItemId();
 
         if (currentTabId == itemId) {
-            // If same tab clicked, pop to root of that tab
+            // If same tab clicked
             NavHostFragment currentFragment = getCurrentNavHostFragment();
             if (currentFragment != null) {
                 NavController navController = currentFragment.getNavController();
-                navController.popBackStack(navController.getGraph().getStartDestination(), false);
+
+                // Check if we're already at the root destination
+                if (navController.getCurrentDestination() != null &&
+                        navController.getCurrentDestination().getId() == navController.getGraph().getStartDestination()) {
+
+                    // We're at root - recreate the fragment to refresh it
+                    recreateCurrentTab(itemId);
+                } else {
+                    // We're in a child fragment - pop to root
+                    navController.popBackStack(navController.getGraph().getStartDestination(), false);
+                }
             }
             return true;
         }
@@ -56,6 +66,33 @@ public class BottomNavigationHelper {
         switchTab(itemId);
         return true;
     }
+
+    private void recreateCurrentTab(int tabId) {
+        String tag = tabTags.get(tabId);
+        if (tag == null) return;
+
+        // Remove current fragment
+        Fragment currentFragment = fragmentManager.findFragmentByTag(tag);
+        if (currentFragment != null) {
+            fragmentManager.beginTransaction()
+                    .remove(currentFragment)
+                    .commit();
+            fragmentManager.executePendingTransactions();
+        }
+
+        // Create new NavHostFragment
+        Fragment newFragment = NavHostFragment.create(tabGraphs.get(tabId));
+        fragmentManager.beginTransaction()
+                .add(containerId, newFragment, tag)
+                .commit();
+        fragmentManager.executePendingTransactions();
+
+        // Navigate to start destination
+        NavHostFragment navHostFragment = (NavHostFragment) newFragment;
+        NavController navController = navHostFragment.getNavController();
+        navController.navigate(navController.getGraph().getStartDestination());
+    }
+
 
     private void switchTab(int tabId) {
         String tag = tabTags.get(tabId);
