@@ -71,6 +71,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
     private List<Session> generateMockSessions(String courseId) {
         List<Session> sessions = new ArrayList<>();
 
+        // Week 1
         sessions.add(new Session(
                 "S001",
                 "Session - 1",
@@ -119,6 +120,261 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 courseId,
                 "Mathematics",
                 "Systems of Equations"
+        ));
+
+        // Week 2
+        sessions.add(new Session(
+                "S006",
+                "Session - 6",
+                "08/01/2025",
+                "Attended",
+                courseId,
+                "Mathematics",
+                "Polynomial Functions"
+        ));
+
+        sessions.add(new Session(
+                "S007",
+                "Session - 7",
+                "09/01/2025",
+                "Attended",
+                courseId,
+                "Mathematics",
+                "Factoring Polynomials"
+        ));
+
+        sessions.add(new Session(
+                "S008",
+                "Session - 8",
+                "10/01/2025",
+                "Late",
+                courseId,
+                "Mathematics",
+                "Rational Functions"
+        ));
+
+        sessions.add(new Session(
+                "S009",
+                "Session - 9",
+                "11/01/2025",
+                "Absent",
+                courseId,
+                "Mathematics",
+                "Exponential Functions"
+        ));
+
+        sessions.add(new Session(
+                "S010",
+                "Session - 10",
+                "12/01/2025",
+                "Attended",
+                courseId,
+                "Mathematics",
+                "Logarithmic Functions"
+        ));
+
+        // Week 3
+        sessions.add(new Session(
+                "S011",
+                "Session - 11",
+                "15/01/2025",
+                "Attended",
+                courseId,
+                "Mathematics",
+                "Trigonometric Functions"
+        ));
+
+        sessions.add(new Session(
+                "S012",
+                "Session - 12",
+                "16/01/2025",
+                "Attended",
+                courseId,
+                "Mathematics",
+                "Unit Circle and Angles"
+        ));
+
+        sessions.add(new Session(
+                "S013",
+                "Session - 13",
+                "17/01/2025",
+                "Late",
+                courseId,
+                "Mathematics",
+                "Trigonometric Identities"
+        ));
+
+        sessions.add(new Session(
+                "S014",
+                "Session - 14",
+                "18/01/2025",
+                "Attended",
+                courseId,
+                "Mathematics",
+                "Inverse Trigonometric Functions"
+        ));
+
+        sessions.add(new Session(
+                "S015",
+                "Session - 15",
+                "19/01/2025",
+                "Absent",
+                courseId,
+                "Mathematics",
+                "Sequences and Series"
+        ));
+
+        // Week 4
+        sessions.add(new Session(
+                "S016",
+                "Session - 16",
+                "22/01/2025",
+                "Attended",
+                courseId,
+                "Mathematics",
+                "Arithmetic Sequences"
+        ));
+
+        sessions.add(new Session(
+                "S017",
+                "Session - 17",
+                "23/01/2025",
+                "Attended",
+                courseId,
+                "Mathematics",
+                "Geometric Sequences"
+        ));
+
+        sessions.add(new Session(
+                "S018",
+                "Session - 18",
+                "24/01/2025",
+                "Attended",
+                courseId,
+                "Mathematics",
+                "Limits and Continuity"
+        ));
+
+        sessions.add(new Session(
+                "S019",
+                "Session - 19",
+                "25/01/2025",
+                "Late",
+                courseId,
+                "Mathematics",
+                "Introduction to Derivatives"
+        ));
+
+        sessions.add(new Session(
+                "S020",
+                "Session - 20",
+                "26/01/2025",
+                "Attended",
+                courseId,
+                "Mathematics",
+                "Derivative Rules"
+        ));
+
+        // Week 5
+        sessions.add(new Session(
+                "S021",
+                "Session - 21",
+                "29/01/2025",
+                "Attended",
+                courseId,
+                "Mathematics",
+                "Chain Rule"
+        ));
+
+        sessions.add(new Session(
+                "S022",
+                "Session - 22",
+                "30/01/2025",
+                "Absent",
+                courseId,
+                "Mathematics",
+                "Applications of Derivatives"
+        ));
+
+        sessions.add(new Session(
+                "S023",
+                "Session - 23",
+                "31/01/2025",
+                "Attended",
+                courseId,
+                "Mathematics",
+                "Optimization Problems"
+        ));
+
+        sessions.add(new Session(
+                "S024",
+                "Session - 24",
+                "01/02/2025",
+                "Attended",
+                courseId,
+                "Mathematics",
+                "Related Rates"
+        ));
+
+        sessions.add(new Session(
+                "S025",
+                "Session - 25",
+                "02/02/2025",
+                "Late",
+                courseId,
+                "Mathematics",
+                "Introduction to Integrals"
+        ));
+
+        // Week 6
+        sessions.add(new Session(
+                "S026",
+                "Session - 26",
+                "05/02/2025",
+                "Attended",
+                courseId,
+                "Mathematics",
+                "Fundamental Theorem of Calculus"
+        ));
+
+        sessions.add(new Session(
+                "S027",
+                "Session - 27",
+                "06/02/2025",
+                "Attended",
+                courseId,
+                "Mathematics",
+                "Integration Techniques"
+        ));
+
+        sessions.add(new Session(
+                "S028",
+                "Session - 28",
+                "07/02/2025",
+                "Attended",
+                courseId,
+                "Mathematics",
+                "Applications of Integrals"
+        ));
+
+        sessions.add(new Session(
+                "S029",
+                "Session - 29",
+                "08/02/2025",
+                "Absent",
+                courseId,
+                "Mathematics",
+                "Area and Volume Calculations"
+        ));
+
+        sessions.add(new Session(
+                "S030",
+                "Session - 30",
+                "09/02/2025",
+                "Attended",
+                courseId,
+                "Mathematics",
+                "Final Review and Assessment"
         ));
 
         return sessions;

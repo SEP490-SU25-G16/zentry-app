@@ -56,12 +56,12 @@ public class SessionAdapter extends RecyclerView.Adapter<SessionAdapter.ViewHold
             super(binding.getRoot());
             this.binding = binding;
 
-            binding.getRoot().setOnClickListener(v -> {
-                int position = getAdapterPosition();
-                if (position != RecyclerView.NO_POSITION && onSessionClickListener != null) {
-                    onSessionClickListener.onSessionClick(sessions.get(position));
-                }
-            });
+//            binding.getRoot().setOnClickListener(v -> {
+//                int position = getAdapterPosition();
+//                if (position != RecyclerView.NO_POSITION && onSessionClickListener != null) {
+//                    onSessionClickListener.onSessionClick(sessions.get(position));
+//                }
+//            });
         }
 
         public void bind(Session session, boolean isLastItem) {

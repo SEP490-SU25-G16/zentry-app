@@ -63,7 +63,7 @@ public class StudentReportListSessionFragment extends Fragment implements Sessio
 
     private void setupRecyclerView() {
         sessionAdapter = new SessionAdapter();
-        sessionAdapter.setOnSessionClickListener(this);
+//        sessionAdapter.setOnSessionClickListener(this);
 
         binding.rvSessions.setLayoutManager(new LinearLayoutManager(requireContext()));
         binding.rvSessions.setAdapter(sessionAdapter);
@@ -129,14 +129,14 @@ public class StudentReportListSessionFragment extends Fragment implements Sessio
 
     @Override
     public void onSessionClick(Session session) {
-        Toast.makeText(requireContext(), "Clicked: " + session.getTitle(), Toast.LENGTH_SHORT).show();
-
-        Bundle args = new Bundle();
-        args.putString("sessionId", session.getId());
-        args.putString("sessionTitle", session.getTitle());
-        navController.navigate(R.id.action_listSession_to_sessionDetail, args);
-
-        viewModel.onSessionClicked(session);
+//        Toast.makeText(requireContext(), "Clicked: " + session.getTitle(), Toast.LENGTH_SHORT).show();
+//
+//        Bundle args = new Bundle();
+//        args.putString("sessionId", session.getId());
+//        args.putString("sessionTitle", session.getTitle());
+//        navController.navigate(R.id.action_listSession_to_sessionDetail, args);
+//
+//        viewModel.onSessionClicked(session);
     }
 
     @Override

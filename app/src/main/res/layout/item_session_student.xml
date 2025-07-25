@@ -10,64 +10,58 @@
         android:id="@+id/llSessionItem"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
+        android:orientation="vertical"
         android:paddingTop="12dp"
         android:paddingBottom="12dp">
 
-        <LinearLayout
-            android:id="@+id/llSessionInfo"
-            android:layout_width="0dp"
+        <!-- Session Title -->
+        <TextView
+            android:id="@+id/tvSessionTitle"
+            android:fontFamily="@font/mulishextrabold"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:text="Session - 1"
+            android:textColor="#232B42"
+            android:textSize="16sp"
+            android:textStyle="bold"/>
 
+        <!-- Attendance và Date nằm 2 bên -->
+        <LinearLayout
+            android:id="@+id/llSessionDetails"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical">
+
+            <!-- Attendance Status - Bên trái -->
             <TextView
-                android:id="@+id/tvSessionTitle"
+                android:id="@+id/tvSessionAttendance"
+                android:fontFamily="@font/jostsemibold"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Attended"
+                android:textSize="12sp"
+                android:textColor="#167F71"/>
+
+            <!-- Spacer để đẩy date sang bên phải -->
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"/>
+
+            <!-- Date - Bên phải -->
+            <TextView
+                android:id="@+id/tvSessionDate"
                 android:fontFamily="@font/mulishextrabold"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Session - 1"
-                android:textColor="#232B42"
-                android:textSize="16sp"
-                android:textStyle="bold"/>
+                android:text="01/01/2025"
+                android:textSize="12sp"
+                android:textColor="#979797"/>
 
-            <LinearLayout
-                android:id="@+id/llSessionDetails"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="4dp">
-
-                <TextView
-                    android:id="@+id/tvSessionAttendance"
-                    android:fontFamily="@font/jostsemibold"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Attended"
-                    android:textSize="12sp"
-                    android:textColor="#167F71"/>
-
-                <TextView
-                    android:id="@+id/tvSessionSeparator"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
-                    android:text="|"
-                    android:textSize="12sp"
-                    android:textColor="#CCCCCC"/>
-
-                <TextView
-                    android:id="@+id/tvSessionDate"
-                    android:fontFamily="@font/mulishextrabold"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
-                    android:text="01/01/2025"
-                    android:textSize="12sp"
-                    android:textColor="#979797"/>
-            </LinearLayout>
         </LinearLayout>
+
     </LinearLayout>
 
     <!-- Divider -->
