@@ -126,9 +126,6 @@ public class LecturerScheduleFragment extends Fragment implements ScheduleSessio
     @Override
     public void onSessionClick(ScheduleSession session) {
         if (session.isCanViewDetail()) {
-            Toast.makeText(requireContext(),
-                    "Opening session detail: " + session.getCourseName(), Toast.LENGTH_SHORT).show();
-
             // Navigate to session detail
             Bundle args = new Bundle();
             args.putString("sessionId", session.getSessionId());

@@ -72,16 +72,12 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
             // Configure action button
             configureActionButton(session);
 
-            // Set click listeners
-            binding.getRoot().setOnClickListener(v -> {
-                if (session.isCanViewDetail() && listener != null) {
-                    listener.onSessionClick(session);
-                }
-            });
-
+            // Chỉ giữ lại click listener cho button
             binding.btnSessionAction.setOnClickListener(v -> {
                 if (session.isCanStartInstant() && listener != null) {
                     listener.onStartInstantClick(session);
+                } else if (session.isCanViewDetail() && listener != null) {
+                    listener.onSessionClick(session);
                 }
             });
 
