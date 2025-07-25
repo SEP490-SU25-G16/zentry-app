@@ -69,12 +69,6 @@ public class ClassHistoryAdapter extends RecyclerView.Adapter<ClassHistoryAdapte
             binding.tvSessionNumber.setText(session.getSessionNumber());
             binding.tvSessionDate.setText(session.getFormattedDate());
             binding.tvAttendanceStatus.setText(session.getMyAttendanceStatus());
-
-            // Set colors based on attendance status
-            int color = session.getAttendanceColor();
-            binding.viewAttendanceIndicator.setBackgroundTintList(
-                    android.content.res.ColorStateList.valueOf(color));
-            binding.tvAttendanceStatus.setTextColor(color);
         }
     }
 }

@@ -4,18 +4,10 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:padding="16dp"
     android:minHeight="60dp"
     android:foreground="?attr/selectableItemBackground"
     android:clickable="true"
     android:focusable="true">
-
-    <!-- Round Indicator -->
-    <View
-        android:id="@+id/viewAttendanceIndicator"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:backgroundTint="#059669" />
 
     <!-- Session Info -->
     <LinearLayout
