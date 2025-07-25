@@ -146,7 +146,6 @@ public class StudentScheduleFragment extends Fragment implements ScheduleAdapter
 
     @Override
     public void onScheduleClick(Schedule schedule) {
-        Toast.makeText(requireContext(), "Clicked: " + schedule.getClassNameWithGrade(), Toast.LENGTH_SHORT).show();
         navController.navigate(R.id.action_studentSchedule_to_classDetail);
         viewModel.onScheduleClicked(schedule);
     }

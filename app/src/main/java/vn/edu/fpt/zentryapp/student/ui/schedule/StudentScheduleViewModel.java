@@ -139,47 +139,129 @@ public class StudentScheduleViewModel extends ViewModel {
     private List<Schedule> generateMockSchedules() {
         List<Schedule> schedules = new ArrayList<>();
 
-        // Get current time for testing
-        Calendar now = Calendar.getInstance();
         String currentDay = getCurrentDayName();
 
-        // Add a schedule for current time (should be clickable)
+        // ========== SCHEDULES ĐÃ QUA (Past) - Ở TRÊN ==========
+
+        // Schedule đã kết thúc từ sáng sớm
         schedules.add(new Schedule(
                 "SCH001",
                 "Mathematics",
                 "07",
                 currentDay,
-                getCurrentTimeFormatted(-30), // Started 30 minutes ago
-                getCurrentTimeFormatted(30),  // Ends in 30 minutes
+                getCurrentTimeFormatted(-360), // Started 6 hours ago (6:00 AM)
+                getCurrentTimeFormatted(-270), // Ended 4.5 hours ago (7:30 AM)
                 "BE-201",
                 "Nguyễn Văn A",
                 "MATH07"
         ));
 
-        // Add a schedule for later today (should not be clickable yet)
+        // Schedule đã kết thúc từ sáng
         schedules.add(new Schedule(
                 "SCH002",
-                "Physics",
+                "English Literature",
                 "08",
                 currentDay,
-                getCurrentTimeFormatted(60),  // Starts in 1 hour
-                getCurrentTimeFormatted(120), // Ends in 2 hours
-                "BE-203",
-                "Trần Thị B",
-                "PHY08"
+                getCurrentTimeFormatted(-240), // Started 4 hours ago (8:00 AM)
+                getCurrentTimeFormatted(-150), // Ended 2.5 hours ago (9:30 AM)
+                "BE-301",
+                "Phạm Thị D",
+                "ENG08"
         ));
 
-        // Add a schedule that's about to start (should be clickable)
+        // Schedule vừa kết thúc gần đây
         schedules.add(new Schedule(
                 "SCH003",
-                "Chemistry",
-                "07",
+                "Physics",
+                "09",
                 currentDay,
-                getCurrentTimeFormatted(10),  // Starts in 10 minutes
-                getCurrentTimeFormatted(70),  // Ends in 70 minutes
+                getCurrentTimeFormatted(-120), // Started 2 hours ago (10:00 AM)
+                getCurrentTimeFormatted(-30),  // Ended 30 minutes ago (11:30 AM)
+                "BE-203",
+                "Trần Thị B",
+                "PHY09"
+        ));
+
+        // ========== SCHEDULE HIỆN TẠI (Current) ==========
+
+        // Schedule đang diễn ra (clickable)
+        schedules.add(new Schedule(
+                "SCH004",
+                "Computer Science",
+                "10",
+                currentDay,
+                getCurrentTimeFormatted(-15), // Started 15 minutes ago
+                getCurrentTimeFormatted(75),  // Ends in 75 minutes
+                "BE-401",
+                "Lê Văn E",
+                "CS10"
+        ));
+
+        // ========== SCHEDULES CHƯA BẮT ĐẦU (Future) - Ở DƯỚI ==========
+
+        // Schedule sắp bắt đầu (gần kề - có thể clickable)
+        schedules.add(new Schedule(
+                "SCH005",
+                "Chemistry",
+                "11",
+                currentDay,
+                getCurrentTimeFormatted(45),  // Starts in 45 minutes
+                getCurrentTimeFormatted(135), // Ends in 2h 15m
                 "BE-105",
-                "Lê Văn C",
-                "CHEM07"
+                "Hoàng Văn F",
+                "CHEM11"
+        ));
+
+        // Schedule chiều
+        schedules.add(new Schedule(
+                "SCH006",
+                "Biology",
+                "12",
+                currentDay,
+                getCurrentTimeFormatted(120), // Starts in 2 hours
+                getCurrentTimeFormatted(210), // Ends in 3.5 hours
+                "BE-102",
+                "Ngô Thị G",
+                "BIO12"
+        ));
+
+        // Schedule muộn hơn
+        schedules.add(new Schedule(
+                "SCH007",
+                "History",
+                "13",
+                currentDay,
+                getCurrentTimeFormatted(180), // Starts in 3 hours
+                getCurrentTimeFormatted(270), // Ends in 4.5 hours
+                "BE-304",
+                "Đỗ Văn H",
+                "HIST13"
+        ));
+
+        // Schedule cuối ngày
+        schedules.add(new Schedule(
+                "SCH008",
+                "Art & Design",
+                "14",
+                currentDay,
+                getCurrentTimeFormatted(300), // Starts in 5 hours
+                getCurrentTimeFormatted(390), // Ends in 6.5 hours
+                "BE-501",
+                "Vũ Thị I",
+                "ART14"
+        ));
+
+        // Schedule tối
+        schedules.add(new Schedule(
+                "SCH009",
+                "Music Theory",
+                "15",
+                currentDay,
+                getCurrentTimeFormatted(420), // Starts in 7 hours
+                getCurrentTimeFormatted(510), // Ends in 8.5 hours
+                "BE-502",
+                "Bùi Văn K",
+                "MUS15"
         ));
 
         return schedules;
