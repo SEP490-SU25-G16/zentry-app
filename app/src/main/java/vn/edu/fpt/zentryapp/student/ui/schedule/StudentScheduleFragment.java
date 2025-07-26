@@ -77,10 +77,11 @@ public class StudentScheduleFragment extends Fragment implements ScheduleAdapter
 //        });
 
         // Notification click
+        // Notification click
         binding.btnStudentScheduleNotification.setOnClickListener(v -> {
-            Toast.makeText(requireContext(), "Notification clicked", Toast.LENGTH_SHORT).show();
-            // TODO: Open notification screen/dialog
+            navController.navigate(R.id.action_studentSchedule_to_notification);
         });
+
     }
 
     private void observeViewModel() {

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/nav_graph_tab_schedule_student"
     app:startDestination="@id/studentScheduleFragment">
 
@@ -17,6 +18,11 @@
         <action
             android:id="@+id/action_studentSchedule_to_classDetail"
             app:destination="@id/studentScheduleClassDetailFragment" />
+
+        <!-- Navigate to notification -->
+        <action
+            android:id="@+id/action_studentSchedule_to_notification"
+            app:destination="@id/notificationFragment" />
     </fragment>
 
     <!-- 2. Calendar Screen -->
@@ -44,4 +50,10 @@
             app:popUpTo="@id/studentScheduleFragment"
             app:popUpToInclusive="true" />
     </fragment>
+    <!-- 4. Notification Screen -->
+    <fragment
+        android:id="@+id/notificationFragment"
+        android:name="vn.edu.fpt.zentryapp.notification.ui.NotificationFragment"
+        android:label="Thông báo"
+        tools:layout="@layout/fragment_notification" />
 </navigation>
