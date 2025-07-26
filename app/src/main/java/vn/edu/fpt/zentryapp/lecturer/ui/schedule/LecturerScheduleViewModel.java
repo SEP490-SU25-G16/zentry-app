@@ -17,13 +17,13 @@ import java.util.Locale;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
-import vn.edu.fpt.zentryapp.lecturer.data.model.response.ScheduleSession;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerScheduleSession;
 
 public class LecturerScheduleViewModel extends ViewModel {
 
     // LiveData cho UI state
     private final MutableLiveData<Boolean> _isLoading = new MutableLiveData<>(false);
-    private final MutableLiveData<List<ScheduleSession>> _todaySessions = new MutableLiveData<>();
+    private final MutableLiveData<List<LecturerScheduleSession>> _todaySessions = new MutableLiveData<>();
     private final MutableLiveData<String> _errorMessage = new MutableLiveData<>();
     private final MutableLiveData<UserProfile> _userProfile = new MutableLiveData<>();
     private final MutableLiveData<String> _greeting = new MutableLiveData<>();
@@ -34,7 +34,7 @@ public class LecturerScheduleViewModel extends ViewModel {
         return _isLoading;
     }
 
-    public LiveData<List<ScheduleSession>> todaySessions() {
+    public LiveData<List<LecturerScheduleSession>> todaySessions() {
         return _todaySessions;
     }
 
@@ -72,7 +72,7 @@ public class LecturerScheduleViewModel extends ViewModel {
 
         // Simulate network delay
         new Handler().postDelayed(() -> {
-            List<ScheduleSession> sessions = generateTodaySchedule();
+            List<LecturerScheduleSession> sessions = generateTodaySchedule();
             _todaySessions.setValue(sessions);
             _isLoading.setValue(false);
         }, 1000);
@@ -136,8 +136,8 @@ public class LecturerScheduleViewModel extends ViewModel {
     /**
      * Generate mock schedule for today
      */
-    private List<ScheduleSession> generateTodaySchedule() {
-        List<ScheduleSession> sessions = new ArrayList<>();
+    private List<LecturerScheduleSession> generateTodaySchedule() {
+        List<LecturerScheduleSession> sessions = new ArrayList<>();
         Calendar today = Calendar.getInstance();
 
         // Session 1: Past session (8:00-9:30) - Can view detail, cannot start
@@ -148,7 +148,7 @@ public class LecturerScheduleViewModel extends ViewModel {
         session1End.set(Calendar.HOUR_OF_DAY, 9);
         session1End.set(Calendar.MINUTE, 30);
 
-        sessions.add(new ScheduleSession(
+        sessions.add(new LecturerScheduleSession(
                 "SCH001",
                 "CSE101",
                 "Lập trình căn bản",
@@ -168,7 +168,7 @@ public class LecturerScheduleViewModel extends ViewModel {
         Calendar session2End = (Calendar) today.clone();
         session2End.add(Calendar.HOUR_OF_DAY, 1); // Ends in 1 hour
 
-        sessions.add(new ScheduleSession(
+        sessions.add(new LecturerScheduleSession(
                 "SCH002",
                 "CSE201",
                 "Cấu trúc dữ liệu và giải thuật",
@@ -188,7 +188,7 @@ public class LecturerScheduleViewModel extends ViewModel {
         Calendar session3End = (Calendar) session3.clone();
         session3End.add(Calendar.HOUR, 2);
 
-        sessions.add(new ScheduleSession(
+        sessions.add(new LecturerScheduleSession(
                 "SCH003",
                 "CSE301",
                 "Lập trình Web",
@@ -208,7 +208,7 @@ public class LecturerScheduleViewModel extends ViewModel {
         Calendar session4End = (Calendar) session4.clone();
         session4End.add(Calendar.HOUR, 2);
 
-        sessions.add(new ScheduleSession(
+        sessions.add(new LecturerScheduleSession(
                 "SCH004",
                 "CSE401",
                 "Phát triển ứng dụng di động",
@@ -231,8 +231,8 @@ public class LecturerScheduleViewModel extends ViewModel {
     /**
      * Update session permissions based on current time
      */
-    private void updateSessionPermissions(List<ScheduleSession> sessions) {
-        for (ScheduleSession session : sessions) {
+    private void updateSessionPermissions(List<LecturerScheduleSession> sessions) {
+        for (LecturerScheduleSession session : sessions) {
             // Can start instant: if session is ongoing or starting within 15 minutes
             boolean canStart = session.isCurrentTimeInSession() || session.isSessionStartingSoon();
             session.setCanStartInstant(canStart);
@@ -246,7 +246,7 @@ public class LecturerScheduleViewModel extends ViewModel {
     /**
      * Handle start instant class
      */
-    public void startInstantClass(ScheduleSession session) {
+    public void startInstantClass(LecturerScheduleSession session) {
         if (!session.isCanStartInstant()) {
             _errorMessage.setValue("Cannot start this session at the moment");
             return;

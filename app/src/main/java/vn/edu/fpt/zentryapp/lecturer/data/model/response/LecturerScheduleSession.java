@@ -3,6 +3,8 @@ package vn.edu.fpt.zentryapp.lecturer.data.model.response;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.io.Serializable;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -10,7 +12,8 @@ import java.util.Locale;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class ScheduleSession {
+public class LecturerScheduleSession implements Serializable {
+    private static final long serialVersionUID = 1L;
     private String sessionId;
     private String courseCode;
     private String courseName;

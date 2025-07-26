@@ -28,7 +28,6 @@ public class LecturerScheduleClassDetailFragment extends Fragment {
     private LecturerScheduleClassDetailViewModel viewModel;
     private NavController navController;
     private String sessionId;
-
     private AttendanceHistoryFragment historyFragment;
     private FinalAttendanceFragment attendanceFragment;
 
@@ -111,7 +110,7 @@ public class LecturerScheduleClassDetailFragment extends Fragment {
             }
         });
         // Observer riêng cho button visibility
-        viewModel.canAddRound().observe(getViewLifecycleOwner(), canAdd -> {
+        viewModel.canAddFaceId().observe(getViewLifecycleOwner(), canAdd -> {
             binding.btnScheduleClassDetailAdd.setVisibility(canAdd ? View.VISIBLE : View.GONE);
         });
 

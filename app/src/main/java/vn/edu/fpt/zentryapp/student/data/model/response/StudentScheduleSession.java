@@ -1,6 +1,9 @@
 package vn.edu.fpt.zentryapp.student.data.model.response;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+
+import java.io.Serializable;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -8,8 +11,10 @@ import java.util.Date;
 import java.util.Locale;
 
 @Getter
-public class Schedule {
-    private final String id;
+@AllArgsConstructor
+public class StudentScheduleSession implements Serializable {
+    private static final long serialVersionUID = 1L;
+    private final String sessionId;
     private final String className;
     private final String grade;
     private final String dayOfWeek;
@@ -18,19 +23,6 @@ public class Schedule {
     private final String room;
     private final String lecturer;
     private final String courseCode;
-
-    public Schedule(String id, String className, String grade, String dayOfWeek,
-                    String startTime, String endTime, String room, String lecturer, String courseCode) {
-        this.id = id;
-        this.className = className;
-        this.grade = grade;
-        this.dayOfWeek = dayOfWeek;
-        this.startTime = startTime;
-        this.endTime = endTime;
-        this.room = room;
-        this.lecturer = lecturer;
-        this.courseCode = courseCode;
-    }
 
     public String getClassNameWithGrade() {
         return className + " Grade - " + grade;
@@ -135,14 +127,22 @@ public class Schedule {
 
     private int getDayOfWeekInt(String dayName) {
         switch (dayName.toLowerCase()) {
-            case "sunday": return Calendar.SUNDAY;
-            case "monday": return Calendar.MONDAY;
-            case "tuesday": return Calendar.TUESDAY;
-            case "wednesday": return Calendar.WEDNESDAY;
-            case "thursday": return Calendar.THURSDAY;
-            case "friday": return Calendar.FRIDAY;
-            case "saturday": return Calendar.SATURDAY;
-            default: return Calendar.MONDAY;
+            case "sunday":
+                return Calendar.SUNDAY;
+            case "monday":
+                return Calendar.MONDAY;
+            case "tuesday":
+                return Calendar.TUESDAY;
+            case "wednesday":
+                return Calendar.WEDNESDAY;
+            case "thursday":
+                return Calendar.THURSDAY;
+            case "friday":
+                return Calendar.FRIDAY;
+            case "saturday":
+                return Calendar.SATURDAY;
+            default:
+                return Calendar.MONDAY;
         }
     }
 

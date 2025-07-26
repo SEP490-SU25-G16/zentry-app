@@ -1,20 +1,16 @@
 package vn.edu.fpt.zentryapp.student.data.model.response;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @Getter
+@AllArgsConstructor
+
 public class MyAttendance {
     private final int totalSessions;
     private final int attendedSessions;
     private final int absentSessions;
     private final int lateSessions;
-
-    public MyAttendance(int totalSessions, int attendedSessions, int absentSessions, int lateSessions) {
-        this.totalSessions = totalSessions;
-        this.attendedSessions = attendedSessions;
-        this.absentSessions = absentSessions;
-        this.lateSessions = lateSessions;
-    }
 
     public float getAttendancePercentage() {
         if (totalSessions == 0) return 0;
