@@ -9,4 +9,15 @@
 
     <!-- UI Label -->
     <string name="notifications">Thông báo</string>
+    <string name="notification_title">Notifications</string>
+    <string name="notification_empty">You have no new notifications.</string>
+    <string name="notification_history_link">Go to notification history</string>
+    <string name="notification_settings">Settings</string>
+    <string name="back">Back</string>
+    <string name="settings">Settings</string>
+    <string name="delete_notification">Delete notification</string>
+    <string name="see_more_notifications">See previous notifications</string>
+    <string name="notification_icon">Notification Icon</string>
+
+
 </resources>

@@ -1,9 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Màu cơ bản -->
+    <color name="primary">#0961F5</color> <!-- xanh nổi bật -->
+    <color name="primaryText">#232B42</color> <!-- màu chữ chính -->
+    <color name="gray">#888888</color> <!-- màu mô tả, ngày tháng -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="green">#00FF00</color>
     <!-- Face ID colors -->
     <color name="green_success">#4CAF50</color>
     <color name="red_error">#F44336</color>
+
+    <color name="tab_selected_background">#EEF3F9</color>
+    <color name="success">#4CAF50</color>
+    <color name="warning">#FFC107</color>
+    <color name="info">#2196F3</color>
+    <color name="notification_unread_background">#E6F2FF</color>
+    <color name="lightGray">#E5E5E5</color>
 </resources>
