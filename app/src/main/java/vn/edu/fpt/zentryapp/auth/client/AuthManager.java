@@ -58,7 +58,7 @@ public class AuthManager {
     // Helper methods để lấy thông tin user
     public String getCurrentUserId() {
         UserInfo userInfo = getUserInfo();
-        return userInfo != null ? userInfo.getId() : null;
+        return userInfo != null ? userInfo.getAccountId() : null;
     }
 
     public String getCurrentUserEmail() {
