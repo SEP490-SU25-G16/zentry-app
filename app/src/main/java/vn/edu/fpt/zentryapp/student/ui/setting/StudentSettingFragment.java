@@ -9,6 +9,7 @@ import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
 import androidx.navigation.fragment.NavHostFragment;
 
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -62,9 +63,21 @@ public class StudentSettingFragment extends Fragment {
         });
 
         // Xử lý click Notifications để điều hướng sang màn hình cài đặt thông báo
-        binding.llStudentSettingRowNotifications.setOnClickListener(v ->
-                navController.navigate(R.id.action_studentSetting_to_notifications)
-        );
+        binding.llStudentSettingRowNotifications.setOnClickListener(v -> {
+            try {
+                Log.d("StudentSettingFragment", "Navigating to StudentSettingNotificationFragment");
+                
+                // Tạo bundle để truyền source
+                Bundle args = new Bundle();
+                args.putString(StudentSettingNotificationFragment.ARG_SOURCE, 
+                               StudentSettingNotificationFragment.SOURCE_SETTINGS);
+                
+                // Navigate với bundle
+                navController.navigate(R.id.action_studentSetting_to_notifications, args);
+            } catch (Exception e) {
+                Log.e("StudentSettingFragment", "Navigation error", e);
+            }
+        });
 
         // Xử lý click Profile Overview để điều hướng sang màn hình tổng quan profile
         binding.llStudentSettingRowProfileOverview.setOnClickListener(v ->
