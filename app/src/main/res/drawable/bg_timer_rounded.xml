@@ -1,0 +1,6 @@
+<!-- res/drawable/bg_timer_rounded.xml -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#99ABF7"/> <!-- Màu nền xanh nhạt, bạn có thể đổi -->
+    <corners android:radius="18dp"/>
+</shape>

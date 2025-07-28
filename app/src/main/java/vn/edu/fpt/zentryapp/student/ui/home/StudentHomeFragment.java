@@ -125,7 +125,6 @@ public class StudentHomeFragment extends Fragment implements StudentCourseAdapte
 
     @Override
     public void onCourseClick(StudentCourse course) {
-        Toast.makeText(requireContext(), "Clicked: " + course.getName(), Toast.LENGTH_SHORT).show();
         viewModel.onCourseClicked(course);
     }
 

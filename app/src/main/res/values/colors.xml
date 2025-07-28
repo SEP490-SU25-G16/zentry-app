@@ -6,4 +6,15 @@
     <!-- Face ID colors -->
     <color name="green_success">#4CAF50</color>
     <color name="red_error">#F44336</color>
+
+
+    <color name="backgroundLight">#F9F8FE</color>
+    <color name="primary">#6367F1</color>
+    <color name="highlight">#9e9bc3</color>
+    <color name="bodyText">#6A6B7C</color>
+    <color name="countdownTimer">#FFFFFF</color>
+    <color name="subTitle">#B2B6D3</color>
+    <color name="bottomNavBg">#F9F8FE</color>
+    <!-- Thêm các màu khác nếu cần -->
+
 </resources>
