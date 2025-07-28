@@ -78,7 +78,14 @@ public class LecturerReportFragment extends Fragment implements SessionAdapter.O
     private void setupClickListeners() {
         // Notification button
         binding.btnNotification.setOnClickListener(v -> {
-            // TODO: Navigate to notifications screen
+            // Navigate đến NotificationFragment (cùng fragment với student)
+            try {
+                navController.navigate(R.id.action_lecturerReport_to_notification);
+            } catch (Exception e) {
+                // Fallback nếu action không tồn tại
+                android.util.Log.e("LecturerReport", "Navigation error: ", e);
+                Toast.makeText(requireContext(), "Chức năng thông báo đang được phát triển", Toast.LENGTH_SHORT).show();
+            }
         });
     }
 

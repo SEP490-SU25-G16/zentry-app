@@ -52,6 +52,16 @@
             app:destination="@id/lecturerScheduleFragment"
             app:popUpTo="@id/lecturerScheduleFragment"
             app:popUpToInclusive="false" />
+        <!-- Navigation đến NotificationFragment -->
+        <action
+            android:id="@+id/action_scheduleClassDetail_to_notification"
+            app:destination="@id/notificationFragment" />
     </fragment>
 
+    <!-- 4. Notification Fragment (shared với student) -->
+    <fragment
+        android:id="@+id/notificationFragment"
+        android:name="vn.edu.fpt.zentryapp.notification.ui.NotificationFragment"
+        android:label="Notifications"
+        tools:layout="@layout/fragment_notification" />
 </navigation>
