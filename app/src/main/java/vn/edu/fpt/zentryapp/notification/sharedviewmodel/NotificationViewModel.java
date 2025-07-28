@@ -16,6 +16,7 @@ public class NotificationViewModel extends ViewModel {
     private final MutableLiveData<List<NotificationItem>> allNotifications = new MutableLiveData<>(new ArrayList<>());
     private final MutableLiveData<List<NotificationItem>> filteredNotifications = new MutableLiveData<>(new ArrayList<>());
     private final MutableLiveData<Boolean> showSeeMoreButton = new MutableLiveData<>(false);
+    private final MutableLiveData<Integer> unseenCount = new MutableLiveData<>(0);
     private boolean isDataLoaded = false;
     
     // Pagination constants
@@ -39,6 +40,10 @@ public class NotificationViewModel extends ViewModel {
     public LiveData<Boolean> shouldShowSeeMoreButton() {
         return showSeeMoreButton;
     }
+    
+    public LiveData<Integer> getUnseenCount() {
+        return unseenCount;
+    }
 
     public void loadNotifications() {
         // Chỉ load dữ liệu một lần
@@ -46,26 +51,74 @@ public class NotificationViewModel extends ViewModel {
             return;
         }
         
+        // Tạo dữ liệu mock
         List<NotificationItem> mockData = new ArrayList<>();
-        mockData.add(new NotificationItem("1", "Điểm danh buổi sáng", "Bạn cần điểm danh khuôn mặt trước 9h00 hôm nay.", "Jul 26, 2025", false));
-        mockData.add(new NotificationItem("2", "Nhắc lịch học", "Lớp Pháp luật đại cương học bù lúc 15h hôm nay.", "Jul 25, 2025", false));
-        mockData.add(new NotificationItem("3", "Bảo trì hệ thống", "Cổng điểm danh sẽ tạm ngưng từ 23h00 đến 01h00.", "Jul 24, 2025", true));
-        mockData.add(new NotificationItem("4", "Thông báo điểm danh", "Bạn chưa điểm danh môn Kỹ thuật lập trình sáng nay.", "Jul 26, 2025", false));
-        mockData.add(new NotificationItem("5", "Lịch học thay đổi", "Lớp Hệ điều hành chuyển sang phòng 302.", "Jul 26, 2025", true));
-        mockData.add(new NotificationItem("6", "Thông báo mới", "Trường phát hành thẻ sinh viên mới cho K65.", "Jul 23, 2025", true));
-        mockData.add(new NotificationItem("7", "Tuyển thành viên CLB AI", "CLB AI tuyển thành viên mới đến hết tháng này.", "Jul 22, 2025", false));
-        mockData.add(new NotificationItem("8", "Điểm danh muộn", "Bạn vừa điểm danh trễ môn Xác suất Thống kê.", "Jul 25, 2025", true));
-        mockData.add(new NotificationItem("9", "Lịch thi giữa kỳ", "Môn Giải tích 2 sẽ thi vào 01/08 tại phòng A101.", "Jul 20, 2025", true));
-        mockData.add(new NotificationItem("10", "Nộp học phí", "Hạn nộp học phí đợt 2 là ngày 31/07/2025.", "Jul 18, 2025", false));
-        mockData.add(new NotificationItem("11", "Thông báo từ thư viện", "Bạn có sách quá hạn cần trả gấp trước 30/07.", "Jul 17, 2025", false));
-        mockData.add(new NotificationItem("12", "Điểm rèn luyện", "Điểm rèn luyện HK2 đã được cập nhật trên hệ thống.", "Jul 16, 2025", true));
-        mockData.add(new NotificationItem("13", "Cuộc thi sáng tạo trẻ", "Mời bạn tham gia cuộc thi với giải thưởng hấp dẫn.", "Jul 15, 2025", false));
-        mockData.add(new NotificationItem("14", "Thông báo học bổng", "Danh sách xét học bổng HK2 đã được công bố.", "Jul 14, 2025", true));
-        mockData.add(new NotificationItem("15", "Chấm dứt học phần", "Bạn đã rút học phần Toán cao cấp.", "Jul 13, 2025", true));
+        
+        // Mock notifications với một số chưa được seen
+        mockData.add(new NotificationItem("1", "Yêu cầu điểm danh", 
+            "Vui lòng thực hiện điểm danh bằng khuôn mặt cho buổi học SEP490 - Session 1", 
+            "2025-01-28 08:30", false, false)); // Chưa read, chưa seen
+        
+        mockData.add(new NotificationItem("2", "Vượt quá số buổi vắng", 
+            "Bạn đã vắng 3/4 buổi học cho môn SEP490. Vui lòng liên hệ giảng viên.", 
+            "2025-01-27 14:20", false, false)); // Chưa read, chưa seen
+        
+        mockData.add(new NotificationItem("3", "Thay đổi lịch học", 
+            "Lịch học môn SEP490 buổi 5 đã được chuyển từ 7:30 sang 9:00 ngày 30/01/2025", 
+            "2025-01-26 16:45", true, false)); // Đã read, chưa seen
+        
+        mockData.add(new NotificationItem("4", "Điểm danh thành công", 
+            "Bạn đã điểm danh thành công cho buổi học SEP490 - Session 2", 
+            "2025-01-25 08:35", true, true)); // Đã read, đã seen
+        
+        mockData.add(new NotificationItem("5", "Nhắc nhở điểm danh", 
+            "Còn 15 phút nữa hết thời gian điểm danh cho buổi học PRN231", 
+            "2025-01-25 07:45", false, false)); // Chưa read, chưa seen
+        
+        mockData.add(new NotificationItem("6", "Cập nhật điểm số", 
+            "Điểm Assignment 1 môn SEP490 đã được cập nhật: 8.5/10", 
+            "2025-01-24 15:30", true, true)); // Đã read, đã seen
+        
+        mockData.add(new NotificationItem("7", "Thông báo nghỉ học", 
+            "Buổi học PRN231 ngày 25/01/2025 được chuyển sang ngày 26/01/2025", 
+            "2025-01-23 10:15", true, false)); // Đã read, chưa seen
+        
+        mockData.add(new NotificationItem("8", "Yêu cầu xác thực Face ID", 
+            "Hệ thống yêu cầu bạn cập nhật dữ liệu Face ID để cải thiện độ chính xác", 
+            "2025-01-22 09:00", false, false)); // Chưa read, chưa seen
+        
+        mockData.add(new NotificationItem("9", "Điểm danh muộn", 
+            "Bạn đã điểm danh muộn 5 phút cho buổi học SWD392", 
+            "2025-01-21 08:05", true, true)); // Đã read, đã seen
+        
+        mockData.add(new NotificationItem("10", "Thông báo bài tập mới", 
+            "Bài tập Assignment 2 cho môn SEP490 đã được giao, hạn nộp: 05/02/2025", 
+            "2025-01-20 16:00", true, false)); // Đã read, chưa seen
+        
+        mockData.add(new NotificationItem("11", "Cảnh báo vắng học", 
+            "Bạn đã vắng 2 buổi học liên tiếp cho môn PRN231", 
+            "2025-01-19 14:30", false, false)); // Chưa read, chưa seen
+        
+        mockData.add(new NotificationItem("12", "Điểm danh thành công", 
+            "Bạn đã điểm danh thành công cho buổi học SWD392 - Session 3", 
+            "2025-01-18 08:32", true, true)); // Đã read, đã seen
+        
+        mockData.add(new NotificationItem("13", "Thay đổi phòng học", 
+            "Phòng học môn SEP490 buổi 8 đã được chuyển từ 501 sang 601", 
+            "2025-01-17 12:00", true, false)); // Đã read, chưa seen
+        
+        mockData.add(new NotificationItem("14", "Nhắc nhở nộp bài", 
+            "Còn 2 ngày để nộp Assignment 1 cho môn SWD392", 
+            "2025-01-16 18:45", true, true)); // Đã read, đã seen
+        
+        mockData.add(new NotificationItem("15", "Điểm danh bằng khuôn mặt", 
+            "Vui lòng thực hiện điểm danh bằng khuôn mặt cho buổi học PRN231 - Session 4", 
+            "2025-01-15 07:30", false, false)); // Chưa read, chưa seen
 
         allNotifications.setValue(mockData);
+        applyFilter(currentFilter); // Áp dụng bộ lọc hiện tại
         isDataLoaded = true; // Đánh dấu đã load dữ liệu
-        applyFilter(currentFilter);
+        updateUnseenCount(); // Cập nhật số lượng thông báo chưa seen
     }
 
     public void applyFilter(FilterType filter) {
@@ -119,8 +172,29 @@ public class NotificationViewModel extends ViewModel {
     }
     
     public boolean canLoadMoreByScroll() {
-        // Chỉ cho phép infinite scroll sau khi đã click "See More"
         return seeMoreClicked;
+    }
+    
+    /**
+     * Đánh dấu tất cả thông báo là đã seen khi người dùng vào màn hình notification
+     */
+    public void markAllAsSeen() {
+        List<NotificationItem> all = allNotifications.getValue();
+        if (all == null) return;
+        
+        boolean hasChanges = false;
+        for (NotificationItem item : all) {
+            if (!item.isSeen()) {
+                item.setSeen(true);
+                hasChanges = true;
+            }
+        }
+        
+        if (hasChanges) {
+            allNotifications.setValue(new ArrayList<>(all));
+            applyFilter(currentFilter);
+            updateUnseenCount();
+        }
     }
 
 
@@ -153,6 +227,20 @@ public class NotificationViewModel extends ViewModel {
         }
     }
 
+    private void updateUnseenCount() {
+        List<NotificationItem> all = allNotifications.getValue();
+        if (all == null) {
+            unseenCount.setValue(0);
+            return;
+        }
+        int count = 0;
+        for (NotificationItem item : all) {
+            if (!item.isSeen()) { // Đếm thông báo chưa được seen
+                count++;
+            }
+        }
+        unseenCount.setValue(count);
+    }
 
     // 🧠 Helper: kiểm tra 2 list có giống nhau không (tránh re-render)
     private boolean isSameList(List<NotificationItem> oldList, List<NotificationItem> newList) {

@@ -79,6 +79,9 @@ public class NotificationFragment extends Fragment {
 
         // Load initial data
         viewModel.loadNotifications();
+        
+        // Đánh dấu tất cả thông báo là đã seen khi vào màn hình notification
+        viewModel.markAllAsSeen();
     }
 
     // Alternative navigation method using FragmentManager

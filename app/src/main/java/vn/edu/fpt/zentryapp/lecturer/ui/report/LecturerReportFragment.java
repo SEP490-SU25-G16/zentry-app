@@ -20,6 +20,7 @@ import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentLecturerReportBinding;
 import vn.edu.fpt.zentryapp.lecturer.adapter.SessionAdapter;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.Session;
+import vn.edu.fpt.zentryapp.notification.sharedviewmodel.NotificationViewModel;
 
 /**
  * Màn hình này gần giống với màn hình Home nhưng cái này là nó hiện thị ra list report session hôm nay
@@ -33,6 +34,7 @@ public class LecturerReportFragment extends Fragment implements SessionAdapter.O
 
     private FragmentLecturerReportBinding binding;
     private LecturerReportViewModel viewModel;
+    private NotificationViewModel notificationViewModel;
     private SessionAdapter sessionAdapter;
     private NavController navController;
 
@@ -53,8 +55,12 @@ public class LecturerReportFragment extends Fragment implements SessionAdapter.O
 
         // Initialize ViewModel
         viewModel = new ViewModelProvider(this).get(LecturerReportViewModel.class);
+        notificationViewModel = new ViewModelProvider(requireActivity()).get(NotificationViewModel.class);
         AuthManager authManager = AuthManager.getInstance(requireContext());
         viewModel.init(authManager);
+        
+        // Load notifications để có dữ liệu cho badge
+        notificationViewModel.loadNotifications();
 
         setupRecyclerView();
         setupClickListeners();
@@ -115,6 +121,16 @@ public class LecturerReportFragment extends Fragment implements SessionAdapter.O
         viewModel.errorMessage().observe(getViewLifecycleOwner(), error -> {
             if (error != null) {
                 Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
+            }
+        });
+        
+        // Observe notification unseen count để hiển thị badge
+        notificationViewModel.getUnseenCount().observe(getViewLifecycleOwner(), unseenCount -> {
+            if (unseenCount != null && unseenCount > 0) {
+                binding.tvNotificationBadge.setVisibility(View.VISIBLE);
+                binding.tvNotificationBadge.setText(String.valueOf(unseenCount));
+            } else {
+                binding.tvNotificationBadge.setVisibility(View.GONE);
             }
         });
     }

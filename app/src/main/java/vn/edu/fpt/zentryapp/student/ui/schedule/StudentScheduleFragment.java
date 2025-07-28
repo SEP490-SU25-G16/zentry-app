@@ -20,6 +20,7 @@ import android.view.ViewGroup;
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentScheduleBinding;
+import vn.edu.fpt.zentryapp.notification.sharedviewmodel.NotificationViewModel;
 import vn.edu.fpt.zentryapp.student.adapter.ScheduleAdapter;
 import vn.edu.fpt.zentryapp.student.data.model.response.StudentScheduleSession;
 
@@ -27,6 +28,7 @@ public class StudentScheduleFragment extends Fragment implements ScheduleAdapter
 
     private FragmentStudentScheduleBinding binding;
     private StudentScheduleViewModel viewModel;
+    private NotificationViewModel notificationViewModel;
     private ScheduleAdapter scheduleAdapter;
     private NavController navController;
     private AuthManager authManager;
@@ -49,8 +51,12 @@ public class StudentScheduleFragment extends Fragment implements ScheduleAdapter
 
         // Initialize ViewModel
         viewModel = new ViewModelProvider(this).get(StudentScheduleViewModel.class);
+        notificationViewModel = new ViewModelProvider(requireActivity()).get(NotificationViewModel.class);
         authManager = AuthManager.getInstance(requireContext());
         viewModel.init(authManager);
+        
+        // Load notifications để có dữ liệu cho badge
+        notificationViewModel.loadNotifications();
 
         setupRecyclerView();
         setupClickListeners();
@@ -131,6 +137,16 @@ public class StudentScheduleFragment extends Fragment implements ScheduleAdapter
                 if (error.contains("network") || error.contains("connection")) {
                     showRetryDialog();
                 }
+            }
+        });
+        
+        // Observe notification unseen count để hiển thị badge
+        notificationViewModel.getUnseenCount().observe(getViewLifecycleOwner(), unseenCount -> {
+            if (unseenCount != null && unseenCount > 0) {
+                binding.tvNotificationBadge.setVisibility(View.VISIBLE);
+                binding.tvNotificationBadge.setText(String.valueOf(unseenCount));
+            } else {
+                binding.tvNotificationBadge.setVisibility(View.GONE);
             }
         });
     }
