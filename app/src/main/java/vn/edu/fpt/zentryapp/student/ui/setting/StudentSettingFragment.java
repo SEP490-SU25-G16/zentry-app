@@ -84,16 +84,30 @@ public class StudentSettingFragment extends Fragment {
                 navController.navigate(R.id.action_studentSetting_to_profileOverview)
         );
 
-        // TODO: Xử lý Logout nếu có
+        // Xử lý Logout
         binding.llStudentSettingRowLogout.setOnClickListener(v -> {
-            // TODO: gọi API logout hoặc xử lý đăng xuất
-            // Sau khi đăng xuất thành công, điều hướng về màn hình đăng nhập
-            // 1) Xoá token / session ở đây
-            // Ví dụ: SessionManager.clear()
-
-            // 2) Điều hướng về LoginFragment, xóa hết back stack
-            NavController nav = Navigation.findNavController(requireActivity(), R.id.nav_host_fragment);
-            nav.navigate(R.id.action_global_logout);
+            try {
+                Log.d("StudentSettingFragment", "Performing logout");
+                
+                // 1. Xóa token và thông tin người dùng
+                vn.edu.fpt.zentryapp.auth.client.AuthManager authManager = 
+                    vn.edu.fpt.zentryapp.auth.client.AuthManager.getInstance(requireContext());
+                authManager.clearTokens();
+                
+                // 2. Điều hướng về LoginFragment với popUpTo để xóa back stack
+                androidx.navigation.NavOptions navOptions = new androidx.navigation.NavOptions.Builder()
+                    .setPopUpTo(R.id.nav_graph_root, true)
+                    .build();
+                
+                // Sử dụng action global logout đã định nghĩa trong nav_graph_root.xml
+                NavController navController = androidx.navigation.Navigation.findNavController(
+                    requireActivity(), R.id.nav_host_fragment);
+                navController.navigate(R.id.action_global_logout, null, navOptions);
+                
+                Log.d("StudentSettingFragment", "Logout navigation completed");
+            } catch (Exception e) {
+                Log.e("StudentSettingFragment", "Error during logout: ", e);
+            }
         });
     }
 

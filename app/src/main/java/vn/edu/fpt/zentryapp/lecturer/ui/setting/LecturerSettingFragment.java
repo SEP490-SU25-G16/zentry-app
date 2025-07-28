@@ -68,7 +68,7 @@ public class LecturerSettingFragment extends Fragment {
 
         // Logout row
         binding.llSettingRowLogout.setOnClickListener(v -> {
-            showLogoutConfirmationDialog();
+            performLogout();
         });
 
 
@@ -148,7 +148,60 @@ public class LecturerSettingFragment extends Fragment {
     }
 
     private void performLogout() {
-        viewModel.performLogout();
+        try {
+            android.util.Log.d("LecturerSettingFragment", "Performing logout");
+            
+            // 1. Xóa token và thông tin người dùng
+            vn.edu.fpt.zentryapp.auth.client.AuthManager authManager = 
+                vn.edu.fpt.zentryapp.auth.client.AuthManager.getInstance(requireContext());
+            authManager.clearTokens();
+            
+            // 2. Tìm activity container và lấy NavController gốc
+            androidx.navigation.NavController rootNavController = null;
+            try {
+                // Lấy NavController từ activity container
+                rootNavController = androidx.navigation.Navigation.findNavController(
+                    requireActivity(), R.id.nav_host_fragment);
+                
+                // Tạo NavOptions để xóa back stack
+                androidx.navigation.NavOptions navOptions = new androidx.navigation.NavOptions.Builder()
+                    .setPopUpTo(R.id.nav_graph_root, true)
+                    .build();
+                
+                // Navigate về LoginFragment
+                rootNavController.navigate(R.id.loginFragment, null, navOptions);
+                
+                android.util.Log.d("LecturerSettingFragment", "Navigated to login using root NavController");
+                return;
+            } catch (Exception e) {
+                android.util.Log.e("LecturerSettingFragment", "Error navigating with root NavController: ", e);
+            }
+            
+            // 3. Fallback: Sử dụng Intent để khởi động lại ứng dụng
+            try {
+                android.content.Intent intent = requireActivity().getPackageManager()
+                    .getLaunchIntentForPackage(requireActivity().getPackageName());
+                if (intent != null) {
+                    // Xóa stack cũ
+                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP | 
+                                   android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK |
+                                   android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(intent);
+                    requireActivity().finish();
+                    android.util.Log.d("LecturerSettingFragment", "Restarted app using Intent");
+                    return;
+                }
+            } catch (Exception e) {
+                android.util.Log.e("LecturerSettingFragment", "Error restarting app: ", e);
+            }
+            
+            // 4. Ultimate fallback: Kết thúc activity hiện tại
+            requireActivity().finish();
+            android.util.Log.d("LecturerSettingFragment", "Finished current activity");
+            
+        } catch (Exception e) {
+            android.util.Log.e("LecturerSettingFragment", "Error during logout: ", e);
+        }
     }
 
     private void handleLogoutSuccess() {
