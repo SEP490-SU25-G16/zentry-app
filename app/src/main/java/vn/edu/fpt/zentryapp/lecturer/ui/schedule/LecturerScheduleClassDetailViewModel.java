@@ -12,7 +12,6 @@ import java.util.Calendar;
 import java.util.List;
 import java.util.Random;
 
-import lombok.Getter;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.AttendanceRound;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.FinalAttendance;
@@ -25,10 +24,10 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
     private final MutableLiveData<List<AttendanceRound>> _attendanceRounds = new MutableLiveData<>();
     private final MutableLiveData<List<FinalAttendance>> _finalAttendance = new MutableLiveData<>();
     private final MutableLiveData<String> _errorMessage = new MutableLiveData<>();
-    private final MutableLiveData<Boolean> _canAddRound = new MutableLiveData<>(true);
+    private final MutableLiveData<Boolean> _canAddFaceId = new MutableLiveData<>(true);
 
-    public LiveData<Boolean> canAddRound() {
-        return _canAddRound;
+    public LiveData<Boolean> canAddFaceId() {
+        return _canAddFaceId;
     }
 
     private boolean isSessionCompleted(SessionDetailInfoRound sessionInfo) {
@@ -80,8 +79,8 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
             _sessionInfo.setValue(sessionInfo);
 
             // Cập nhật trạng thái có thể thêm round
-            boolean canAdd = !isSessionCompleted(sessionInfo);
-            _canAddRound.setValue(canAdd);
+            boolean canAddFaceId = !isSessionCompleted(sessionInfo);
+            _canAddFaceId.setValue(canAddFaceId);
         }, 500);
     }
 
@@ -117,7 +116,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
 
         info.setTotalStudents(32);
         info.setTotalRounds(4);
-        info.setStatus("COMPLETED");
+        info.setStatus("IN PROGRESS");
         info.setDuration(90 * 60 * 1000L); // 1h30m
 
         return info;

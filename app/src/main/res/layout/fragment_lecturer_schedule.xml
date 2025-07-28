@@ -40,7 +40,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:fontFamily="@font/jostsemibold"
-                android:text="Ready to teach today? Here's your schedule."
+                android:text="Ready to teach today? Here's your studentScheduleSession."
                 android:textColor="#666666"
                 android:textSize="14sp"
                 android:textStyle="bold" />

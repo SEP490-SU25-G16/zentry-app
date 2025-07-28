@@ -14,12 +14,12 @@ import java.util.Locale;
 
 import lombok.Getter;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
-import vn.edu.fpt.zentryapp.student.data.model.response.Schedule;
+import vn.edu.fpt.zentryapp.student.data.model.response.StudentScheduleSession;
 
 public class StudentScheduleViewModel extends ViewModel {
 
     private final MutableLiveData<Boolean> _isLoading = new MutableLiveData<>(false);
-    private final MutableLiveData<List<Schedule>> _schedules = new MutableLiveData<>();
+    private final MutableLiveData<List<StudentScheduleSession>> _schedules = new MutableLiveData<>();
     private final MutableLiveData<String> _errorMessage = new MutableLiveData<>();
     private final MutableLiveData<String> _successMessage = new MutableLiveData<>();
     private final MutableLiveData<UserProfile> _userProfile = new MutableLiveData<>();
@@ -30,7 +30,7 @@ public class StudentScheduleViewModel extends ViewModel {
         return _isLoading;
     }
 
-    public LiveData<List<Schedule>> schedules() {
+    public LiveData<List<StudentScheduleSession>> schedules() {
         return _schedules;
     }
 
@@ -73,8 +73,8 @@ public class StudentScheduleViewModel extends ViewModel {
 
         new Handler().postDelayed(() -> {
             try {
-                List<Schedule> mockSchedules = generateMockSchedules();
-                _schedules.setValue(mockSchedules);
+                List<StudentScheduleSession> mockStudentScheduleSessions = generateMockSchedules();
+                _schedules.setValue(mockStudentScheduleSessions);
                 _successMessage.setValue("Schedules loaded successfully");
             } catch (Exception e) {
                 _errorMessage.setValue("Failed to load schedules: " + e.getMessage());
@@ -136,15 +136,15 @@ public class StudentScheduleViewModel extends ViewModel {
         return "Student";
     }
 
-    private List<Schedule> generateMockSchedules() {
-        List<Schedule> schedules = new ArrayList<>();
+    private List<StudentScheduleSession> generateMockSchedules() {
+        List<StudentScheduleSession> studentScheduleSessions = new ArrayList<>();
 
         String currentDay = getCurrentDayName();
 
         // ========== SCHEDULES ĐÃ QUA (Past) - Ở TRÊN ==========
 
         // Schedule đã kết thúc từ sáng sớm
-        schedules.add(new Schedule(
+        studentScheduleSessions.add(new StudentScheduleSession(
                 "SCH001",
                 "Mathematics",
                 "07",
@@ -157,7 +157,7 @@ public class StudentScheduleViewModel extends ViewModel {
         ));
 
         // Schedule đã kết thúc từ sáng
-        schedules.add(new Schedule(
+        studentScheduleSessions.add(new StudentScheduleSession(
                 "SCH002",
                 "English Literature",
                 "08",
@@ -170,7 +170,7 @@ public class StudentScheduleViewModel extends ViewModel {
         ));
 
         // Schedule vừa kết thúc gần đây
-        schedules.add(new Schedule(
+        studentScheduleSessions.add(new StudentScheduleSession(
                 "SCH003",
                 "Physics",
                 "09",
@@ -185,7 +185,7 @@ public class StudentScheduleViewModel extends ViewModel {
         // ========== SCHEDULE HIỆN TẠI (Current) ==========
 
         // Schedule đang diễn ra (clickable)
-        schedules.add(new Schedule(
+        studentScheduleSessions.add(new StudentScheduleSession(
                 "SCH004",
                 "Computer Science",
                 "10",
@@ -200,7 +200,7 @@ public class StudentScheduleViewModel extends ViewModel {
         // ========== SCHEDULES CHƯA BẮT ĐẦU (Future) - Ở DƯỚI ==========
 
         // Schedule sắp bắt đầu (gần kề - có thể clickable)
-        schedules.add(new Schedule(
+        studentScheduleSessions.add(new StudentScheduleSession(
                 "SCH005",
                 "Chemistry",
                 "11",
@@ -213,7 +213,7 @@ public class StudentScheduleViewModel extends ViewModel {
         ));
 
         // Schedule chiều
-        schedules.add(new Schedule(
+        studentScheduleSessions.add(new StudentScheduleSession(
                 "SCH006",
                 "Biology",
                 "12",
@@ -226,7 +226,7 @@ public class StudentScheduleViewModel extends ViewModel {
         ));
 
         // Schedule muộn hơn
-        schedules.add(new Schedule(
+        studentScheduleSessions.add(new StudentScheduleSession(
                 "SCH007",
                 "History",
                 "13",
@@ -239,7 +239,7 @@ public class StudentScheduleViewModel extends ViewModel {
         ));
 
         // Schedule cuối ngày
-        schedules.add(new Schedule(
+        studentScheduleSessions.add(new StudentScheduleSession(
                 "SCH008",
                 "Art & Design",
                 "14",
@@ -252,7 +252,7 @@ public class StudentScheduleViewModel extends ViewModel {
         ));
 
         // Schedule tối
-        schedules.add(new Schedule(
+        studentScheduleSessions.add(new StudentScheduleSession(
                 "SCH009",
                 "Music Theory",
                 "15",
@@ -264,7 +264,7 @@ public class StudentScheduleViewModel extends ViewModel {
                 "MUS15"
         ));
 
-        return schedules;
+        return studentScheduleSessions;
     }
 
     private String getCurrentDayName() {
@@ -282,7 +282,7 @@ public class StudentScheduleViewModel extends ViewModel {
     }
 
 
-    public void onScheduleClicked(Schedule schedule) {
+    public void onScheduleClicked(StudentScheduleSession studentScheduleSession) {
         // TODO: Handle schedule click for navigation
     }
 

@@ -1,8 +1,10 @@
 package vn.edu.fpt.zentryapp.student.data.model.response;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @Getter
+@AllArgsConstructor
 public class AttendanceSummary {
     private final String studentId;
     private final String studentName;
@@ -11,17 +13,6 @@ public class AttendanceSummary {
     private final int attendedSessions;
     private final int lateSessions;
     private final int absentSessions;
-
-    public AttendanceSummary(String studentId, String studentName, String studentEmail,
-                             int totalSessions, int attendedSessions, int lateSessions, int absentSessions) {
-        this.studentId = studentId;
-        this.studentName = studentName;
-        this.studentEmail = studentEmail;
-        this.totalSessions = totalSessions;
-        this.attendedSessions = attendedSessions;
-        this.lateSessions = lateSessions;
-        this.absentSessions = absentSessions;
-    }
 
     public float getAttendancePercentage() {
         if (totalSessions == 0) return 0;

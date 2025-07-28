@@ -19,7 +19,7 @@ import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentLecturerScheduleBinding;
 import vn.edu.fpt.zentryapp.lecturer.adapter.ScheduleSessionAdapter;
-import vn.edu.fpt.zentryapp.lecturer.data.model.response.ScheduleSession;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerScheduleSession;
 
 public class LecturerScheduleFragment extends Fragment implements ScheduleSessionAdapter.OnSessionActionListener {
 
@@ -27,6 +27,7 @@ public class LecturerScheduleFragment extends Fragment implements ScheduleSessio
     private LecturerScheduleViewModel viewModel;
     private ScheduleSessionAdapter sessionAdapter;
     private NavController navController;
+    AuthManager authManager;
 
     @Nullable
     @Override
@@ -45,7 +46,7 @@ public class LecturerScheduleFragment extends Fragment implements ScheduleSessio
 
         // Initialize ViewModel
         viewModel = new ViewModelProvider(this).get(LecturerScheduleViewModel.class);
-        AuthManager authManager = AuthManager.getInstance(requireContext());
+        authManager = AuthManager.getInstance(requireContext());
         viewModel.init(authManager);
 
         setupRecyclerView();
@@ -54,7 +55,7 @@ public class LecturerScheduleFragment extends Fragment implements ScheduleSessio
     }
 
     private void setupRecyclerView() {
-        sessionAdapter = new ScheduleSessionAdapter();
+        sessionAdapter = new ScheduleSessionAdapter(authManager);
         sessionAdapter.setOnSessionActionListener(this);
 
         binding.rvSessions.setLayoutManager(new LinearLayoutManager(requireContext()));
@@ -103,7 +104,7 @@ public class LecturerScheduleFragment extends Fragment implements ScheduleSessio
         // Observe current date
         viewModel.currentDate().observe(getViewLifecycleOwner(), date -> {
             if (date != null) {
-               // binding.tvCurrentDate.setText("Today, " + date);
+                // binding.tvCurrentDate.setText("Today, " + date);
             }
         });
 
@@ -124,7 +125,7 @@ public class LecturerScheduleFragment extends Fragment implements ScheduleSessio
     }
 
     @Override
-    public void onSessionClick(ScheduleSession session) {
+    public void onSessionClick(LecturerScheduleSession session) {
         if (session.isCanViewDetail()) {
             // Navigate to session detail
             Bundle args = new Bundle();
@@ -138,25 +139,6 @@ public class LecturerScheduleFragment extends Fragment implements ScheduleSessio
         } else {
             Toast.makeText(requireContext(),
                     "Session detail not available yet", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    @Override
-    public void onStartInstantClick(ScheduleSession session) {
-        if (session.isCanStartInstant()) {
-            // Handle start instant class
-            viewModel.startInstantClass(session);
-
-            Toast.makeText(requireContext(),
-                    "Starting instant class: " + session.getCourseName(), Toast.LENGTH_SHORT).show();
-
-            // TODO: Navigate to teaching interface or attendance screen
-            // Bundle args = new Bundle();
-            // args.putString("sessionId", session.getSessionId());
-            // navController.navigate(R.id.action_schedule_to_instantClass, args);
-        } else {
-            Toast.makeText(requireContext(),
-                    "Cannot start this session at the moment", Toast.LENGTH_SHORT).show();
         }
     }
 

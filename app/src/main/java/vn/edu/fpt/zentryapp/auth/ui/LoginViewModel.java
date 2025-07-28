@@ -2,6 +2,7 @@ package vn.edu.fpt.zentryapp.auth.ui;
 
 import android.os.Handler;
 import android.text.TextUtils;
+import android.util.Log;
 import android.util.Patterns;
 
 import androidx.lifecycle.LiveData;
@@ -26,12 +27,28 @@ public class LoginViewModel extends ViewModel {
     private final MutableLiveData<LoginSuccess> _loginSuccess = new MutableLiveData<>();
     private final MutableLiveData<String> _emailError = new MutableLiveData<>();
     private final MutableLiveData<String> _passwordError = new MutableLiveData<>();
+
     // Public getters cho Fragment observe
-    public LiveData<Boolean> isLoading() { return _isLoading; }
-    public LiveData<String> errorMessage() { return _errorMessage; }
-    public LiveData<LoginSuccess> loginSuccess() { return _loginSuccess; }
-    public LiveData<String> emailError() { return _emailError; }
-    public LiveData<String> passwordError() { return _passwordError; }
+    public LiveData<Boolean> isLoading() {
+        return _isLoading;
+    }
+
+    public LiveData<String> errorMessage() {
+        return _errorMessage;
+    }
+
+    public LiveData<LoginSuccess> loginSuccess() {
+        return _loginSuccess;
+    }
+
+    public LiveData<String> emailError() {
+        return _emailError;
+    }
+
+    public LiveData<String> passwordError() {
+        return _passwordError;
+    }
+
     private AuthService authService;
     private AuthManager authManager;
     // Fake accounts for testing
@@ -64,6 +81,7 @@ public class LoginViewModel extends ViewModel {
             performRealLogin(email, password);
         }
     }
+
     /**
      * Check if email/password combination is a fake test account
      */
@@ -155,7 +173,9 @@ public class LoginViewModel extends ViewModel {
 
         return isValid;
     }
+
     private void performRealLogin(String email, String password) {
+        _isLoading.setValue(true);
         LoginRequest request = new LoginRequest(email, password);
 
         authService.login(request).enqueue(new Callback<TokenResponse>() {
@@ -163,8 +183,15 @@ public class LoginViewModel extends ViewModel {
             public void onResponse(Call<TokenResponse> call, Response<TokenResponse> response) {
                 _isLoading.setValue(false);
 
+                // ✅ Log response details
+                Log.d("LoginViewModel", "Response code: " + response.code());
+                Log.d("LoginViewModel", "Response message: " + response.message());
+                Log.d("LoginViewModel", "Response body: " + (response.body() != null ? "Not null" : "NULL"));
+
                 if (response.isSuccessful() && response.body() != null) {
                     TokenResponse tokenResponse = response.body();
+
+                    Log.d("LoginViewModel", "Login successful for: " + tokenResponse.getUserInfo().getEmail());
 
                     // Save auth data
                     authManager.saveAuthData(tokenResponse.getToken(), tokenResponse.getUserInfo());
@@ -179,6 +206,17 @@ public class LoginViewModel extends ViewModel {
                             isLecturer
                     ));
                 } else {
+                    // ✅ Log error response details
+                    Log.e("LoginViewModel", "Login failed - Code: " + response.code());
+                    try {
+                        if (response.errorBody() != null) {
+                            String errorBody = response.errorBody().string();
+                            Log.e("LoginViewModel", "Error body: " + errorBody);
+                        }
+                    } catch (Exception e) {
+                        Log.e("LoginViewModel", "Could not read error body", e);
+                    }
+
                     _errorMessage.setValue("Đăng nhập thất bại. Vui lòng kiểm tra thông tin.");
                 }
             }
@@ -186,7 +224,35 @@ public class LoginViewModel extends ViewModel {
             @Override
             public void onFailure(Call<TokenResponse> call, Throwable t) {
                 _isLoading.setValue(false);
-                _errorMessage.setValue("Lỗi kết nối. Vui lòng thử lại.");
+
+                // ✅ Log chi tiết lỗi network
+                Log.e("LoginViewModel", "Network call failed", t);
+                Log.e("LoginViewModel", "Error type: " + t.getClass().getSimpleName());
+                Log.e("LoginViewModel", "Error message: " + t.getMessage());
+
+                // ✅ Log request URL để debug
+                if (call.request() != null) {
+                    Log.e("LoginViewModel", "Request URL: " + call.request().url());
+                    Log.e("LoginViewModel", "Request method: " + call.request().method());
+                }
+
+                String errorMessage = "Lỗi kết nối";
+
+                // Chi tiết hóa error message based on exception type
+                if (t instanceof java.net.SocketTimeoutException) {
+                    errorMessage = "Kết nối quá chậm. Vui lòng thử lại";
+                    Log.e("LoginViewModel", "Timeout error");
+                } else if (t instanceof java.net.UnknownHostException) {
+                    errorMessage = "Không có kết nối internet hoặc server không tồn tại";
+                } else if (t instanceof java.net.ConnectException) {
+                    errorMessage = "Không thể kết nối đến server";
+                    Log.e("LoginViewModel", "Connection refused - Server might be down");
+                } else if (t instanceof javax.net.ssl.SSLException) {
+                    errorMessage = "Lỗi bảo mật kết nối";
+                    Log.e("LoginViewModel", "SSL error");
+                }
+
+                _errorMessage.setValue(errorMessage);
             }
         });
     }

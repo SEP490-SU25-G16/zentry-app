@@ -21,7 +21,7 @@ import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentScheduleBinding;
 import vn.edu.fpt.zentryapp.student.adapter.ScheduleAdapter;
-import vn.edu.fpt.zentryapp.student.data.model.response.Schedule;
+import vn.edu.fpt.zentryapp.student.data.model.response.StudentScheduleSession;
 
 public class StudentScheduleFragment extends Fragment implements ScheduleAdapter.OnScheduleClickListener {
 
@@ -29,6 +29,7 @@ public class StudentScheduleFragment extends Fragment implements ScheduleAdapter
     private StudentScheduleViewModel viewModel;
     private ScheduleAdapter scheduleAdapter;
     private NavController navController;
+    private AuthManager authManager;
 
     @Nullable
     @Override
@@ -48,7 +49,7 @@ public class StudentScheduleFragment extends Fragment implements ScheduleAdapter
 
         // Initialize ViewModel
         viewModel = new ViewModelProvider(this).get(StudentScheduleViewModel.class);
-        AuthManager authManager = AuthManager.getInstance(requireContext());
+        authManager = AuthManager.getInstance(requireContext());
         viewModel.init(authManager);
 
         setupRecyclerView();
@@ -57,7 +58,7 @@ public class StudentScheduleFragment extends Fragment implements ScheduleAdapter
     }
 
     private void setupRecyclerView() {
-        scheduleAdapter = new ScheduleAdapter();
+        scheduleAdapter = new ScheduleAdapter(authManager);
         scheduleAdapter.setOnScheduleClickListener(this);
 
         binding.rvSchedules.setLayoutManager(new LinearLayoutManager(requireContext()));
@@ -146,9 +147,9 @@ public class StudentScheduleFragment extends Fragment implements ScheduleAdapter
     }
 
     @Override
-    public void onScheduleClick(Schedule schedule) {
+    public void onScheduleClick(StudentScheduleSession studentScheduleSession) {
         navController.navigate(R.id.action_studentSchedule_to_classDetail);
-        viewModel.onScheduleClicked(schedule);
+        viewModel.onScheduleClicked(studentScheduleSession);
     }
 
     @Override

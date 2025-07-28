@@ -128,7 +128,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Your class schedule will appear here"
+            android:text="Your class studentScheduleSession will appear here"
             android:textColor="#999999"
             android:textSize="14sp" />
 
