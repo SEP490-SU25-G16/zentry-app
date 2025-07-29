@@ -17,9 +17,11 @@ import androidx.annotation.RequiresApi;
 import androidx.annotation.RequiresPermission;
 import androidx.core.app.NotificationCompat;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -53,7 +55,7 @@ public class BLEAttendanceService extends Service {
 
         // Initialize components
         bleManager = new BLEAttendanceManager(this);
-        submissionHandler = new AttendanceSubmissionHandler(); // You'll need to implement this
+        submissionHandler = new AttendanceSubmissionHandler(this); // You'll need to implement this
 
         Log.d(TAG, "BLE Attendance Service created");
     }
@@ -167,31 +169,44 @@ public class BLEAttendanceService extends Service {
         List<AttendanceModels.ScannedDevice> currentDevices = new ArrayList<>(detectedDevices.values());
 
         // TODO: Get data MAC and userId here to submit
-        @SuppressLint("HardwareIds") String deviceMac = BluetoothAdapter.getDefaultAdapter().getAddress();
+        @SuppressLint("HardwareIds")
+        String deviceMac = BluetoothAdapter.getDefaultAdapter().getAddress();
+
+        // 🔧 SỬA: Format Date thành String timestamp
+        String timestamp = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
+                .format(new Date());
+        // Tạo submission - bỏ userId vì API không cần
         AttendanceModels.AttendanceSubmission submission = new AttendanceModels.AttendanceSubmission(
-                deviceMac,
-                userId,
-                sessionId,
-                currentDevices,
-                new Date()
+                deviceMac,      // submitterDeviceMacAddress
+                sessionId,      // sessionId
+                currentDevices, // scannedDevices
+                timestamp            // timestamp
         );
 
-        // 🔧 BỎ roundNumber parameter, chỉ truyền submission và callback
+        // 🔧 API call đã được chuyển vào AttendanceSubmissionHandler
         submissionHandler.submitAttendance(submission, new AttendanceCallbacks.AttendanceSubmissionCallback() {
             @Override
             public void onSubmissionSuccess(AttendanceModels.AttendanceSubmission submission) {
+                Log.d(TAG, "✅ Attendance submitted successfully for session: " + submission.getSessionId());
+                Log.d(TAG, "Submitted " + submission.getScannedDevices().size() + " scanned devices");
 
-                // Call API to submit here
-                // TODO: If submit success
+                // Clear detected devices after successful submission
                 detectedDevices.clear();
+                Log.d(TAG, "Cleared detected devices cache");
             }
 
             @Override
             public void onSubmissionFailure(int roundNumber, String error) {
-                // TODO:  If submit fail?
-                Log.e(TAG, "Round " + roundNumber + " submission failed: " + error);
+                Log.e(TAG, "❌ Round " + roundNumber + " submission failed: " + error);
+                // Optional: Có thể thêm retry logic hoặc error handling
+                // Ví dụ: lưu submission để retry sau
+                // saveFailedSubmissionForRetry(submission);
+
+                // Hoặc thông báo cho user
+                // showErrorNotification("Attendance submission failed: " + error);
             }
         });
+
 
         // If last round, stop advertising
         if (round.isLastRound()) {
@@ -208,8 +223,9 @@ public class BLEAttendanceService extends Service {
     }
 
     private void handleDeviceDetected(AttendanceModels.ScannedDevice device) {
-        detectedDevices.put(device.getMAC(), device);
-        Log.d(TAG, "Device detected: " + device.getMAC() + ", Total: " + detectedDevices.size());
+        detectedDevices.put(device.getMacAddress(), device); // Cập nhật method name
+        Log.d(TAG, "Device detected: " + device.getMacAddress() + " with RSSI: " + device.getRssi() +
+                ", Total: " + detectedDevices.size());
     }
 
     private void handleDeviceLost(String deviceId) {

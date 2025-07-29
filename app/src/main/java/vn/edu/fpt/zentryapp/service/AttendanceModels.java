@@ -1,8 +1,10 @@
 package vn.edu.fpt.zentryapp.service;
 
 import java.io.Serializable;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -21,7 +23,7 @@ public class AttendanceModels {
     @Getter
     @AllArgsConstructor
     public static class BLEAdvertiseData {
-        private final String mac;
+        private final String macAddress;
         private final String roomName;
     }
 
@@ -29,16 +31,23 @@ public class AttendanceModels {
     @Getter
     @AllArgsConstructor
     public static class ScannedDevice {
-        private final String MAC;
+        private final String macAddress;
+        private final int rssi;
     }
 
     @AllArgsConstructor
     @Getter
     public static class AttendanceSubmission {
-        private final String submitterMac;
-        private final String submitterUserId;
+        private final String submitterDeviceMacAddress;
         private final String sessionId;
         private final List<ScannedDevice> scannedDevices;
-        private final Date timestamp;
+        private final String timestamp;
+        public AttendanceSubmission(String submitterDeviceMacAddress, String userId,
+                                    String sessionId, List<ScannedDevice> scannedDevices, Date timestamp) {
+            this.submitterDeviceMacAddress = submitterDeviceMacAddress;
+            this.sessionId = sessionId;
+            this.scannedDevices = scannedDevices;
+            this.timestamp = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault()).format(timestamp);
+        }
     }
 }

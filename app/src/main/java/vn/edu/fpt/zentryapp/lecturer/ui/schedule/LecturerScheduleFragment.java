@@ -1,6 +1,7 @@
 package vn.edu.fpt.zentryapp.lecturer.ui.schedule;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -26,6 +27,7 @@ public class LecturerScheduleFragment extends Fragment implements ScheduleSessio
     private FragmentLecturerScheduleBinding binding;
     private LecturerScheduleViewModel viewModel;
     private ScheduleSessionAdapter sessionAdapter;
+    private LecturerScheduleSession currentStartingSession = null;
     private NavController navController;
     AuthManager authManager;
 
@@ -47,8 +49,7 @@ public class LecturerScheduleFragment extends Fragment implements ScheduleSessio
         // Initialize ViewModel
         viewModel = new ViewModelProvider(this).get(LecturerScheduleViewModel.class);
         authManager = AuthManager.getInstance(requireContext());
-        viewModel.init(authManager);
-
+        viewModel.init(requireContext(), authManager);
         setupRecyclerView();
         setupClickListeners();
         observeViewModel();
@@ -122,23 +123,98 @@ public class LecturerScheduleFragment extends Fragment implements ScheduleSessio
                 Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
             }
         });
+
+        viewModel.isStartingSession().observe(getViewLifecycleOwner(), this::handleStartingSessionState);
+
+        viewModel.startSessionSuccess().observe(getViewLifecycleOwner(), this::handleStartSessionSuccess);
     }
+
+    /**
+     * 🔧 Handle starting session loading state
+     */
+    private void handleStartingSessionState(Boolean isStarting) {
+        if (isStarting != null) {
+            Log.d("LecturerSchedule", "Starting session: " + isStarting);
+        }
+    }
+
+    /**
+     * 🔧 Handle start session success với reference chính xác
+     */
+    private void handleStartSessionSuccess(String successMessage) {
+        if (successMessage != null && !successMessage.trim().isEmpty()) {
+            Toast.makeText(requireContext(), successMessage, Toast.LENGTH_SHORT).show();
+
+            // 🔧 Navigate đến detail của session vừa start
+            if (currentStartingSession != null) {
+                // Update status local trước khi navigate
+                currentStartingSession.setStatus("Active");
+                currentStartingSession.setCanViewDetail(true);
+
+                // Navigate to detail
+                navigateToSessionDetail(currentStartingSession);
+
+                // Clear reference
+                currentStartingSession = null;
+            }
+
+            // Clear message
+            viewModel.clearStartSessionSuccess();
+
+            Log.d("LecturerSchedule", "Auto-navigated to session detail after successful start");
+        }
+    }
+
 
     @Override
     public void onSessionClick(LecturerScheduleSession session) {
+        if (session == null) {
+            Toast.makeText(requireContext(), "Invalid session", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         if (session.isCanViewDetail()) {
-            // Navigate to session detail
+            navigateToSessionDetail(session);
+        } else {
+            Toast.makeText(requireContext(),
+                    "Session details not available yet", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    public void onStartSession(LecturerScheduleSession session) {
+        if (session == null) {
+            Toast.makeText(requireContext(), "Invalid session", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // 🔧 LƯU reference của session đang start
+        currentStartingSession = session;
+
+        // 🔧 GỌI ViewModel để start session via API
+        viewModel.startSessionViaAPI(session);
+    }
+    /**
+     * 🔧 Navigate to session detail screen với đầy đủ thông tin
+     */
+    private void navigateToSessionDetail(LecturerScheduleSession session) {
+        try {
             Bundle args = new Bundle();
             args.putString("sessionId", session.getSessionId());
             args.putString("courseCode", session.getCourseCode());
             args.putString("courseName", session.getCourseName());
-            args.putString("className", session.getClassName());
+            args.putString("room", session.getRoom());
+            args.putLong("startTime", session.getStartTime().getTime());
+            args.putLong("endTime", session.getEndTime().getTime());
+            args.putString("status", session.getStatus()); // 🔧 THÊM status để detail screen biết trạng thái
 
-            // Navigate to existing session detail screen
             navController.navigate(R.id.action_schedule_to_classDetail, args);
-        } else {
-            Toast.makeText(requireContext(),
-                    "Session detail not available yet", Toast.LENGTH_SHORT).show();
+
+            Log.d("LecturerSchedule", "Navigating to session detail: " + session.getSessionId());
+
+        } catch (Exception e) {
+            Toast.makeText(requireContext(), "Cannot open session details", Toast.LENGTH_SHORT).show();
+            Log.e("LecturerSchedule", "Navigation error", e);
         }
     }
 

@@ -1,6 +1,7 @@
 package vn.edu.fpt.zentryapp.service;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.le.AdvertiseCallback;
@@ -17,8 +18,6 @@ import android.util.Log;
 
 import androidx.annotation.RequiresPermission;
 
-import com.google.gson.Gson;
-
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
@@ -29,8 +28,6 @@ public class BLEAttendanceManager {
     private final BluetoothAdapter bluetoothAdapter;
     private final BluetoothLeAdvertiser advertiser;
     private final BluetoothLeScanner scanner;
-    private final Gson gson = new Gson();
-
     private AdvertiseCallback advertiseCallback;
     private ScanCallback scanCallback;
 
@@ -84,7 +81,6 @@ public class BLEAttendanceManager {
                 .build();
     }
 
-
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     public void stopScanning() {
         Optional.ofNullable(scanner)
@@ -124,14 +120,19 @@ public class BLEAttendanceManager {
                 // chỉ quan tâm đến đúng room
                 .filter(d -> targetRoom.equals(d.getRoomName()))
                 .map(d -> {
-                    // deviceId = MAC, studentId tạm lấy MAC (hoặc map sang studentId nếu có)
+                    // 🔧 THÊM RSSI vào ScannedDevice
+                    int rssi = result.getRssi();
                     return new AttendanceModels.ScannedDevice(
-                            d.getMac()
+                            d.getMacAddress(),    // macAddress of their advertiser data
+                            rssi          // rssi
                     );
                 })
-                .ifPresent(callback::onDeviceDetected);
+                .ifPresent(device -> {
+                    Log.d(TAG, "Device detected: " + device.getMacAddress() +
+                            " with RSSI: " + device.getRssi());
+                    callback.onDeviceDetected(device);
+                });
     }
-
 
     private Optional<AttendanceModels.BLEAdvertiseData> extractBLEData(ScanResult result) {
         ParcelUuid uuid = ParcelUuid.fromString(SERVICE_UUID);
@@ -147,7 +148,6 @@ public class BLEAttendanceManager {
         return Optional.of(new AttendanceModels.BLEAdvertiseData(mac, room));
     }
 
-
     private AdvertiseSettings buildAdvertiseSettings() {
         return new AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
@@ -159,7 +159,7 @@ public class BLEAttendanceManager {
 
     private AdvertiseData buildAdvertiseData(AttendanceModels.BLEAdvertiseData data) {
         // Format: MAC|RoomName (VD: "AA:BB:CC:DD:EE:FF|SE1750")
-        String deviceMac = bluetoothAdapter.getAddress(); // Lấy MAC address
+        @SuppressLint("HardwareIds") String deviceMac = bluetoothAdapter.getAddress(); // Lấy MAC address
         String compactData = deviceMac + "|" + data.getRoomName();
         byte[] dataBytes = compactData.getBytes(StandardCharsets.UTF_8);
 
@@ -179,7 +179,6 @@ public class BLEAttendanceManager {
                 .build();
     }
 
-
     private AdvertiseData buildFallbackAdvertiseData(String room) {
         Log.d(TAG, "Using fallback: room only");
         return new AdvertiseData.Builder()
@@ -189,5 +188,4 @@ public class BLEAttendanceManager {
                         room.getBytes(StandardCharsets.UTF_8))
                 .build();
     }
-
 }

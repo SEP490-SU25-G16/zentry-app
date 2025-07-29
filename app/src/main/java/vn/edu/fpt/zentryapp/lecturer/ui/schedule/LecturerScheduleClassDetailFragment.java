@@ -52,7 +52,7 @@ public class LecturerScheduleClassDetailFragment extends Fragment {
         // Initialize ViewModel
         viewModel = new ViewModelProvider(this).get(LecturerScheduleClassDetailViewModel.class);
         AuthManager authManager = AuthManager.getInstance(requireContext());
-        viewModel.init(authManager, sessionId);
+        viewModel.init(requireContext(), authManager, sessionId);
 
         setupViewPager();
         setupClickListeners();
@@ -93,7 +93,7 @@ public class LecturerScheduleClassDetailFragment extends Fragment {
         binding.ivScheduleClassDetailBack.setOnClickListener(v -> navController.navigateUp());
 
         binding.btnScheduleClassDetailAdd.setOnClickListener(v -> {
-            Toast.makeText(requireContext(), "Add new round", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "Create face id", Toast.LENGTH_SHORT).show();
         });
 
         binding.btnScheduleClassDetailNotification.setOnClickListener(v -> {
