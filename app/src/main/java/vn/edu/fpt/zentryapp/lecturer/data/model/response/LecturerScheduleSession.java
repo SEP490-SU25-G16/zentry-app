@@ -22,15 +22,9 @@ public class LecturerScheduleSession implements Serializable {
     private Date startTime;
     private Date endTime;
     private Date sessionDate;
-    private String status; // "UPCOMING", "ONGOING", "COMPLETED", "CANCELLED"
+    private String status;
     private boolean canStartInstant;
     private boolean canViewDetail;
-
-    // Helper methods
-    public String getTimeDisplay() {
-        SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
-        return timeFormat.format(startTime) + " - " + timeFormat.format(endTime);
-    }
 
     public String getDateTimeDisplay() {
         SimpleDateFormat dayFormat = new SimpleDateFormat("EEEE", Locale.getDefault());
@@ -43,53 +37,5 @@ public class LecturerScheduleSession implements Serializable {
 
     public String getClassRoomDisplay() {
         return className + " - " + room;
-    }
-
-    public int getStatusColor() {
-        switch (status) {
-            case "ONGOING":
-                return 0xFF4CAF50; // Green
-            case "UPCOMING":
-                return 0xFF2196F3; // Blue
-            case "COMPLETED":
-                return 0xFF9E9E9E; // Grey
-            case "CANCELLED":
-                return 0xFFE53935; // Red
-            default:
-                return 0xFF666666; // Default grey
-        }
-    }
-
-    public String getStatusText() {
-        switch (status) {
-            case "ONGOING":
-                return "In Progress";
-            case "UPCOMING":
-                return "Scheduled";
-            case "COMPLETED":
-                return "Completed";
-            case "CANCELLED":
-                return "Cancelled";
-            default:
-                return status;
-        }
-    }
-
-    public boolean isCurrentTimeInSession() {
-        long currentTime = System.currentTimeMillis();
-        return currentTime >= startTime.getTime() && currentTime <= endTime.getTime();
-    }
-
-    public boolean isSessionPassed() {
-        return System.currentTimeMillis() > endTime.getTime();
-    }
-
-    public boolean isSessionStartingSoon() {
-        long currentTime = System.currentTimeMillis();
-        long sessionStartTime = startTime.getTime();
-        long timeDifference = sessionStartTime - currentTime;
-
-        // Allow starting 15 minutes before session starts
-        return timeDifference <= 15 * 60 * 1000L && timeDifference >= 0;
     }
 }

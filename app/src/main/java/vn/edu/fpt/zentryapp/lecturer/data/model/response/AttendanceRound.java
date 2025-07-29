@@ -3,9 +3,11 @@ package vn.edu.fpt.zentryapp.lecturer.data.model.response;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.TimeZone;
 
 @Data
 @NoArgsConstructor
@@ -20,16 +22,24 @@ public class AttendanceRound {
     private String roundType; // "START", "MIDDLE", "END"
     private String location;
 
-    // Helper methods
-    public String getFormattedDate() {
-        SimpleDateFormat format = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
+
+    public String getFormattedTime() {
+        if (timestamp == null) return "--:--";
+
+        // ✅ Đảm bảo format theo local timezone
+        SimpleDateFormat format = new SimpleDateFormat("HH:mm", Locale.getDefault());
+        format.setTimeZone(TimeZone.getDefault()); // Explicitly set local timezone
         return format.format(timestamp);
     }
 
-    public String getFormattedTime() {
-        SimpleDateFormat format = new SimpleDateFormat("HH:mm", Locale.getDefault());
+    public String getFormattedDate() {
+        if (timestamp == null) return "--/--/----";
+
+        SimpleDateFormat format = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
+        format.setTimeZone(TimeZone.getDefault()); // Explicitly set local timezone
         return format.format(timestamp);
     }
+
 
     public String getAttendanceDisplay() {
         return presentStudents + "/" + totalStudents + " attended";

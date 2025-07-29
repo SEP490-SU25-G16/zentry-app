@@ -22,10 +22,11 @@ import com.google.android.material.button.MaterialButton;
 import java.io.Serializable;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.TimeZone;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -45,12 +46,12 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
 
     private static final String TAG = "ScheduleSessionAdapter";
 
-    // 🔧 CẬP NHẬT: Định nghĩa constants theo backend
-    private static final String STATUS_PENDING = "Pending";      // ID: 1
-    private static final String STATUS_ACTIVE = "Active";        // ID: 2
-    private static final String STATUS_COMPLETED = "Completed";  // ID: 3
-    private static final String STATUS_CANCELLED = "Cancelled";  // ID: 4
-    private static final String STATUS_ARCHIVED = "Archived";    // ID: 5
+    // Constants theo backend
+    private static final String STATUS_PENDING = "Pending";
+    private static final String STATUS_ACTIVE = "Active";
+    private static final String STATUS_COMPLETED = "Completed";
+    private static final String STATUS_CANCELLED = "Cancelled";
+    private static final String STATUS_ARCHIVED = "Archived";
 
     private List<LecturerScheduleSession> sessions = new ArrayList<>();
     private OnSessionActionListener listener;
@@ -58,6 +59,7 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
 
     public interface OnSessionActionListener {
         void onSessionClick(LecturerScheduleSession session);
+
         void onStartSession(LecturerScheduleSession session);
     }
 
@@ -103,6 +105,14 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
 
         @RequiresApi(api = Build.VERSION_CODES.O)
         public void bind(LecturerScheduleSession session) {
+            Log.d(TAG, "=== BINDING SESSION ===");
+            Log.d(TAG, "Position: " + getAdapterPosition());
+            Log.d(TAG, "SessionId: " + session.getSessionId());
+            Log.d(TAG, "Status: " + session.getStatus());
+            Log.d(TAG, "StartTime: " + session.getStartTime());
+            Log.d(TAG, "EndTime: " + session.getEndTime());
+            Log.d(TAG, "========================");
+
             // Set basic info
             binding.tvSessionCourseName.setText(session.getCourseName());
             binding.tvSessionClassRoom.setText(session.getClassRoomDisplay());
@@ -121,9 +131,6 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
             setCardStyling(session);
         }
 
-        /**
-         * 🔧 CẬP NHẬT: Hiển thị status chính xác
-         */
         private void updateStatusDisplay(LecturerScheduleSession session) {
             String statusText = getStatusDisplayText(session);
             int statusColor = getStatusDisplayColor(session);
@@ -132,9 +139,6 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
             binding.tvSessionStatus.setTextColor(statusColor);
         }
 
-        /**
-         * 🔧 XỬ LÝ click button với logic mới
-         */
         @RequiresApi(api = Build.VERSION_CODES.O)
         private void handleButtonClick(View view, LecturerScheduleSession session) {
             String action = getSessionAction(session);
@@ -156,54 +160,193 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
         }
 
         /**
-         * 🔧 CẬP NHẬT: Xác định action dựa trên status constants đúng
+         * 🔧 LOGIC MỚI: Tìm session đúng dựa trên thời gian hiện tại
+         */
+        /**
+         * 🔧 LOGIC ĐÚNG: Đọc status từ session list
          */
         private String getSessionAction(LecturerScheduleSession session) {
+            Log.d(TAG, "=== GET SESSION ACTION ===");
+            Log.d(TAG, "Checking session: " + session.getSessionId());
+
+            // 🎯 BƯỚC 1: Kiểm tra trong danh sách sessions xem có session nào Active không
+            boolean hasActiveSession = hasActiveSessionInList();
+
+            if (hasActiveSession) {
+                // Nếu có session Active, tìm session đó
+                LecturerScheduleSession activeSession = findActiveSession();
+                if (activeSession != null && session.getSessionId().equals(activeSession.getSessionId())) {
+                    Log.d(TAG, "→ This is the ACTIVE session → VIEW_DETAIL");
+                    return "VIEW_DETAIL";
+                } else {
+                    Log.d(TAG, "→ Not the active session → NOT_AVAILABLE");
+                    return "NOT_AVAILABLE";
+                }
+            }
+
+            // 🎯 BƯỚC 2: Không có session Active, kiểm tra session Pending trong thời gian hiện tại
+            String rawStatus = getRawStatus(session);
+            Log.d(TAG, "Session raw status: " + rawStatus);
+
+            if ("Pending".equals(rawStatus)) {
+                boolean isInCurrentTime = isSessionInCurrentTime(session);
+                Log.d(TAG, "Is Pending session in current time: " + isInCurrentTime);
+
+                if (isInCurrentTime) {
+                    Log.d(TAG, "→ Pending session in current time → START");
+                    return "START";
+                } else {
+                    Log.d(TAG, "→ Pending session not in current time → NOT_AVAILABLE");
+                    return "NOT_AVAILABLE";
+                }
+            }
+
+            // 🎯 BƯỚC 3: Các trường hợp khác
+            if ("Completed".equals(rawStatus) ||
+                    "Cancelled".equals(rawStatus) ||
+                    "Archived".equals(rawStatus)) {
+                Log.d(TAG, "→ Completed/Cancelled/Archived → VIEW_DETAIL");
+                return "VIEW_DETAIL";
+            }
+
+            Log.d(TAG, "→ Unknown status → NOT_AVAILABLE");
+            return "NOT_AVAILABLE";
+        }
+
+        /**
+         * 🔧 KIỂM TRA có session Active trong danh sách không
+         */
+        private boolean hasActiveSessionInList() {
+            for (LecturerScheduleSession session : sessions) {
+                String rawStatus = getRawStatus(session);
+                if ("Active".equals(rawStatus)) {
+                    Log.d(TAG, "Found Active session in list: " + session.getSessionId());
+                    return true;
+                }
+            }
+            Log.d(TAG, "No Active session found in list");
+            return false;
+        }
+
+        /**
+         * 🔧 TÌM session Active trong danh sách
+         */
+        private LecturerScheduleSession findActiveSession() {
+            for (LecturerScheduleSession session : sessions) {
+                String rawStatus = getRawStatus(session);
+                if ("Active".equals(rawStatus)) {
+                    return session;
+                }
+            }
+            return null;
+        }
+
+        /**
+         * 🔧 LẤY raw status từ JSON (không phải display text)
+         */
+        /**
+         * 🔧 LẤY raw status từ session list trong JSON
+         */
+        private String getRawStatus(LecturerScheduleSession session) {
+            // Tìm session trong danh sách gốc dựa trên sessionId
+            String sessionId = session.getSessionId();
+
+            Log.d(TAG, "Getting raw status for session: " + sessionId);
+
+            // Lặp qua danh sách sessions để tìm session với ID tương ứng
+            for (LecturerScheduleSession s : sessions) {
+                if (sessionId.equals(s.getSessionId())) {
+                    // Lấy status từ field, không phải từ display method
+                    String rawStatus = s.getStatus(); // Direct access to field
+                    Log.d(TAG, "Found raw status: " + rawStatus + " for session: " + sessionId);
+                    return rawStatus;
+                }
+            }
+
+            // Fallback: nếu không tìm thấy, dùng display status và map
+            String displayStatus = session.getStatus();
+            Log.d(TAG, "Fallback to display status: " + displayStatus);
+
+            // Map display status về raw status
+            if ("ONGOING".equals(displayStatus)) {
+                return "Active"; // ONGOING thường là Active session
+            } else if ("READY TO START".equals(displayStatus)) {
+                return "Pending";
+            } else if ("COMPLETED".equals(displayStatus)) {
+                return "Completed";
+            } else if ("CANCELLED".equals(displayStatus)) {
+                return "Cancelled";
+            } else if ("ARCHIVED".equals(displayStatus)) {
+                return "Archived";
+            }
+
+            return displayStatus; // Trả về như cũ nếu không map được
+        }
+
+
+        /**
+         * 🔧 KIỂM TRA session có trong thời gian hiện tại không
+         */
+        private boolean isSessionInCurrentTime(LecturerScheduleSession session) {
             Date currentTime = new Date();
             Date startTime = session.getStartTime();
             Date endTime = session.getEndTime();
 
-            // Chỉ cho phép start khi đúng giờ (trong khoảng thời gian session)
-            boolean isInSessionTime = currentTime.getTime() >= startTime.getTime() &&
+            boolean isInTime = currentTime.getTime() >= startTime.getTime() &&
                     currentTime.getTime() <= endTime.getTime();
-            boolean isAfterStart = currentTime.getTime() >= startTime.getTime();
-            boolean isBeforeEnd = currentTime.getTime() <= endTime.getTime();
 
-            String status = session.getStatus();
+            Log.d(TAG, "Session time check:");
+            Log.d(TAG, "  Current: " + currentTime);
+            Log.d(TAG, "  Start: " + startTime);
+            Log.d(TAG, "  End: " + endTime);
+            Log.d(TAG, "  Is in time: " + isInTime);
 
-            if (STATUS_ACTIVE.equals(status)) {
-                // Session đã được start (Active)
-                if (isAfterStart && isBeforeEnd) {
-                    return "VIEW_DETAIL"; // Đang diễn ra → cho xem detail
-                } else if (currentTime.getTime() > endTime.getTime()) {
-                    return "VIEW_DETAIL"; // Đã kết thúc → cho xem detail
-                } else {
-                    return "NOT_AVAILABLE"; // Chưa đến giờ nhưng đã start
-                }
-            } else if (STATUS_COMPLETED.equals(status)) {
-                return "VIEW_DETAIL"; // Đã hoàn thành → cho xem detail
-            } else if (STATUS_CANCELLED.equals(status) || STATUS_ARCHIVED.equals(status)) {
-                return "VIEW_DETAIL"; // Đã hủy/lưu trữ → chỉ cho xem detail
-            } else if (STATUS_PENDING.equals(status)) {
-                // Session chưa start (Pending) - chỉ cho start khi đúng giờ
-                if (isInSessionTime) {
-                    return "START"; // Đúng giờ → cho phép start
-                } else {
-                    return "NOT_AVAILABLE"; // Chưa đến giờ hoặc đã quá giờ
-                }
-            } else {
-                // Trường hợp khác hoặc status không xác định
-                if (isInSessionTime) {
-                    return "START"; // Có thể start nếu đúng giờ
-                } else {
-                    return "NOT_AVAILABLE";
-                }
+            return isInTime;
+        }
+
+        /**
+         * 🔧 CẬP NHẬT findCurrentSession() để loại bỏ logic cũ
+         */
+        private LecturerScheduleSession findCurrentSession() {
+            // Method này không còn cần thiết với logic mới
+            // Nhưng giữ lại để tương thích với code khác
+            return findActiveSession();
+        }
+
+        /**
+         * 🔧 KIỂM TRA session có đang diễn ra không
+         */
+        private boolean isSessionInCurrentTime(LecturerScheduleSession session, Date currentTime) {
+            try {
+                // Parse UTC time từ server
+                Date sessionStart = parseUTCToLocal(session.getStartTime());
+                Date sessionEnd = parseUTCToLocal(session.getEndTime());
+
+                // Kiểm tra thời gian hiện tại có nằm trong khoảng session không
+                boolean isInTime = currentTime.getTime() >= sessionStart.getTime() &&
+                        currentTime.getTime() <= sessionEnd.getTime();
+
+                Log.d(TAG, "Session " + session.getSessionId() + ":");
+                Log.d(TAG, "  Start: " + sessionStart);
+                Log.d(TAG, "  End: " + sessionEnd);
+                Log.d(TAG, "  Is in time: " + isInTime);
+
+                return isInTime;
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error checking session time", e);
+                return false;
             }
         }
 
         /**
-         * 🔧 CẤU HÌNH button dựa trên action
+         * 🔧 PARSE UTC time sang local time
          */
+        private Date parseUTCToLocal(Date utcDate) {
+            // Nếu đã là local time thì return luôn
+            return utcDate;
+        }
+
         private void configureActionButton(LecturerScheduleSession session) {
             String action = getSessionAction(session);
 
@@ -236,10 +379,18 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
             }
         }
 
-        /**
-         * 🔧 LÝ DO tại sao không available
-         */
         private String getNotAvailableReason(LecturerScheduleSession session) {
+            // Tìm session hiện tại
+            LecturerScheduleSession currentSession = findCurrentSession();
+
+            if (currentSession == null) {
+                return "No Active Session";
+            }
+
+            if (!session.getSessionId().equals(currentSession.getSessionId())) {
+                return "Not Current Session";
+            }
+
             Date currentTime = new Date();
             Date startTime = session.getStartTime();
             Date endTime = session.getEndTime();
@@ -258,9 +409,6 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
             }
         }
 
-        /**
-         * 🔧 CẬP NHẬT: Status display text theo constants đúng
-         */
         private String getStatusDisplayText(LecturerScheduleSession session) {
             String status = session.getStatus();
             Date currentTime = new Date();
@@ -269,15 +417,15 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
 
             if (STATUS_ACTIVE.equals(status)) {
                 if (currentTime.getTime() >= startTime.getTime() && currentTime.getTime() <= endTime.getTime()) {
-                    return "ONGOING"; // Hiển thị ONGOING khi Active và đang diễn ra
+                    return "ONGOING";
                 } else if (currentTime.getTime() > endTime.getTime()) {
-                    return "COMPLETED"; // Active nhưng đã kết thúc
+                    return "COMPLETED";
                 } else {
-                    return "ACTIVE"; // Active nhưng chưa đến giờ
+                    return "ACTIVE";
                 }
             } else if (STATUS_PENDING.equals(status)) {
                 if (currentTime.getTime() >= startTime.getTime() && currentTime.getTime() <= endTime.getTime()) {
-                    return "READY TO START"; // Pending nhưng đã đến giờ
+                    return "READY TO START";
                 } else {
                     return "PENDING";
                 }
@@ -288,13 +436,10 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
             } else if (STATUS_ARCHIVED.equals(status)) {
                 return "ARCHIVED";
             } else {
-                return status; // Fallback
+                return status;
             }
         }
 
-        /**
-         * 🔧 CẬP NHẬT: Status display color theo constants đúng
-         */
         private int getStatusDisplayColor(LecturerScheduleSession session) {
             String displayStatus = getStatusDisplayText(session);
 
@@ -317,6 +462,7 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
             }
         }
 
+        // Các method khác giữ nguyên...
         @RequiresApi(api = Build.VERSION_CODES.O)
         private void showStartClassConfirmation(View view, LecturerScheduleSession session) {
             Dialog dialog = new Dialog(view.getContext());
@@ -337,16 +483,13 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
             btnConfirm.setOnClickListener(v -> {
                 dialog.dismiss();
 
-                // 1. Start BLE service ngay lập tức (offline-first)
                 startBLEAttendanceService(view.getContext(), session);
 
-                // 2. Gọi API trong background (best effort)
                 if (listener != null) {
                     listener.onStartSession(session);
                 }
 
-                // 3. Update local session status optimistically
-                session.setStatus("Active"); // Optimistic update
+                session.setStatus(STATUS_ACTIVE);
                 notifyDataSetChanged();
 
                 Log.d(TAG, "Session start initiated: " + session.getSessionId());
@@ -357,6 +500,10 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
             dialog.show();
         }
 
+        // Các method còn lại giữ nguyên...
+        // (startBLEAttendanceService, loadSessionRounds, mapApiRoundsToAttendanceRounds,
+        //  startBLEServiceWithRounds, setCardStyling)
+
         @RequiresApi(api = Build.VERSION_CODES.O)
         private void startBLEAttendanceService(Context context, LecturerScheduleSession session) {
             try {
@@ -366,9 +513,7 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
                     return;
                 }
 
-                // 🔧 GỌI API LẤY ROUNDS THẬT
                 loadSessionRounds(context, session, userId);
-
                 Log.d(TAG, "BLE Attendance Service started for session: " + session.getSessionId());
 
             } catch (Exception e) {
@@ -376,13 +521,9 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
             }
         }
 
-        /**
-         * 🔧 THÊM method để load rounds từ API
-         */
         private void loadSessionRounds(Context context, LecturerScheduleSession session, String userId) {
             Log.d(TAG, "Loading rounds for session: " + session.getSessionId());
 
-            // Tạo API service
             AttendanceApiService apiService = ApiClient.getClient(context).create(AttendanceApiService.class);
 
             apiService.getSessionRounds(session.getSessionId())
@@ -397,7 +538,6 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
                                     List<AttendanceModels.AttendanceRound> rounds = mapApiRoundsToAttendanceRounds(apiResponse.getData());
 
                                     if (!rounds.isEmpty()) {
-                                        // Start BLE service với rounds thật
                                         startBLEServiceWithRounds(context, session, userId, rounds);
                                         Log.d(TAG, "✅ Loaded " + rounds.size() + " rounds from API");
                                     } else {
@@ -419,9 +559,6 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
                     });
         }
 
-        /**
-         * 🔧 MAP API rounds sang AttendanceModels.AttendanceRound
-         */
         private List<AttendanceModels.AttendanceRound> mapApiRoundsToAttendanceRounds(List<RoundData> apiRounds) {
             List<AttendanceModels.AttendanceRound> rounds = new ArrayList<>();
 
@@ -435,17 +572,14 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
                 RoundData apiRound = apiRounds.get(i);
 
                 try {
-                    // Parse start time từ ISO string
                     Date startTime = isoFormat.parse(apiRound.getStartTime());
-
-                    // Xác định nếu đây là round cuối cùng
                     boolean isLastRound = (i == apiRounds.size() - 1);
 
                     AttendanceModels.AttendanceRound round = new AttendanceModels.AttendanceRound(
-                            apiRound.getRoundId(),        // 🔧 THÊM roundId
-                            startTime,                    // executionTime
-                            apiRound.getRoundNumber(),    // roundNumber
-                            isLastRound                   // isLastRound
+                            apiRound.getRoundId(),
+                            startTime,
+                            apiRound.getRoundNumber(),
+                            isLastRound
                     );
 
                     rounds.add(round);
@@ -462,9 +596,6 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
             return rounds;
         }
 
-        /**
-         * 🔧 START BLE service với rounds từ API
-         */
         @RequiresApi(api = Build.VERSION_CODES.O)
         private void startBLEServiceWithRounds(Context context, LecturerScheduleSession session,
                                                String userId, List<AttendanceModels.AttendanceRound> rounds) {
@@ -484,7 +615,6 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
                 Log.e(TAG, "❌ Failed to start BLE service with API rounds", e);
             }
         }
-
 
         private void setCardStyling(LecturerScheduleSession session) {
             float alpha = 1.0f;

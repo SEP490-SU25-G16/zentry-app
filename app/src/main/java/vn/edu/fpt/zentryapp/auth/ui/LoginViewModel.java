@@ -15,6 +15,7 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
+import vn.edu.fpt.zentryapp.auth.models.ApiResponse;
 import vn.edu.fpt.zentryapp.auth.models.LoginRequest;
 import vn.edu.fpt.zentryapp.auth.models.TokenResponse;
 import vn.edu.fpt.zentryapp.auth.models.UserInfo;
@@ -128,19 +129,19 @@ public class LoginViewModel extends ViewModel {
         String token;
 
         if (LECTURER_EMAIL.equalsIgnoreCase(email)) {
-            // Fake Lecturer Account
             userInfo = new UserInfo(
-                    "LEC001",
+                    "fake_lecturer_id",
                     LECTURER_EMAIL,
+                    "Fake Lecturer",
                     "Lecturer"
             );
             token = "fake_lecturer_token_" + System.currentTimeMillis();
 
         } else if (STUDENT_EMAIL.equalsIgnoreCase(email)) {
-            // Fake Student Account
             userInfo = new UserInfo(
-                    "STU001",
+                    "fake_student_id",
                     STUDENT_EMAIL,
+                    "Fake Student",
                     "Student"
             );
             token = "fake_student_token_" + System.currentTimeMillis();
@@ -151,6 +152,7 @@ public class LoginViewModel extends ViewModel {
 
         return new TokenResponse(token, userInfo);
     }
+
 
     private boolean validateInput(String email, String password) {
         boolean isValid = true;
@@ -178,35 +180,43 @@ public class LoginViewModel extends ViewModel {
         _isLoading.setValue(true);
         LoginRequest request = new LoginRequest(email, password);
 
-        authService.login(request).enqueue(new Callback<TokenResponse>() {
+        authService.login(request).enqueue(new Callback<ApiResponse<TokenResponse>>() {
             @Override
-            public void onResponse(Call<TokenResponse> call, Response<TokenResponse> response) {
+            public void onResponse(Call<ApiResponse<TokenResponse>> call, Response<ApiResponse<TokenResponse>> response) {
                 _isLoading.setValue(false);
 
-                // ✅ Log response details
                 Log.d("LoginViewModel", "Response code: " + response.code());
                 Log.d("LoginViewModel", "Response message: " + response.message());
-                Log.d("LoginViewModel", "Response body: " + (response.body() != null ? "Not null" : "NULL"));
 
                 if (response.isSuccessful() && response.body() != null) {
-                    TokenResponse tokenResponse = response.body();
+                    ApiResponse<TokenResponse> apiResponse = response.body();
 
-                    Log.d("LoginViewModel", "Login successful for: " + tokenResponse.getUserInfo().getEmail());
+                    // Kiểm tra Success flag từ API
+                    if (apiResponse.isSuccess() && apiResponse.getData() != null) {
+                        TokenResponse tokenResponse = apiResponse.getData();
 
-                    // Save auth data
-                    authManager.saveAuthData(tokenResponse.getToken(), tokenResponse.getUserInfo());
+                        Log.d("LoginViewModel", "Login successful for: " + tokenResponse.getUserInfo().getEmail());
 
-                    // Determine navigation based on role
-                    String role = tokenResponse.getUserInfo().getRole();
-                    boolean isLecturer = "Lecturer".equalsIgnoreCase(role);
+                        // Save auth data
+                        authManager.saveAuthData(tokenResponse.getToken(), tokenResponse.getUserInfo());
 
-                    _loginSuccess.setValue(new LoginSuccess(
-                            tokenResponse.getUserInfo().getEmail(),
-                            role,
-                            isLecturer
-                    ));
+                        // Determine navigation based on role
+                        String role = tokenResponse.getUserInfo().getRole();
+                        boolean isLecturer = "Lecturer".equalsIgnoreCase(role);
+
+                        _loginSuccess.setValue(new LoginSuccess(
+                                tokenResponse.getUserInfo().getEmail(),
+                                role,
+                                isLecturer
+                        ));
+                    } else {
+                        // API trả về Success = false
+                        String errorMsg = apiResponse.getError() != null ?
+                                apiResponse.getError() : "Đăng nhập thất bại";
+                        Log.e("LoginViewModel", "API Error: " + errorMsg);
+                        _errorMessage.setValue(errorMsg);
+                    }
                 } else {
-                    // ✅ Log error response details
                     Log.e("LoginViewModel", "Login failed - Code: " + response.code());
                     try {
                         if (response.errorBody() != null) {
@@ -216,21 +226,18 @@ public class LoginViewModel extends ViewModel {
                     } catch (Exception e) {
                         Log.e("LoginViewModel", "Could not read error body", e);
                     }
-
                     _errorMessage.setValue("Đăng nhập thất bại. Vui lòng kiểm tra thông tin.");
                 }
             }
 
             @Override
-            public void onFailure(Call<TokenResponse> call, Throwable t) {
+            public void onFailure(Call<ApiResponse<TokenResponse>> call, Throwable t) {
                 _isLoading.setValue(false);
 
-                // ✅ Log chi tiết lỗi network
                 Log.e("LoginViewModel", "Network call failed", t);
                 Log.e("LoginViewModel", "Error type: " + t.getClass().getSimpleName());
                 Log.e("LoginViewModel", "Error message: " + t.getMessage());
 
-                // ✅ Log request URL để debug
                 if (call.request() != null) {
                     Log.e("LoginViewModel", "Request URL: " + call.request().url());
                     Log.e("LoginViewModel", "Request method: " + call.request().method());
@@ -238,7 +245,6 @@ public class LoginViewModel extends ViewModel {
 
                 String errorMessage = "Lỗi kết nối";
 
-                // Chi tiết hóa error message based on exception type
                 if (t instanceof java.net.SocketTimeoutException) {
                     errorMessage = "Kết nối quá chậm. Vui lòng thử lại";
                     Log.e("LoginViewModel", "Timeout error");
@@ -256,6 +262,7 @@ public class LoginViewModel extends ViewModel {
             }
         });
     }
+
 
     private void clearErrors() {
         _errorMessage.setValue(null);

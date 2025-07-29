@@ -47,7 +47,6 @@ public class AttendanceHistoryFragment extends Fragment  {
         }
 
         setupRecyclerView();
-        loadRoundHistory();
     }
 
     private void setupRecyclerView() {
@@ -56,10 +55,6 @@ public class AttendanceHistoryFragment extends Fragment  {
         binding.rvRounds.setAdapter(roundAdapter);
     }
 
-    private void loadRoundHistory() {
-        // TODO: Load from ViewModel in parent fragment
-        // This will be called from parent fragment
-    }
 
     public void updateRoundHistory(List<AttendanceRound> rounds) {
         if (roundAdapter != null) {

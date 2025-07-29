@@ -13,6 +13,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.TimeZone;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -26,6 +27,7 @@ import vn.edu.fpt.zentryapp.lecturer.data.model.response.ClassSectionData;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.DailyScheduleResponse;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerScheduleSession;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.SessionData;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.StartSessionRequest;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.StartSessionResponse;
 
 public class LecturerScheduleViewModel extends ViewModel {
@@ -47,14 +49,37 @@ public class LecturerScheduleViewModel extends ViewModel {
     private AuthManager authManager;
     private Context context;
 
-    public LiveData<Boolean> isLoading() { return _isLoading; }
-    public LiveData<List<LecturerScheduleSession>> todaySessions() { return _todaySessions; }
-    public LiveData<String> errorMessage() { return _errorMessage; }
-    public LiveData<UserProfile> userProfile() { return _userProfile; }
-    public LiveData<String> greeting() { return _greeting; }
-    public LiveData<String> currentDate() { return _currentDate; }
-    public LiveData<Boolean> isStartingSession() { return _isStartingSession; }
-    public LiveData<String> startSessionSuccess() { return _startSessionSuccess; }
+    public LiveData<Boolean> isLoading() {
+        return _isLoading;
+    }
+
+    public LiveData<List<LecturerScheduleSession>> todaySessions() {
+        return _todaySessions;
+    }
+
+    public LiveData<String> errorMessage() {
+        return _errorMessage;
+    }
+
+    public LiveData<UserProfile> userProfile() {
+        return _userProfile;
+    }
+
+    public LiveData<String> greeting() {
+        return _greeting;
+    }
+
+    public LiveData<String> currentDate() {
+        return _currentDate;
+    }
+
+    public LiveData<Boolean> isStartingSession() {
+        return _isStartingSession;
+    }
+
+    public LiveData<String> startSessionSuccess() {
+        return _startSessionSuccess;
+    }
 
     public void init(Context context, AuthManager authManager) {
         this.context = context;
@@ -130,55 +155,157 @@ public class LecturerScheduleViewModel extends ViewModel {
             return sessions;
         }
 
-        String todayDate = getTodayDateString(); // yyyy-MM-dd format
+        String todayDate = getTodayDateString();
         Log.d(TAG, "Mapping sessions for date: " + todayDate);
 
         for (ClassSectionData classSection : apiData) {
-            // Find active session based on status and date
-            SessionData activeSession = findActiveSession(classSection.getSessions(), todayDate);
+            try {
+                // 🔧 TÌM SESSION HIỆN TẠI (trong thời gian hôm nay)
+                SessionData currentSession = findTodaySession(classSection.getSessions(), todayDate);
 
-            if (activeSession != null) {
-                try {
-                    // Parse times
-                    Date startTime = parseDateTime(activeSession.getStartTime());
-                    Date endTime = parseDateTime(activeSession.getEndTime());
-                    Date currentDate = new Date();
-
-                    // Determine status based on session status and current time
-                    String status = determineSessionStatus(activeSession.getStatus(), startTime, endTime, currentDate);
-
-                    // Create session object
-                    LecturerScheduleSession session = new LecturerScheduleSession(
-                            activeSession.getSessionId(),        // sessionId
-                            classSection.getCourseCode(),        // courseCode
-                            classSection.getCourseName(),        // courseName
-                            classSection.getSectionCode(),       // sectionCode
-                            classSection.getRoomName(),          // room
-                            startTime,                           // startTime
-                            endTime,                             // endTime
-                            currentDate,                         // currentDate
-                            status,                              // status
-                            determineCanStartSession(classSection.isCanStartSession(), status, startTime, currentDate), // canStartInstant
-                            isSessionCompleted(status)           // canViewDetail
-                    );
-
-                    sessions.add(session);
-                    Log.d(TAG, "✅ Mapped session: " + classSection.getCourseCode() +
-                            " [" + classSection.getSectionCode() + "] - " + status +
-                            " (Session #" + activeSession.getSessionNumber() + ")");
-
-                } catch (Exception e) {
-                    Log.e(TAG, "❌ Error mapping session: " + classSection.getCourseCode(), e);
+                if (currentSession == null) {
+                    Log.w(TAG, "⚠️ No session found for today: " + classSection.getCourseCode());
+                    continue; // Skip nếu không có session hôm nay
                 }
-            } else {
-                Log.w(TAG, "⚠️ No active session found for: " + classSection.getCourseCode() +
-                        " [" + classSection.getSectionCode() + "]");
+
+                // 🎯 SỬ DỤNG SESSION TIME (không phải schedule time)
+                Date sessionStartTime = parseUTCToLocal(currentSession.getStartTime());
+                Date sessionEndTime = parseUTCToLocal(currentSession.getEndTime());
+                Date currentTime = new Date();
+
+                // 🔧 LẤY STATUS TỪ SESSION (không phải schedule)
+                String sessionStatus = currentSession.getStatus(); // Raw status từ JSON
+
+                Log.d(TAG, "Session mapping details:");
+                Log.d(TAG, "  SessionId: " + currentSession.getSessionId());
+                Log.d(TAG, "  SessionNumber: " + currentSession.getSessionNumber());
+                Log.d(TAG, "  Raw Status: " + sessionStatus);
+                Log.d(TAG, "  Start Time: " + sessionStartTime);
+                Log.d(TAG, "  End Time: " + sessionEndTime);
+
+                // 🚀 TẠO LECTURER SCHEDULE SESSION với thông tin chính xác
+                LecturerScheduleSession session = new LecturerScheduleSession(
+                        currentSession.getSessionId(),           // ✅ Session ID từ session
+                        classSection.getCourseCode(),
+                        classSection.getCourseName(),
+                        classSection.getSectionCode(),
+                        classSection.getRoomName() + " - " + classSection.getBuilding(),
+                        sessionStartTime,                        // ✅ Session start time (UTC → Local)
+                        sessionEndTime,                          // ✅ Session end time (UTC → Local)
+                        new Date(),                              // Current date
+                        sessionStatus,                           // ✅ Raw status từ session
+                        isSessionAvailableForAction(sessionStatus, sessionStartTime, sessionEndTime, currentTime),
+                        isSessionCompleted(sessionStatus)
+                );
+
+                sessions.add(session);
+
+                Log.d(TAG, "✅ Mapped session: " + classSection.getCourseCode() +
+                        " [" + classSection.getSectionCode() + "] - Status: " + sessionStatus +
+                        " (Session #" + currentSession.getSessionNumber() + ")" +
+                        " Time: " + formatTime(sessionStartTime) + "-" + formatTime(sessionEndTime));
+
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Error mapping session: " + classSection.getCourseCode(), e);
             }
         }
 
         Log.d(TAG, "Total mapped sessions: " + sessions.size());
         return sessions;
     }
+
+    /**
+     * 🔧 PARSE UTC TIME SANG LOCAL TIME
+     */
+    private Date parseUTCToLocal(String utcTimeString) {
+        try {
+            SimpleDateFormat utcFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault());
+            utcFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+            return utcFormat.parse(utcTimeString);
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing UTC time: " + utcTimeString, e);
+            return new Date(); // Fallback
+        }
+    }
+
+    /**
+     * 🔧 KIỂM TRA SESSION CÓ SẴN SÀNG CHO ACTION KHÔNG
+     */
+    private boolean isSessionAvailableForAction(String status, Date startTime, Date endTime, Date currentTime) {
+        // Active session luôn có thể view detail
+        if ("Active".equals(status)) {
+            return true;
+        }
+
+        // Pending session chỉ có thể start khi đúng thời gian
+        if ("Pending".equals(status)) {
+            return currentTime.getTime() >= startTime.getTime() &&
+                    currentTime.getTime() <= endTime.getTime();
+        }
+
+        // Completed, Cancelled, Archived có thể view detail
+        if ("Completed".equals(status) || "Cancelled".equals(status) || "Archived".equals(status)) {
+            return true;
+        }
+
+        return false;
+    }
+
+
+    /**
+     * Parse schedule time (HH:mm:ss) with today's date
+     */
+    private Date parseScheduleTime(String timeString, String dateString) {
+        if (timeString == null || dateString == null) {
+            Log.w(TAG, "Null time or date string");
+            return new Date();
+        }
+
+        try {
+            // Combine date and time: "2025-07-30 00:12:27"
+            String dateTimeString = dateString + " " + timeString;
+            SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+            Date parsed = format.parse(dateTimeString);
+
+            if (parsed == null) {
+                Log.w(TAG, "Parsed schedule time is null for: " + dateTimeString);
+                return new Date();
+            }
+
+            Log.d(TAG, "Parsed schedule time: " + dateTimeString + " -> " + parsed);
+            return parsed;
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing schedule time: " + timeString, e);
+            return new Date();
+        }
+    }
+
+    /**
+     * Find session cho hôm nay dựa trên date
+     */
+    private SessionData findTodaySession(List<SessionData> sessions, String todayDate) {
+        if (sessions == null || sessions.isEmpty()) {
+            return null;
+        }
+
+        for (SessionData session : sessions) {
+            if (isSessionToday(session.getStartTime(), todayDate)) {
+                Log.d(TAG, "Found session for today: #" + session.getSessionNumber() +
+                        " Status: " + session.getStatus());
+                return session;
+            }
+        }
+
+        Log.d(TAG, "No session found for today: " + todayDate);
+        return null;
+    }
+
+    private String formatTime(Date date) {
+        SimpleDateFormat format = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+        return format.format(date);
+    }
+
 
     /**
      * Find active session based on status and date info
@@ -219,18 +346,39 @@ public class LecturerScheduleViewModel extends ViewModel {
     /**
      * Check if session belongs to today
      */
+    /**
+     * 🔧 SỬA: Check if session belongs to today (xử lý múi giờ đúng)
+     */
     private boolean isSessionToday(String sessionStartTime, String todayDate) {
         if (sessionStartTime == null || todayDate == null) return false;
 
         try {
-            // Extract date part from ISO datetime (2025-07-29T07:51:50Z -> 2025-07-29)
-            String sessionDate = sessionStartTime.substring(0, 10);
-            return todayDate.equals(sessionDate);
+            // Parse UTC time từ server
+            SimpleDateFormat utcFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault());
+            utcFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+            Date sessionDateTime = utcFormat.parse(sessionStartTime);
+
+            // Convert về local timezone
+            Calendar sessionCal = Calendar.getInstance();
+            sessionCal.setTime(sessionDateTime);
+
+            // Format thành local date string
+            SimpleDateFormat localDateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            String sessionLocalDate = localDateFormat.format(sessionCal.getTime());
+
+            Log.d(TAG, "Session UTC time: " + sessionStartTime);
+            Log.d(TAG, "Session local date: " + sessionLocalDate);
+            Log.d(TAG, "Today date: " + todayDate);
+            Log.d(TAG, "Is same date: " + todayDate.equals(sessionLocalDate));
+
+            return todayDate.equals(sessionLocalDate);
+
         } catch (Exception e) {
             Log.e(TAG, "Error checking if session is today: " + sessionStartTime, e);
             return false;
         }
     }
+
 
     /**
      * Find next upcoming session (status = Pending and future date)
@@ -283,41 +431,38 @@ public class LecturerScheduleViewModel extends ViewModel {
     }
 
     /**
-     * Enhanced status determination with buffer time
+     * Enhanced status determination using schedule-level status
      */
-    private String determineSessionStatus(String apiStatus, Date startTime, Date endTime, Date currentTime) {
+    private String determineSessionStatus(String scheduleStatus, Date startTime, Date endTime, Date currentTime) {
         long currentMillis = currentTime.getTime();
         long startMillis = startTime.getTime();
         long endMillis = endTime.getTime();
 
         // Buffer time: 15 minutes before session starts
-        long bufferTime = 15 * 60 * 1000; // 15 minutes in milliseconds
+        long bufferTime = 15 * 60 * 1000; // 15 minutes
 
-        if ("Active".equalsIgnoreCase(apiStatus)) {
-            if (currentMillis < (startMillis - bufferTime)) {
-                return "UPCOMING";
-            } else if (currentMillis >= (startMillis - bufferTime) && currentMillis < startMillis) {
-                return "STARTING_SOON";
-            } else if (currentMillis >= startMillis && currentMillis <= endMillis) {
-                return "ONGOING";
-            } else {
-                return "COMPLETED";
-            }
-        } else if ("Pending".equalsIgnoreCase(apiStatus)) {
-            // For pending sessions, determine based on time
-            if (currentMillis > endMillis) {
-                return "COMPLETED";
-            } else if (currentMillis >= startMillis && currentMillis <= endMillis) {
-                return "ONGOING"; // API might not be updated yet
-            } else if (currentMillis >= (startMillis - bufferTime)) {
-                return "STARTING_SOON";
-            } else {
-                return "UPCOMING";
-            }
-        } else {
-            // Default fallback
-            return "UPCOMING";
+        Log.d(TAG, "Determining status - Schedule: " + scheduleStatus +
+                ", Current: " + formatTime(currentTime) +
+                ", Start: " + formatTime(startTime) +
+                ", End: " + formatTime(endTime));
+
+        // Nếu đã qua giờ kết thúc
+        if (currentMillis > endMillis) {
+            return "COMPLETED";
         }
+
+        // Nếu đang trong giờ học
+        if (currentMillis >= startMillis && currentMillis <= endMillis) {
+            return "ONGOING";
+        }
+
+        // Nếu sắp tới giờ (trong 15 phút)
+        if (currentMillis >= (startMillis - bufferTime) && currentMillis < startMillis) {
+            return "STARTING_SOON";
+        }
+
+        // Còn lại là upcoming
+        return "UPCOMING";
     }
 
     /**
@@ -467,7 +612,11 @@ public class LecturerScheduleViewModel extends ViewModel {
         String sessionId = session.getSessionId();
         Log.d(TAG, "Starting session via API: " + sessionId);
 
-        apiService.startSession(sessionId)
+        String currentUserId = AuthManager.getInstance(context).getCurrentUserId();
+        StartSessionRequest request = new StartSessionRequest(currentUserId);
+
+
+        apiService.startSession(sessionId, request)
                 .enqueue(new Callback<StartSessionResponse>() {
                     @Override
                     public void onResponse(Call<StartSessionResponse> call, Response<StartSessionResponse> response) {

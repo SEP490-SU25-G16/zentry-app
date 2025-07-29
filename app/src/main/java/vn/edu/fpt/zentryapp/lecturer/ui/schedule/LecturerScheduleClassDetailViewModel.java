@@ -17,6 +17,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
+import java.util.TimeZone;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -50,12 +51,29 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
     private String sessionId;
 
     // Public getters
-    public LiveData<Boolean> isLoading() { return _isLoading; }
-    public LiveData<SessionDetailInfoRound> sessionInfo() { return _sessionInfo; }
-    public LiveData<List<AttendanceRound>> attendanceRounds() { return _attendanceRounds; }
-    public LiveData<List<FinalAttendance>> finalAttendance() { return _finalAttendance; }
-    public LiveData<String> errorMessage() { return _errorMessage; }
-    public LiveData<Boolean> canAddFaceId() { return _canAddFaceId; }
+    public LiveData<Boolean> isLoading() {
+        return _isLoading;
+    }
+
+    public LiveData<SessionDetailInfoRound> sessionInfo() {
+        return _sessionInfo;
+    }
+
+    public LiveData<List<AttendanceRound>> attendanceRounds() {
+        return _attendanceRounds;
+    }
+
+    public LiveData<List<FinalAttendance>> finalAttendance() {
+        return _finalAttendance;
+    }
+
+    public LiveData<String> errorMessage() {
+        return _errorMessage;
+    }
+
+    public LiveData<Boolean> canAddFaceId() {
+        return _canAddFaceId;
+    }
 
     public void init(Context context, AuthManager authManager, String sessionId) {
         this.context = context;
@@ -126,7 +144,6 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                             if (apiResponse.isSuccess()) {
                                 List<AttendanceRound> rounds = mapApiDataToAttendanceRounds(apiResponse.getData());
                                 _attendanceRounds.setValue(rounds);
-
                                 // Load final attendance sau khi có rounds
                                 loadFinalAttendance();
 
@@ -156,17 +173,12 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                 });
     }
 
-    /**
-     * 🔧 MAP API data sang AttendanceRound objects
-     */
     private List<AttendanceRound> mapApiDataToAttendanceRounds(List<AttendanceRoundData> apiData) {
         List<AttendanceRound> rounds = new ArrayList<>();
 
         if (apiData == null || apiData.isEmpty()) {
             return rounds;
         }
-
-        SimpleDateFormat isoFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault());
 
         for (AttendanceRoundData apiRound : apiData) {
             try {
@@ -177,10 +189,9 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                 round.setSessionId(apiRound.getSessionId());
                 round.setRoundNumber(apiRound.getRoundNumber());
 
-                // Parse times
-                Date startTime = isoFormat.parse(apiRound.getStartTime());
-                Date endTime = isoFormat.parse(apiRound.getEndTime());
-                round.setTimestamp(startTime); // hoặc có thể dùng endTime tùy logic
+                // ✅ SỬA: Dùng StartTime từ API và convert sang UTC+7
+                Date roundTime = parseUtcTimeToLocal(apiRound.getStartTime());
+                round.setTimestamp(roundTime);
 
                 // Attendance data
                 round.setTotalStudents(apiRound.getTotalStudents());
@@ -188,13 +199,13 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
 
                 // Status và type
                 round.setRoundType(determineRoundType(apiRound.getRoundNumber(), apiData.size()));
-                round.setLocation(extractLocationFromData(apiRound)); // Extract từ course info nếu có
+                round.setLocation(extractLocationFromData(apiRound));
 
                 rounds.add(round);
 
-                Log.d(TAG, "Mapped round " + apiRound.getRoundNumber() +
-                        ": " + apiRound.getAttendedCount() + "/" + apiRound.getTotalStudents() +
-                        " (" + apiRound.getStatus() + ")");
+                Log.d(TAG, "✅ Mapped round " + apiRound.getRoundNumber() +
+                        " - UTC: " + apiRound.getStartTime() +
+                        " → Local: " + formatTime(roundTime));
 
             } catch (Exception e) {
                 Log.e(TAG, "Error mapping round " + apiRound.getRoundNumber(), e);
@@ -203,6 +214,96 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
 
         return rounds;
     }
+
+
+    /**
+     * 🕐 PARSE UTC time từ API sang Vietnam timezone (UTC+7)
+     */
+    private Date parseUtcTimeToLocal(String utcTimeString) {
+        try {
+            if (utcTimeString == null || utcTimeString.isEmpty()) {
+                return new Date();
+            }
+
+            // Parse UTC time string
+            SimpleDateFormat utcFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault());
+            utcFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+
+            Date utcDate = utcFormat.parse(utcTimeString);
+
+            if (utcDate == null) {
+                Log.w(TAG, "Failed to parse UTC time: " + utcTimeString);
+                return new Date();
+            }
+
+            // ✅ FIX: Convert sang Vietnam timezone
+            Date vietnamTime = convertUtcToVietnamTime(utcDate);
+
+            Log.d(TAG, "Time conversion: " + utcTimeString +
+                    " (UTC) → " + formatTimeDetailed(vietnamTime) + " (UTC+7)");
+
+            return vietnamTime;
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing UTC time: " + utcTimeString, e);
+            return new Date();
+        }
+    }
+
+    /**
+     * 🌏 CONVERT UTC sang Vietnam time (UTC+7)
+     */
+    private Date convertUtcToVietnamTime(Date utcDate) {
+        if (utcDate == null) return new Date();
+
+        // Tạo Calendar với UTC timezone
+        Calendar utcCalendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        utcCalendar.setTime(utcDate);
+
+        // Tạo Calendar với Vietnam timezone
+        Calendar vietnamCalendar = Calendar.getInstance(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
+        vietnamCalendar.set(Calendar.YEAR, utcCalendar.get(Calendar.YEAR));
+        vietnamCalendar.set(Calendar.MONTH, utcCalendar.get(Calendar.MONTH));
+        vietnamCalendar.set(Calendar.DAY_OF_MONTH, utcCalendar.get(Calendar.DAY_OF_MONTH));
+        vietnamCalendar.set(Calendar.HOUR_OF_DAY, utcCalendar.get(Calendar.HOUR_OF_DAY));
+        vietnamCalendar.set(Calendar.MINUTE, utcCalendar.get(Calendar.MINUTE));
+        vietnamCalendar.set(Calendar.SECOND, utcCalendar.get(Calendar.SECOND));
+        vietnamCalendar.set(Calendar.MILLISECOND, utcCalendar.get(Calendar.MILLISECOND));
+
+        // Add 7 hours for UTC+7
+        vietnamCalendar.add(Calendar.HOUR_OF_DAY, 7);
+
+        return vietnamCalendar.getTime();
+    }
+
+    /**
+     * 🕐 FORMAT time chi tiết cho debugging
+     */
+    private String formatTimeDetailed(Date date) {
+        if (date == null) return "null";
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+        return format.format(date);
+    }
+
+
+    /**
+     * 🕐 FORMAT time với timezone info cho debugging
+     */
+    private String formatTimeWithTimezone(Date date) {
+        if (date == null) return "null";
+        SimpleDateFormat format = new SimpleDateFormat("HH:mm:ss (Z)", Locale.getDefault());
+        return format.format(date);
+    }
+
+    /**
+     * Format time for logging
+     */
+    private String formatTime(Date date) {
+        if (date == null) return "null";
+        SimpleDateFormat format = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+        return format.format(date);
+    }
+
 
     /**
      * 🔧 XÁC ĐỊNH round type dựa trên vị trí
@@ -225,6 +326,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
         // Tạm thời return empty, sẽ được set từ session info
         return "";
     }
+
     /**
      * 🔧 LOAD final attendance từ API thật
      */
@@ -424,6 +526,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
 
         return info;
     }
+
     /**
      * 🔧 CLEANUP receiver
      */

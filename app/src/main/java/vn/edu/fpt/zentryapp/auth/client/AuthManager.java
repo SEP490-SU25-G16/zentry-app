@@ -55,10 +55,9 @@ public class AuthManager {
         sharedPreferences.edit().clear().apply();
     }
 
-    // Helper methods để lấy thông tin user
     public String getCurrentUserId() {
         UserInfo userInfo = getUserInfo();
-        return userInfo != null ? userInfo.getAccountId() : null;
+        return userInfo != null ? userInfo.getId() : null;
     }
 
     public String getCurrentUserEmail() {
