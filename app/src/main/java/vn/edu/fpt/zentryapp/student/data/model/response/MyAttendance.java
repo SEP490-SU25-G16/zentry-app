@@ -1,43 +1,53 @@
+// MyAttendance.java
 package vn.edu.fpt.zentryapp.student.data.model.response;
+
+import java.util.Date;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-
 public class MyAttendance {
-    private final int totalSessions;
-    private final int attendedSessions;
-    private final int absentSessions;
-    private final int lateSessions;
+    private String studentId;
+    private String studentName;
+    private String email;
+    private int totalSessions;
+    private int attendedSessions;
+    private int absentSessions;
+    private Date lastAttendanceTime;
+    private boolean isPresent;
+    private String status;
+    private String detailedStatus;
 
-    public float getAttendancePercentage() {
-        if (totalSessions == 0) return 0;
-        return (float) attendedSessions / totalSessions * 100;
+    public double getAttendancePercentage() {
+        if (totalSessions == 0) return 0.0;
+        return (double) attendedSessions / totalSessions * 100.0;
     }
 
     public String getAttendanceGrade() {
-        float percentage = getAttendancePercentage();
-        if (percentage >= 95) {
-            return "Excellent";
-        } else if (percentage >= 85) {
-            return "Good";
-        } else if (percentage >= 70) {
-            return "Average";
+        double percentage = getAttendancePercentage();
+        if (percentage >= 80.0) {
+            return "EXCELLENT";
+        } else if (percentage >= 60.0) {
+            return "GOOD";
+        } else if (percentage >= 40.0) {
+            return "FAIR";
         } else {
-            return "Poor";
+            return "POOR";
         }
     }
 
     public int getAttendanceColor() {
-        float percentage = getAttendancePercentage();
-        if (percentage >= 85) {
-            return android.graphics.Color.parseColor("#059669"); // Green
-        } else if (percentage >= 70) {
-            return android.graphics.Color.parseColor("#F59E0B"); // Orange
+        double percentage = getAttendancePercentage();
+        if (percentage >= 80.0) {
+            return 0xFF4CAF50; // Green
+        } else if (percentage >= 60.0) {
+            return 0xFF2196F3; // Blue
+        } else if (percentage >= 40.0) {
+            return 0xFFFF9800; // Orange
         } else {
-            return android.graphics.Color.parseColor("#DC2626"); // Red
+            return 0xFFF44336; // Red
         }
     }
 }

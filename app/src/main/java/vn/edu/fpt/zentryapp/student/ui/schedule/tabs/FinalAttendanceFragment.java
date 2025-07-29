@@ -14,19 +14,19 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
-import vn.edu.fpt.zentryapp.databinding.FragmentFinalAttendanceBinding;
 import vn.edu.fpt.zentryapp.databinding.FragmentFinalAttendanceStudentBinding;
 
 public class FinalAttendanceFragment extends Fragment {
 
     private FragmentFinalAttendanceStudentBinding binding;
     private FinalAttendanceViewModel viewModel;
-    private String classId;
+    private String sessionId; // 🔧 ĐỔI từ classId thành sessionId
 
-    public static FinalAttendanceFragment newInstance(String classId) {
+    // 🔧 CẬP NHẬT newInstance để nhận sessionId
+    public static FinalAttendanceFragment newInstance(String sessionId) {
         FinalAttendanceFragment fragment = new FinalAttendanceFragment();
         Bundle args = new Bundle();
-        args.putString("classId", classId);
+        args.putString("sessionId", sessionId); // 🔧 ĐỔI key
         fragment.setArguments(args);
         return fragment;
     }
@@ -35,7 +35,7 @@ public class FinalAttendanceFragment extends Fragment {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (getArguments() != null) {
-            classId = getArguments().getString("classId");
+            sessionId = getArguments().getString("sessionId"); // 🔧 ĐỔI key
         }
     }
 
@@ -52,22 +52,23 @@ public class FinalAttendanceFragment extends Fragment {
 
         viewModel = new ViewModelProvider(this).get(FinalAttendanceViewModel.class);
         AuthManager authManager = AuthManager.getInstance(requireContext());
-        viewModel.init(authManager, classId);
+
+        // 🔧 TRUYỀN context và sessionId
+        viewModel.init(requireContext(), authManager, sessionId);
 
         setupClickListener();
         observeViewModel();
     }
 
     private void setupClickListener() {
-//        binding.cardMyAttendance.setOnClickListener(v -> {
-//            Toast.makeText(requireContext(), "Attendance details", Toast.LENGTH_SHORT).show();
-//        });
+        // Optional: Add click listeners if needed
     }
 
     @SuppressLint("SetTextI18n")
     private void observeViewModel() {
         viewModel.isLoading().observe(getViewLifecycleOwner(), isLoading -> {
-            //   binding.progressLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+            // Optional: show loading indicator
+            // binding.progressLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
         });
 
         viewModel.myAttendance().observe(getViewLifecycleOwner(), attendance -> {
@@ -79,18 +80,21 @@ public class FinalAttendanceFragment extends Fragment {
                 binding.tvAttendanceStatus.setText(attendance.getAttendanceGrade());
                 binding.tvAttendanceStatus.setTextColor(attendance.getAttendanceColor());
                 binding.tvAttendancePercentage.setTextColor(attendance.getAttendanceColor());
+
+                Log.d("FinalAttendance", "My attendance loaded: " + attendance.getAttendancePercentage() + "%");
             }
         });
 
         viewModel.errorMessage().observe(getViewLifecycleOwner(), error -> {
-            if (error != null) {
+            if (error != null && !error.trim().isEmpty()) {
                 Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
+                Log.e("FinalAttendance", "Error: " + error);
             }
         });
 
         viewModel.successMessage().observe(getViewLifecycleOwner(), message -> {
-            if (message != null) {
-                Log.d("FinalAttendance", message);
+            if (message != null && !message.trim().isEmpty()) {
+                Log.d("FinalAttendance", "Success: " + message);
             }
         });
     }

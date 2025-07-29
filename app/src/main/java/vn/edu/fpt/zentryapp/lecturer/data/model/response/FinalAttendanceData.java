@@ -2,7 +2,11 @@ package vn.edu.fpt.zentryapp.lecturer.data.model.response;
 
 import com.google.gson.annotations.SerializedName;
 
-// FinalAttendanceData.java
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+@Getter
+@AllArgsConstructor
 public class FinalAttendanceData {
     @SerializedName("StudentId")
     private String studentId;
@@ -55,22 +59,4 @@ public class FinalAttendanceData {
     @SerializedName("LastAttendanceTime")
     private String lastAttendanceTime;
 
-    // Getters
-    public String getStudentId() { return studentId; }
-    public String getStudentFullName() { return studentFullName; }
-    public String getEmail() { return email; }
-    public String getPhoneNumber() { return phoneNumber; }
-    public String getStatus() { return status; }
-    public String getEnrollmentId() { return enrollmentId; }
-    public String getEnrolledAt() { return enrolledAt; }
-    public String getEnrollmentStatus() { return enrollmentStatus; }
-    public String getSessionId() { return sessionId; }
-    public String getClassSectionId() { return classSectionId; }
-    public String getScheduleId() { return scheduleId; }
-    public String getCourseId() { return courseId; }
-    public String getClassInfo() { return classInfo; }
-    public String getSessionStartTime() { return sessionStartTime; }
-    public String getLastAttendanceRecordId() { return lastAttendanceRecordId; }
-    public String getDetailedAttendanceStatus() { return detailedAttendanceStatus; }
-    public String getLastAttendanceTime() { return lastAttendanceTime; }
 }

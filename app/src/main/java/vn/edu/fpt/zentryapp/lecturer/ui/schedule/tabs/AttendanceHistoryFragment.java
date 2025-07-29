@@ -16,7 +16,7 @@ import vn.edu.fpt.zentryapp.databinding.FragmentAttendanceHistoryBinding;
 import vn.edu.fpt.zentryapp.lecturer.adapter.AttendanceRoundAdapter;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.AttendanceRound;
 
-public class AttendanceHistoryFragment extends Fragment implements AttendanceRoundAdapter.OnRoundClickListener {
+public class AttendanceHistoryFragment extends Fragment  {
 
     private FragmentAttendanceHistoryBinding binding;
     private AttendanceRoundAdapter roundAdapter;
@@ -52,8 +52,6 @@ public class AttendanceHistoryFragment extends Fragment implements AttendanceRou
 
     private void setupRecyclerView() {
         roundAdapter = new AttendanceRoundAdapter();
-        roundAdapter.setOnRoundClickListener(this);
-
         binding.rvRounds.setLayoutManager(new LinearLayoutManager(requireContext()));
         binding.rvRounds.setAdapter(roundAdapter);
     }
@@ -69,12 +67,6 @@ public class AttendanceHistoryFragment extends Fragment implements AttendanceRou
         }
     }
 
-    @Override
-    public void onRoundClick(AttendanceRound round) {
-        android.widget.Toast.makeText(requireContext(),
-                "Round " + round.getRoundNumber() + " - " + round.getAttendanceDisplay(),
-                android.widget.Toast.LENGTH_SHORT).show();
-    }
 
     @Override
     public void onDestroyView() {

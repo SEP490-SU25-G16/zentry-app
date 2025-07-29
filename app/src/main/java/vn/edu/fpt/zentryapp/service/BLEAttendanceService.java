@@ -35,6 +35,10 @@ public class BLEAttendanceService extends Service {
     private static final String CHANNEL_ID = "BLE_ATTENDANCE_CHANNEL";
     private static final int NOTIFICATION_ID = 1001;
 
+    // 🔧 SIMPLE broadcast constants
+    public static final String ACTION_ATTENDANCE_CALCULATED = "vn.edu.fpt.zentryapp.ATTENDANCE_CALCULATED";
+    public static final String EXTRA_SESSION_ID = "sessionId";
+
     // Core components
     private BLEAttendanceManager bleManager;
     private AttendanceRoundScheduler roundScheduler;
@@ -46,6 +50,8 @@ public class BLEAttendanceService extends Service {
     private String sessionId;
     private String room;
     private String userId;
+    private AttendanceCalculateHandler calculateHandler; // 🔧 THÊM
+    private String userRole; // 🔧 THÊM để track role
 
     @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
@@ -55,8 +61,8 @@ public class BLEAttendanceService extends Service {
 
         // Initialize components
         bleManager = new BLEAttendanceManager(this);
-        submissionHandler = new AttendanceSubmissionHandler(this); // You'll need to implement this
-
+        submissionHandler = new AttendanceSubmissionHandler(this);
+        calculateHandler = new AttendanceCalculateHandler(this);
         Log.d(TAG, "BLE Attendance Service created");
     }
 
@@ -124,12 +130,57 @@ public class BLEAttendanceService extends Service {
         // Schedule rounds
         roundScheduler = new AttendanceRoundScheduler(
                 rounds,
-                this::executeRound,
-                this::onAllRoundsComplete
+                this::executeRound,           // execution callback
+                this::calculateRound,         // 🔧 THÊM calculate callback
+                this::onAllRoundsComplete     // completion callback
         );
         roundScheduler.start();
 
         Log.d(TAG, "Attendance service started for session: " + sessionId);
+    }
+
+    private void calculateRound(AttendanceModels.AttendanceRound round) {
+        // 🔧 CHỈ LECTURER mới calculate
+        if (!"LECTURER".equals(userRole)) {
+            Log.d(TAG, "Skipping calculate for role: " + userRole);
+            return;
+        }
+
+        Log.d(TAG, "Calculating attendance for round " + round.getRoundNumber());
+
+        // Lấy roundId từ round object (cần thêm field này vào AttendanceModels.AttendanceRound)
+        String roundId = round.getRoundId(); // 🔧 CẦN THÊM field này
+
+        calculateHandler.calculateRoundAttendance(sessionId, roundId,
+                new AttendanceCallbacks.CalculateAttendanceCallback() {
+                    @Override
+                    public void onCalculateSuccess(String roundId, int attendedCount, String message) {
+                        Log.d(TAG, "✅ Round " + round.getRoundNumber() + " calculated: " +
+                                attendedCount + " students attended");
+
+                        // 🔧 SIMPLE broadcast - chỉ thông báo có update
+                        sendAttendanceCalculatedBroadcast();
+                    }
+
+                    @Override
+                    public void onCalculateFailure(String roundId, String error) {
+                        Log.e(TAG, "❌ Failed to calculate round " + round.getRoundNumber() + ": " + error);
+                    }
+                });
+    }
+
+    /**
+     * 🔧 SIMPLE broadcast - chỉ notify có update
+     */
+    private void sendAttendanceCalculatedBroadcast() {
+        Intent broadcastIntent = new Intent(ACTION_ATTENDANCE_CALCULATED);
+        broadcastIntent.putExtra(EXTRA_SESSION_ID, sessionId);
+
+        androidx.localbroadcastmanager.content.LocalBroadcastManager
+                .getInstance(this)
+                .sendBroadcast(broadcastIntent);
+
+        Log.d(TAG, "📢 Broadcasted attendance calculated for session: " + sessionId);
     }
 
     @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_SCAN})

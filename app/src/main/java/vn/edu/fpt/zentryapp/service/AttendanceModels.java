@@ -15,7 +15,8 @@ public class AttendanceModels {
     @Getter
     public static class AttendanceRound implements Serializable {
         private static final long serialVersionUID = 1L;
-        private final Date timestamp;
+        private String roundId;
+        private final Date executionTime;
         private final int roundNumber;
         private final boolean isLastRound;
     }

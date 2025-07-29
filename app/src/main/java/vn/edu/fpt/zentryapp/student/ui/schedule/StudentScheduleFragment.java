@@ -50,7 +50,7 @@ public class StudentScheduleFragment extends Fragment implements ScheduleAdapter
         // Initialize ViewModel
         viewModel = new ViewModelProvider(this).get(StudentScheduleViewModel.class);
         authManager = AuthManager.getInstance(requireContext());
-        viewModel.init(authManager);
+        viewModel.init(requireContext(), authManager);
 
         setupRecyclerView();
         setupClickListeners();
@@ -147,8 +147,27 @@ public class StudentScheduleFragment extends Fragment implements ScheduleAdapter
 
     @Override
     public void onScheduleClick(StudentScheduleSession studentScheduleSession) {
-        navController.navigate(R.id.action_studentSchedule_to_classDetail);
-        viewModel.onScheduleClicked(studentScheduleSession);
+        // 🔧 PASS data qua Bundle để tránh call API lấy thông tin cơ bản
+        Bundle args = new Bundle();
+
+        //   "CourseId": "ff128e22-09a6-4a7f-bda9-71600f5d2d54",
+        //            "CourseCode": "CS673",
+        //            "CourseName": "Introduction to Computer Science",
+
+        // Core session info
+        args.putString("sessionId", studentScheduleSession.getSessionId());
+        args.putString("courseCode", studentScheduleSession.getCourseCode());
+        args.putString("courseName", studentScheduleSession.getClassName());
+        args.putString("sectionCode", studentScheduleSession.getGrade());
+        args.putString("room", studentScheduleSession.getRoom());
+        args.putString("lecturer", studentScheduleSession.getLecturer());
+
+        // Timing info
+        args.putString("startTime", studentScheduleSession.getStartTime());
+        args.putString("endTime", studentScheduleSession.getEndTime());
+        args.putString("dayOfWeek", studentScheduleSession.getDayOfWeek());
+
+        navController.navigate(R.id.action_studentSchedule_to_classDetail, args);
     }
 
     @Override

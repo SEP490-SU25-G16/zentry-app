@@ -4,69 +4,163 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
-import android.os.Handler;
+import android.content.Context;
+import android.util.Log;
 
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import vn.edu.fpt.zentryapp.auth.client.ApiClient;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
-import vn.edu.fpt.zentryapp.student.data.model.response.ClassDetail;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.AttendanceRoundData;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.AttendanceRoundsResponse;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.FinalAttendanceData;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.FinalAttendanceResponse;
+import vn.edu.fpt.zentryapp.service.AttendanceApiService;
 
 public class StudentScheduleClassDetailViewModel extends ViewModel {
+    private static final String TAG = "StudentClassDetailVM";
 
     private final MutableLiveData<Boolean> _isLoading = new MutableLiveData<>(false);
-    private final MutableLiveData<ClassDetail> _classDetail = new MutableLiveData<>();
+    private final MutableLiveData<List<AttendanceRoundData>> _attendanceRounds = new MutableLiveData<>();
+    private final MutableLiveData<List<FinalAttendanceData>> _finalAttendance = new MutableLiveData<>();
     private final MutableLiveData<String> _errorMessage = new MutableLiveData<>();
-    private final MutableLiveData<String> _successMessage = new MutableLiveData<>();
 
-    public LiveData<Boolean> isLoading() { return _isLoading; }
-    public LiveData<ClassDetail> classDetail() { return _classDetail; }
-    public LiveData<String> errorMessage() { return _errorMessage; }
-    public LiveData<String> successMessage() { return _successMessage; }
 
+    // API Service
+    private AttendanceApiService apiService;
     private AuthManager authManager;
+    private Context context;
+    private String sessionId;
 
-    public void init(AuthManager authManager, String classId) {
+    // Public getters
+    public LiveData<Boolean> isLoading() { return _isLoading; }
+    public LiveData<List<AttendanceRoundData>> attendanceRounds() { return _attendanceRounds; }
+    public LiveData<List<FinalAttendanceData>> finalAttendance() { return _finalAttendance; }
+    public LiveData<String> errorMessage() { return _errorMessage; }
+
+    public void init(Context context, AuthManager authManager, String sessionId) {
+        this.context = context;
         this.authManager = authManager;
-        loadClassDetail(classId);
+        this.sessionId = sessionId;
+        this.apiService = ApiClient.getClient(context).create(AttendanceApiService.class);
+
+        // 🔧 CHỈ load attendance data, không load class detail
+        loadAttendanceData();
     }
 
-    public void loadClassDetail(String classId) {
-        if (Boolean.TRUE.equals(_isLoading.getValue())) {
-            return;
-        }
-
+    /**
+     * 🔧 LOAD attendance rounds và final attendance
+     */
+    private void loadAttendanceData() {
         _isLoading.setValue(true);
         _errorMessage.setValue(null);
 
-        new Handler().postDelayed(() -> {
-            try {
-                ClassDetail mockClassDetail = generateMockClassDetail(classId);
-                _classDetail.setValue(mockClassDetail);
-                _successMessage.setValue("Class detail loaded successfully");
-            } catch (Exception e) {
-                _errorMessage.setValue("Failed to load class detail: " + e.getMessage());
-            } finally {
-                _isLoading.setValue(false);
-            }
-        }, 1000);
+        Log.d(TAG, "Loading attendance data for session: " + sessionId);
+
+        // Load rounds và final attendance parallel
+        loadAttendanceRounds();
+        loadFinalAttendance();
     }
 
-    private ClassDetail generateMockClassDetail(String classId) {
-        return new ClassDetail(
-                classId,
-                "Mathematics Class",
-                "Grade 07",
-                "Mathematics",
-                "2h 30m",
-                "00:14:50",
-                "Nguyễn Văn A",
-                "BE-201",
-                "Monday, Wednesday, Friday 8:00 AM - 10:30 AM",
-                25,
-                23
-        );
+    /**
+     * 🔧 LOAD attendance rounds từ API
+     */
+    private void loadAttendanceRounds() {
+        apiService.getAttendanceRounds(sessionId)
+                .enqueue(new Callback<AttendanceRoundsResponse>() {
+                    @Override
+                    public void onResponse(Call<AttendanceRoundsResponse> call, Response<AttendanceRoundsResponse> response) {
+                        if (response.isSuccessful() && response.body() != null) {
+                            AttendanceRoundsResponse apiResponse = response.body();
+
+                            if (apiResponse.isSuccess()) {
+                                _attendanceRounds.setValue(apiResponse.getData());
+                                Log.d(TAG, "✅ Loaded " + apiResponse.getData().size() + " attendance rounds");
+                            } else {
+                                String error = apiResponse.getError() != null ? apiResponse.getError() : "Unknown API error";
+                                _errorMessage.setValue("Rounds: " + error);
+                                Log.e(TAG, "❌ Rounds API Error: " + error);
+                            }
+                        } else {
+                            String error = "HTTP Error: " + response.code();
+                            _errorMessage.setValue("Rounds: " + error);
+                            Log.e(TAG, "❌ Rounds HTTP Error: " + error);
+                        }
+
+                        checkLoadingComplete();
+                    }
+
+                    @Override
+                    public void onFailure(Call<AttendanceRoundsResponse> call, Throwable t) {
+                        String error = "Network Error: " + t.getMessage();
+                        _errorMessage.setValue("Rounds: " + error);
+                        Log.e(TAG, "❌ Rounds Network Error", t);
+
+                        checkLoadingComplete();
+                    }
+                });
     }
 
-    public void onAddClicked() {
-        // TODO: Handle add action
+    /**
+     * 🔧 LOAD final attendance từ API
+     */
+    private void loadFinalAttendance() {
+        apiService.getFinalAttendance(sessionId)
+                .enqueue(new Callback<FinalAttendanceResponse>() {
+                    @Override
+                    public void onResponse(Call<FinalAttendanceResponse> call, Response<FinalAttendanceResponse> response) {
+                        if (response.isSuccessful() && response.body() != null) {
+                            FinalAttendanceResponse apiResponse = response.body();
+
+                            if (apiResponse.isSuccess()) {
+                                _finalAttendance.setValue(apiResponse.getData());
+                                Log.d(TAG, "✅ Loaded " + apiResponse.getData().size() + " final attendance records");
+                            } else {
+                                String error = apiResponse.getError() != null ? apiResponse.getError() : "Unknown API error";
+                                _errorMessage.setValue("Final Attendance: " + error);
+                                Log.e(TAG, "❌ Final Attendance API Error: " + error);
+                            }
+                        } else {
+                            String error = "HTTP Error: " + response.code();
+                            _errorMessage.setValue("Final Attendance: " + error);
+                            Log.e(TAG, "❌ Final Attendance HTTP Error: " + error);
+                        }
+
+                        checkLoadingComplete();
+                    }
+
+                    @Override
+                    public void onFailure(Call<FinalAttendanceResponse> call, Throwable t) {
+                        String error = "Network Error: " + t.getMessage();
+                        _errorMessage.setValue("Final Attendance: " + error);
+                        Log.e(TAG, "❌ Final Attendance Network Error", t);
+
+                        checkLoadingComplete();
+                    }
+                });
+    }
+
+    /**
+     * 🔧 CHECK if both API calls completed
+     */
+    private void checkLoadingComplete() {
+        // Set loading false khi cả hai API calls đã complete
+        // (có thể implement logic phức tạp hơn nếu cần)
+        _isLoading.setValue(false);
+    }
+
+    /**
+     * 🔧 REFRESH attendance data
+     */
+    public void refreshAttendanceData() {
+        loadAttendanceData();
     }
 
     public void onNotificationClicked() {

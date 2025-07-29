@@ -16,20 +16,12 @@ import vn.edu.fpt.zentryapp.lecturer.data.model.response.AttendanceRound;
 public class AttendanceRoundAdapter extends RecyclerView.Adapter<AttendanceRoundAdapter.RoundViewHolder> {
 
     private List<AttendanceRound> rounds = new ArrayList<>();
-    private OnRoundClickListener listener;
-
-    public interface OnRoundClickListener {
-        void onRoundClick(AttendanceRound round);
-    }
 
     public void setRounds(List<AttendanceRound> rounds) {
         this.rounds = rounds != null ? rounds : new ArrayList<>();
         notifyDataSetChanged();
     }
 
-    public void setOnRoundClickListener(OnRoundClickListener listener) {
-        this.listener = listener;
-    }
 
     @NonNull
     @Override
@@ -56,12 +48,6 @@ public class AttendanceRoundAdapter extends RecyclerView.Adapter<AttendanceRound
             super(binding.getRoot());
             this.binding = binding;
 
-            binding.getRoot().setOnClickListener(v -> {
-                int position = getAdapterPosition();
-                if (position != RecyclerView.NO_POSITION && listener != null) {
-                    listener.onRoundClick(rounds.get(position));
-                }
-            });
         }
 
         public void bind(AttendanceRound round) {

@@ -4,7 +4,10 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.util.Log;
 
 import java.text.SimpleDateFormat;
@@ -28,10 +31,11 @@ import vn.edu.fpt.zentryapp.lecturer.data.model.response.FinalAttendanceData;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.FinalAttendanceResponse;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.SessionDetailInfoRound;
 import vn.edu.fpt.zentryapp.service.AttendanceApiService;
+import vn.edu.fpt.zentryapp.service.BLEAttendanceService;
 
 public class LecturerScheduleClassDetailViewModel extends ViewModel {
     private static final String TAG = "ClassDetailViewModel";
-
+    private BroadcastReceiver attendanceCalculatedReceiver;
     private final MutableLiveData<Boolean> _isLoading = new MutableLiveData<>(false);
     private final MutableLiveData<SessionDetailInfoRound> _sessionInfo = new MutableLiveData<>();
     private final MutableLiveData<List<AttendanceRound>> _attendanceRounds = new MutableLiveData<>();
@@ -58,9 +62,37 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
         this.authManager = authManager;
         this.sessionId = sessionId;
         this.apiService = ApiClient.getClient(context).create(AttendanceApiService.class);
-
+        setupAttendanceCalculatedReceiver();
         loadSessionInfo();
         loadAttendanceRounds(); // 🔧 Load từ API thay vì mock
+    }
+
+    /**
+     * 🔧 SIMPLE broadcast receiver setup
+     */
+    private void setupAttendanceCalculatedReceiver() {
+        attendanceCalculatedReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (BLEAttendanceService.ACTION_ATTENDANCE_CALCULATED.equals(intent.getAction())) {
+                    String receivedSessionId = intent.getStringExtra(BLEAttendanceService.EXTRA_SESSION_ID);
+
+                    // Chỉ refresh nếu là session hiện tại
+                    if (sessionId.equals(receivedSessionId)) {
+                        Log.d(TAG, "📢 Received attendance calculated broadcast - refreshing data");
+                        refreshData();
+                    }
+                }
+            }
+        };
+
+        // Register receiver
+        IntentFilter filter = new IntentFilter(BLEAttendanceService.ACTION_ATTENDANCE_CALCULATED);
+        androidx.localbroadcastmanager.content.LocalBroadcastManager
+                .getInstance(context)
+                .registerReceiver(attendanceCalculatedReceiver, filter);
+
+        Log.d(TAG, "✅ Attendance calculated receiver registered");
     }
 
     private void loadSessionInfo() {
@@ -392,6 +424,20 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
 
         return info;
     }
+    /**
+     * 🔧 CLEANUP receiver
+     */
+    @Override
+    protected void onCleared() {
+        super.onCleared();
 
+        if (attendanceCalculatedReceiver != null && context != null) {
+            androidx.localbroadcastmanager.content.LocalBroadcastManager
+                    .getInstance(context)
+                    .unregisterReceiver(attendanceCalculatedReceiver);
+
+            Log.d(TAG, "✅ Attendance calculated receiver unregistered");
+        }
+    }
 
 }

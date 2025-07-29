@@ -21,20 +21,29 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.button.MaterialButton;
 
 import java.io.Serializable;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 import vn.edu.fpt.zentryapp.R;
+import vn.edu.fpt.zentryapp.auth.client.ApiClient;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.ItemScheduleBinding;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.RoundData;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.RoundsResponse;
+import vn.edu.fpt.zentryapp.service.AttendanceApiService;
 import vn.edu.fpt.zentryapp.service.AttendanceModels;
 import vn.edu.fpt.zentryapp.service.BLEAttendanceService;
 import vn.edu.fpt.zentryapp.student.data.model.response.StudentScheduleSession;
 
 public class ScheduleAdapter extends RecyclerView.Adapter<ScheduleAdapter.ViewHolder> {
-
+    private static final String TAG = "StudentScheduleAdapter";
     private List<StudentScheduleSession> studentScheduleSessions = new ArrayList<>();
     private OnScheduleClickListener onScheduleClickListener;
     private AuthManager authManager;
@@ -89,112 +98,253 @@ public class ScheduleAdapter extends RecyclerView.Adapter<ScheduleAdapter.ViewHo
             binding.tvScheduleClassName.setText(studentScheduleSession.getClassNameWithGrade());
             binding.tvScheduleClassTime.setText(studentScheduleSession.getScheduleTime());
 
-            // Set clickable state and visual feedback
-            boolean isClickable = studentScheduleSession.isClickable();
-            StudentScheduleSession.ScheduleStatus status = studentScheduleSession.getStatus();
+            // 🔧 XÁC ĐỊNH có thể join class không dựa trên thời gian
+            boolean canJoinClass = canJoinClassNow(studentScheduleSession);
 
-            // Configure click behavior
-            if (isClickable) {
+            // Configure click behavior dựa trên timing
+            if (canJoinClass) {
                 binding.getRoot().setOnClickListener(v -> {
-                    // 🔧 Hiển thị dialog confirm thay vì navigate trực tiếp
                     showJoinClassConfirmation(v, studentScheduleSession);
                 });
                 binding.getRoot().setClickable(true);
                 binding.getRoot().setFocusable(true);
                 binding.getRoot().setAlpha(1.0f);
+
+                // Highlight available classes
+                binding.getRoot().setBackgroundColor(0xFFE8F5E8); // Light green
             } else {
                 binding.getRoot().setOnClickListener(v -> {
-                    // Show message when not clickable
                     Toast.makeText(v.getContext(),
-                            "Class is not available yet. Please wait until class time.",
+                            getNotAvailableMessage(studentScheduleSession),
                             Toast.LENGTH_SHORT).show();
                 });
                 binding.getRoot().setClickable(true);
                 binding.getRoot().setFocusable(true);
                 binding.getRoot().setAlpha(0.6f); // Dim appearance
+                binding.getRoot().setBackgroundColor(0xFFFFFFFF); // White
             }
         }
 
-        // 🔧 THÊM method hiển thị dialog confirm
+        /**
+         * 🔧 XÁC ĐỊNH có thể join class không (similar to lecturer start logic)
+         */
+        private boolean canJoinClassNow(StudentScheduleSession session) {
+            try {
+                Date currentTime = new Date();
+                Date sessionStart = parseTimeToday(session.getStartTime());
+                Date sessionEnd = parseTimeToday(session.getEndTime());
+
+                // 🔧 CHỈ CHO JOIN KHI ĐÚNG GIỜ (trong khoảng thời gian session)
+                boolean isInSessionTime = currentTime.getTime() >= sessionStart.getTime() &&
+                        currentTime.getTime() <= sessionEnd.getTime();
+
+                return isInSessionTime;
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error checking join time", e);
+                return false;
+            }
+        }
+
+        /**
+         * 🔧 PARSE time string to Date object for today
+         */
+        private Date parseTimeToday(String timeStr) throws Exception {
+            SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+            Date timeOnly = timeFormat.parse(timeStr);
+
+            Calendar today = Calendar.getInstance();
+            Calendar sessionTime = Calendar.getInstance();
+            sessionTime.setTime(timeOnly);
+
+            today.set(Calendar.HOUR_OF_DAY, sessionTime.get(Calendar.HOUR_OF_DAY));
+            today.set(Calendar.MINUTE, sessionTime.get(Calendar.MINUTE));
+            today.set(Calendar.SECOND, sessionTime.get(Calendar.SECOND));
+
+            return today.getTime();
+        }
+
+        /**
+         * 🔧 GET message khi không thể join
+         */
+        private String getNotAvailableMessage(StudentScheduleSession session) {
+            try {
+                Date currentTime = new Date();
+                Date sessionStart = parseTimeToday(session.getStartTime());
+                Date sessionEnd = parseTimeToday(session.getEndTime());
+
+                if (currentTime.getTime() < sessionStart.getTime()) {
+                    return "Class hasn't started yet. Please wait until " + session.getStartTime();
+                } else if (currentTime.getTime() > sessionEnd.getTime()) {
+                    return "Class has ended.";
+                } else {
+                    return "Class is not available for joining at the moment.";
+                }
+            } catch (Exception e) {
+                return "Class is not available yet. Please wait until class time.";
+            }
+        }
+
         @RequiresApi(api = Build.VERSION_CODES.O)
         private void showJoinClassConfirmation(View view, StudentScheduleSession studentScheduleSession) {
-            // Tạo dialog
             Dialog dialog = new Dialog(view.getContext());
             dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
             dialog.setContentView(R.layout.dialog_join_class_confirmation);
 
-            // Làm cho dialog có background trong suốt
             dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
             dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
 
-            // Tìm các view trong dialog
             TextView tvMessage = dialog.findViewById(R.id.tv_message);
             MaterialButton btnCancel = dialog.findViewById(R.id.btn_cancel);
             MaterialButton btnConfirm = dialog.findViewById(R.id.btn_confirm);
 
-            // Set message
             tvMessage.setText("Bạn có muốn tham gia lớp học \"" + studentScheduleSession.getClassNameWithGrade() + "\" không?");
 
-            // Set click listeners
             btnCancel.setOnClickListener(v -> dialog.dismiss());
 
             btnConfirm.setOnClickListener(v -> {
                 dialog.dismiss();
 
-                // 🔧 Bắt đầu BLE service cho student
+                // 🔧 Load rounds từ API trước khi start BLE service
                 startStudentBLEService(view.getContext(), studentScheduleSession);
 
-                // Mark as joined (có thể cần thêm field này vào Schedule model)
-                // schedule.setJoined(true);
                 notifyDataSetChanged();
 
-                // Callback để navigate hoặc update UI
                 if (onScheduleClickListener != null) {
                     onScheduleClickListener.onScheduleClick(studentScheduleSession);
                 }
             });
 
-            // Cho phép hủy khi ấn ra ngoài
             dialog.setCancelable(true);
             dialog.show();
         }
 
-        // 🔧 THÊM method start BLE service cho student
+        // 🔧 REFACTOR: Load rounds từ API trước khi start BLE service
         @RequiresApi(api = Build.VERSION_CODES.O)
         private void startStudentBLEService(Context context, StudentScheduleSession studentScheduleSession) {
             try {
-                // Lấy user ID từ AuthManager
                 String userId = authManager.getCurrentUserId();
 
                 if (userId == null) {
-                    Log.e("ScheduleAdapter", "Student User ID not available");
+                    Log.e(TAG, "Student User ID not available");
                     Toast.makeText(context, "Không thể xác định thông tin sinh viên", Toast.LENGTH_SHORT).show();
                     return;
                 }
-                // TODO: get round api for student
 
-                // Tạo rounds cho student (giống lecturer)
-                List<AttendanceModels.AttendanceRound> rounds = Arrays.asList(
-                        new AttendanceModels.AttendanceRound(new Date(System.currentTimeMillis() + 30000), 1, false),
-                        new AttendanceModels.AttendanceRound(new Date(System.currentTimeMillis() + 60000), 2, false),
-                        new AttendanceModels.AttendanceRound(new Date(System.currentTimeMillis() + 90000), 3, true)
-                );
+                loadStudentSessionRounds(context, studentScheduleSession, userId);
 
-                // Start BLE service
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to start Student BLE service", e);
+                Toast.makeText(context, "Lỗi khi tham gia lớp học", Toast.LENGTH_SHORT).show();
+            }
+        }
+
+        /**
+         * 🔧 LOAD rounds từ API cho student (tương tự lecturer)
+         */
+        private void loadStudentSessionRounds(Context context, StudentScheduleSession studentScheduleSession, String userId) {
+            Log.d(TAG, "Loading rounds for student session: " + studentScheduleSession.getSessionId());
+
+            // Tạo API service
+            AttendanceApiService apiService = ApiClient.getClient(context).create(AttendanceApiService.class);
+
+            apiService.getSessionRounds(studentScheduleSession.getSessionId())
+                    .enqueue(new Callback<RoundsResponse>() {
+                        @RequiresApi(api = Build.VERSION_CODES.O)
+                        @Override
+                        public void onResponse(Call<RoundsResponse> call, Response<RoundsResponse> response) {
+                            if (response.isSuccessful() && response.body() != null) {
+                                RoundsResponse apiResponse = response.body();
+
+                                if (apiResponse.isSuccess()) {
+                                    List<AttendanceModels.AttendanceRound> rounds = mapApiRoundsToAttendanceRounds(apiResponse.getData());
+
+                                    if (!rounds.isEmpty()) {
+                                        // Start BLE service với rounds thật
+                                        startStudentBLEServiceWithRounds(context, studentScheduleSession, userId, rounds);
+                                        Log.d(TAG, "✅ Student loaded " + rounds.size() + " rounds from API");
+                                    } else {
+                                        Log.w(TAG, "⚠️ No rounds found for student, using fallback");
+                                    }
+                                } else {
+                                    Log.e(TAG, "❌ Student API Error: " + apiResponse.getError());
+                                }
+                            } else {
+                                Log.e(TAG, "❌ Student HTTP Error: " + response.code());
+                            }
+                        }
+
+                        @RequiresApi(api = Build.VERSION_CODES.O)
+                        @Override
+                        public void onFailure(Call<RoundsResponse> call, Throwable t) {
+                            Log.e(TAG, "❌ Student Network Error", t);
+                        }
+                    });
+        }
+
+        /**
+         * 🔧 MAP API rounds sang AttendanceModels.AttendanceRound (tương tự lecturer)
+         */
+        private List<AttendanceModels.AttendanceRound> mapApiRoundsToAttendanceRounds(List<RoundData> apiRounds) {
+            List<AttendanceModels.AttendanceRound> rounds = new ArrayList<>();
+
+            if (apiRounds == null || apiRounds.isEmpty()) {
+                return rounds;
+            }
+
+            SimpleDateFormat isoFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault());
+
+            for (int i = 0; i < apiRounds.size(); i++) {
+                RoundData apiRound = apiRounds.get(i);
+
+                try {
+                    Date startTime = isoFormat.parse(apiRound.getStartTime());
+                    boolean isLastRound = (i == apiRounds.size() - 1);
+
+                    AttendanceModels.AttendanceRound round = new AttendanceModels.AttendanceRound(
+                            apiRound.getRoundId(),        // roundId
+                            startTime,                    // executionTime
+                            apiRound.getRoundNumber(),    // roundNumber
+                            isLastRound                   // isLastRound
+                    );
+
+                    rounds.add(round);
+
+                    Log.d(TAG, "Student mapped round " + apiRound.getRoundNumber() +
+                            ": " + apiRound.getStartTime() +
+                            " (isLast: " + isLastRound + ")");
+
+                } catch (Exception e) {
+                    Log.e(TAG, "Error parsing student round " + apiRound.getRoundNumber(), e);
+                }
+            }
+
+            return rounds;
+        }
+
+        /**
+         * 🔧 START BLE service với rounds từ API
+         */
+        @RequiresApi(api = Build.VERSION_CODES.O)
+        private void startStudentBLEServiceWithRounds(Context context, StudentScheduleSession studentScheduleSession,
+                                                      String userId, List<AttendanceModels.AttendanceRound> rounds) {
+            try {
                 Intent serviceIntent = new Intent(context, BLEAttendanceService.class);
                 serviceIntent.setAction("START_ATTENDANCE");
                 serviceIntent.putExtra("session", studentScheduleSession);
                 serviceIntent.putExtra("userId", userId);
-                serviceIntent.putExtra("userRole", "STUDENT"); // 🔧 Đánh dấu là student
+                serviceIntent.putExtra("userRole", "STUDENT"); // 🔧 Student role
                 serviceIntent.putExtra("rounds", (Serializable) rounds);
                 context.startForegroundService(serviceIntent);
 
-                Log.d("ScheduleAdapter", "Student BLE Service started - Schedule: " + studentScheduleSession.getClassNameWithGrade() + ", User: " + userId);
+                Log.d(TAG, "✅ Student BLE Service started with " + rounds.size() +
+                        " rounds for session: " + studentScheduleSession.getSessionId());
 
-                Toast.makeText(context, "Đã tham gia lớp học và bắt đầu điểm danh BLE", Toast.LENGTH_SHORT).show();
+                Toast.makeText(context, "Đã tham gia lớp học và bắt đầu điểm danh BLE với " + rounds.size() + " rounds",
+                        Toast.LENGTH_LONG).show();
 
             } catch (Exception e) {
-                Log.e("ScheduleAdapter", "Failed to start Student BLE service", e);
+                Log.e(TAG, "❌ Failed to start Student BLE service with API rounds", e);
                 Toast.makeText(context, "Lỗi khi tham gia lớp học", Toast.LENGTH_SHORT).show();
             }
         }

@@ -442,6 +442,7 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
                     boolean isLastRound = (i == apiRounds.size() - 1);
 
                     AttendanceModels.AttendanceRound round = new AttendanceModels.AttendanceRound(
+                            apiRound.getRoundId(),        // 🔧 THÊM roundId
                             startTime,                    // executionTime
                             apiRound.getRoundNumber(),    // roundNumber
                             isLastRound                   // isLastRound
