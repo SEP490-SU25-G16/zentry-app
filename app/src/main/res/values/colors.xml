@@ -17,4 +17,21 @@
     <color name="info">#2196F3</color>
     <color name="notification_unread_background">#E6F2FF</color>
     <color name="lightGray">#E5E5E5</color>
+
+    <!-- UI Design Colors -->
+    <color name="background_light">#F9F9F9</color>
+    <color name="text_primary">#2C2C2E</color>
+    <color name="text_secondary">#8E8E93</color>
+
+    <color name="success_green">#4CAF50</color>
+    <color name="error_red">#F44336</color>
+    <color name="processing_blue">#2196F3</color>
+    <color name="warning_orange">#FF9800</color>
+
+    <!-- UI Colors -->
+    <color name="background_primary">#FFFFFF</color>
+
+    <!-- Button Colors -->
+    <color name="button_primary">#1976D2</color>
+    <color name="button_secondary">#E3F2FD</color>
 </resources>

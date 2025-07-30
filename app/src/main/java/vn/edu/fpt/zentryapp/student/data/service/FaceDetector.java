@@ -11,9 +11,14 @@ import com.google.mediapipe.tasks.vision.core.RunningMode;
 import com.google.mediapipe.framework.image.BitmapImageBuilder;
 import com.google.mediapipe.framework.image.MPImage;
 import com.google.mediapipe.tasks.components.containers.Detection;
+import com.google.mediapipe.tasks.core.BaseOptions;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Utility class for face detection using MediaPipe
@@ -25,6 +30,9 @@ public class FaceDetector {
     
     private final Context context;
     private com.google.mediapipe.tasks.vision.facedetector.FaceDetector detector;
+    private final Executor executor = Executors.newSingleThreadExecutor();
+    private volatile boolean isInitialized = false;
+    private final CountDownLatch initLatch = new CountDownLatch(1);
     
     public static class FaceDetectionResult {
         private final Bitmap croppedBitmap;
@@ -45,22 +53,39 @@ public class FaceDetector {
     }
     
     public FaceDetector(Context context) {
-        this.context = context;
-        try {
-            // Initialize MediaPipe face detector
-            FaceDetectorOptions options = FaceDetectorOptions.builder()
-                    .setBaseOptions(
-                            com.google.mediapipe.tasks.core.BaseOptions.builder()
-                                    .setModelAssetPath(MODEL_FILE)
-                                    .build())
-                    .setRunningMode(RunningMode.IMAGE)
-                    .setMinDetectionConfidence(0.5f)
-                    .setMinSuppressionThreshold(0.3f)
-                    .build();
-            detector = com.google.mediapipe.tasks.vision.facedetector.FaceDetector.createFromOptions(context, options);
-        } catch (Exception e) {
-            Log.e(TAG, "Error initializing face detector", e);
-        }
+        this.context = context.getApplicationContext();
+        
+        // Khởi tạo model bất đồng bộ
+        executor.execute(() -> {
+            try {
+                // Initialize MediaPipe face detector
+                FaceDetectorOptions options = FaceDetectorOptions.builder()
+                        .setBaseOptions(
+                                BaseOptions.builder()
+                                        .setModelAssetPath(MODEL_FILE)
+                                        .build())
+                        .setRunningMode(RunningMode.IMAGE)
+                        .setMinDetectionConfidence(0.5f)
+                        .setMinSuppressionThreshold(0.3f)
+                        .build();
+                detector = com.google.mediapipe.tasks.vision.facedetector.FaceDetector.createFromOptions(context, options);
+                
+                isInitialized = true;
+                Log.d(TAG, "Face detector initialized successfully");
+            } catch (Exception e) {
+                Log.e(TAG, "Error initializing face detector", e);
+            } finally {
+                initLatch.countDown();
+            }
+        });
+    }
+    
+    public boolean isInitialized() {
+        return isInitialized;
+    }
+    
+    public void awaitInitialization(long timeoutMs) throws InterruptedException {
+        initLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
     }
     
     /**
@@ -72,6 +97,12 @@ public class FaceDetector {
         List<FaceDetectionResult> results = new ArrayList<>();
 
         try {
+            // Ensure detector is initialized
+            if (!isInitialized) {
+                Log.e(TAG, "Face detector not initialized yet");
+                return results;
+            }
+            
             // Convert bitmap to MPImage
             MPImage image = new BitmapImageBuilder(bitmap).build();
 

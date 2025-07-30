@@ -22,8 +22,10 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.util.Arrays;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Utility class for face spoof detection
@@ -33,109 +35,119 @@ public class FaceSpoofDetector {
     private static final String TAG = "FaceSpoofDetector";
     private static final String MODEL_FILE_1 = "spoof_model_scale_2_7.tflite";
     private static final String MODEL_FILE_2 = "spoof_model_scale_4_0.tflite";
-    
+
     private static final float SCALE_1 = 2.7f;
     private static final float SCALE_2 = 4.0f;
     private static final int INPUT_IMAGE_DIM = 80;
     private static final int OUTPUT_DIM = 3;
-    private static final int REAL_FACE_LABEL = 0;
-    
-    private final Interpreter firstModelInterpreter;
-    private final Interpreter secondModelInterpreter;
-    private final ImageProcessor imageTensorProcessor;
+    private static final int REAL_FACE_LABEL = 0;  // Fix: Index 0 should be real face as per comment
+
+    // Debug: Log output meanings
+    // Based on the logs and model behavior:
+    // Index 0: Real face probability
+    // Index 1: Unknown/uncertain
+    // Index 2: Spoof probability
+
+    private Interpreter firstModelInterpreter;
+    private Interpreter secondModelInterpreter;
+    private ImageProcessor imageTensorProcessor;
     private boolean useMockDetection = false;
     private final Executor executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    
+    private final Context context;
+
+    private volatile boolean isInitialized = false;
+    private final CountDownLatch initLatch = new CountDownLatch(1);
+
     public static class SpoofResult {
         private final boolean isSpoof;
         private final float score;
         private final long timeMillis;
-        
+
         public SpoofResult(boolean isSpoof, float score, long timeMillis) {
             this.isSpoof = isSpoof;
             this.score = score;
             this.timeMillis = timeMillis;
         }
-        
+
         public boolean isSpoof() {
             return isSpoof;
         }
-        
+
         public float getScore() {
             return score;
         }
-        
+
         public long getTimeMillis() {
             return timeMillis;
         }
     }
-    
+
     public FaceSpoofDetector(Context context) {
-        Interpreter firstInterpreter = null;
-        Interpreter secondInterpreter = null;
-        ImageProcessor processor = null;
-        
-        try {
-            // Log thông tin về assets để debug
-            logAssetsContent(context);
-            
+        this.context = context.getApplicationContext();
+
+        // Khởi tạo model bất đồng bộ
+        executor.execute(() -> {
             try {
-                Log.d(TAG, "Đang tải các file model...");
-                
-                // Initialize TFLiteInterpreter
-                Interpreter.Options interpreterOptions = new Interpreter.Options();
-                
-                // Thử sử dụng GPU nếu có thể
+                // Log thông tin về assets để debug
+                logAssetsContent(context);
+
                 try {
-                    // Sử dụng GPU Delegate
-                    GpuDelegate gpuDelegate = new GpuDelegate();
-                    interpreterOptions.addDelegate(gpuDelegate);
-                    Log.d(TAG, "Đã thêm GPU Delegate");
+                    Log.d(TAG, "Đang tải các file model...");
+
+                    // Initialize TFLiteInterpreter
+                    Interpreter.Options interpreterOptions = TFLiteGpuDelegateManager.getInstance().getInterpreterOptions();
+
+                    // Tải các model từ assets
+                    MappedByteBuffer model1Buffer = FileUtil.loadMappedFile(context, MODEL_FILE_1);
+                    MappedByteBuffer model2Buffer = FileUtil.loadMappedFile(context, MODEL_FILE_2);
+
+                    Log.d(TAG, "Model 1 đã tải, kích thước: " + model1Buffer.capacity() + " bytes");
+                    Log.d(TAG, "Model 2 đã tải, kích thước: " + model2Buffer.capacity() + " bytes");
+
+                    // Tạo interpreter
+                    firstModelInterpreter = new Interpreter(model1Buffer, interpreterOptions);
+                    secondModelInterpreter = new Interpreter(model2Buffer, interpreterOptions);
+
+                    // Tạo image processor cho tiền xử lý
+                    imageTensorProcessor = new ImageProcessor.Builder()
+                            .add(new CastOp(DataType.FLOAT32))
+                            .build();
+
+                    Log.d(TAG, "Đã tải các model thành công");
+                    isInitialized = true;
                 } catch (Exception e) {
-                    // Fallback to CPU if GPU is not supported
-                    Log.d(TAG, "Không thể sử dụng GPU, chuyển sang CPU: " + e.getMessage());
-                    interpreterOptions.setNumThreads(4);
+                    Log.e(TAG, "Lỗi khi khởi tạo model TensorFlow Lite: " + e.getMessage(), e);
+                    mainHandler.post(() ->
+                        Toast.makeText(context, "Lỗi khi tải model spoof detection: " + e.getMessage(), Toast.LENGTH_LONG).show()
+                    );
+                    useMockDetection = true;
                 }
-                
-                // Tải các model từ assets
-                MappedByteBuffer model1Buffer = FileUtil.loadMappedFile(context, MODEL_FILE_1);
-                MappedByteBuffer model2Buffer = FileUtil.loadMappedFile(context, MODEL_FILE_2);
-                
-                Log.d(TAG, "Model 1 đã tải, kích thước: " + model1Buffer.capacity() + " bytes");
-                Log.d(TAG, "Model 2 đã tải, kích thước: " + model2Buffer.capacity() + " bytes");
-                
-                // Tạo interpreter
-                firstInterpreter = new Interpreter(model1Buffer, interpreterOptions);
-                secondInterpreter = new Interpreter(model2Buffer, interpreterOptions);
-                
-                // Tạo image processor cho tiền xử lý
-                processor = new ImageProcessor.Builder()
-                        .add(new CastOp(DataType.FLOAT32))
-                        .build();
-                
-                Log.d(TAG, "Đã tải các model thành công");
             } catch (Exception e) {
-                Log.e(TAG, "Lỗi khi khởi tạo model TensorFlow Lite: " + e.getMessage(), e);
-                Toast.makeText(context, "Lỗi khi tải model spoof detection: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                Log.e(TAG, "Lỗi khi kiểm tra file model: " + e.getMessage(), e);
+                mainHandler.post(() ->
+                    Toast.makeText(context, "Lỗi khi kiểm tra model spoof detection: " + e.getMessage(), Toast.LENGTH_LONG).show()
+                );
                 useMockDetection = true;
+            } finally {
+                initLatch.countDown();
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Lỗi khi kiểm tra file model: " + e.getMessage(), e);
-            Toast.makeText(context, "Lỗi khi kiểm tra model spoof detection: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            useMockDetection = true;
-        }
-        
-        this.firstModelInterpreter = firstInterpreter;
-        this.secondModelInterpreter = secondInterpreter;
-        this.imageTensorProcessor = processor;
+        });
     }
-    
+
+    public boolean isInitialized() {
+        return isInitialized && firstModelInterpreter != null && secondModelInterpreter != null;
+    }
+
+    public void awaitInitialization(long timeoutMs) throws InterruptedException {
+        initLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
+    }
+
     private void logAssetsContent(Context context) {
         try {
             String[] files = context.getAssets().list("");
             Log.d(TAG, "Nội dung thư mục assets: " + Arrays.toString(files));
-            
+
             // Kiểm tra chi tiết về các file model
             for (String file : files) {
                 if (file.endsWith(".tflite")) {
@@ -151,7 +163,7 @@ public class FaceSpoofDetector {
             Log.e(TAG, "Lỗi khi liệt kê thư mục assets: " + e.getMessage(), e);
         }
     }
-    
+
     /**
      * Detect if a face is spoofed asynchronously
      * @param frameImage Original frame image
@@ -160,11 +172,26 @@ public class FaceSpoofDetector {
      */
     public void detectSpoofAsync(Bitmap frameImage, Rect faceRect, SpoofCallback callback) {
         executor.execute(() -> {
-            SpoofResult result = detectSpoof(frameImage, faceRect);
-            mainHandler.post(() -> callback.onResult(result));
+            try {
+                // Ensure model is initialized
+                if (!isInitialized()) {
+                    try {
+                        Log.d(TAG, "Waiting for model initialization...");
+                        awaitInitialization(5000);
+                    } catch (InterruptedException e) {
+                        Log.e(TAG, "Model initialization interrupted", e);
+                    }
+                }
+
+                SpoofResult result = detectSpoof(frameImage, faceRect);
+                mainHandler.post(() -> callback.onResult(result));
+            } catch (Exception e) {
+                Log.e(TAG, "Error in spoof detection", e);
+                mainHandler.post(() -> callback.onResult(new SpoofResult(false, 0.95f, 0)));
+            }
         });
     }
-    
+
     /**
      * Callback interface for spoof detection
      */
@@ -183,7 +210,7 @@ public class FaceSpoofDetector {
 
         // Nếu đang sử dụng mock detection hoặc interpreter không được khởi tạo, luôn trả về không phải spoof
         if (useMockDetection || firstModelInterpreter == null || secondModelInterpreter == null || imageTensorProcessor == null) {
-            Log.d(TAG, "Đang sử dụng mock spoof detection (luôn trả về không phải spoof)");
+            Log.d(TAG, "Using mock spoof detection (always return real face)");
             return new SpoofResult(false, 0.95f, System.currentTimeMillis() - startTime);
         }
 
@@ -257,42 +284,59 @@ public class FaceSpoofDetector {
                 combined[i] = (softmax1[i] + softmax2[i]) / 2.0f;
             }
 
-            Log.d(TAG, "Combined result: [" + combined[0] + ", " + combined[1] + ", " + combined[2] + "]");
+            Log.d(TAG, "Combined result: Real=" + combined[0] + ", Unknown=" + combined[1] + ", Spoof=" + combined[2]);
 
-            // Lấy nhãn có xác suất cao nhất
-            int label = 0;
-            float maxProb = combined[0];
-            for (int i = 1; i < OUTPUT_DIM; i++) {
-                if (combined[i] > maxProb) {
-                    maxProb = combined[i];
-                    label = i;
+            // 🟢 FIXED: Consistent logic with single threshold
+            final float CONFIDENCE_THRESHOLD = 0.6f;
+            final float REAL_SPOOF_RATIO_THRESHOLD = 1.3f; // Real should be 30% higher than spoof
+
+            boolean isSpoof;
+            float confidence;
+
+            // Primary decision: Compare Real vs Spoof directly
+            if (combined[0] > combined[2] * REAL_SPOOF_RATIO_THRESHOLD && combined[0] > CONFIDENCE_THRESHOLD) {
+                // High confidence real face
+                isSpoof = false;
+                confidence = combined[0];
+                Log.d(TAG, "🟢 HIGH CONFIDENCE REAL: Real=" + combined[0] + " >> Spoof=" + combined[2]);
+            } else if (combined[2] > combined[0] * REAL_SPOOF_RATIO_THRESHOLD && combined[2] > CONFIDENCE_THRESHOLD) {
+                // High confidence spoof
+                isSpoof = true;
+                confidence = combined[2];
+                Log.d(TAG, "🔴 HIGH CONFIDENCE SPOOF: Spoof=" + combined[2] + " >> Real=" + combined[0]);
+            } else {
+                // Low confidence or unclear - default to safer choice based on ratio
+                if (combined[0] >= combined[2]) {
+                    isSpoof = false;
+                    confidence = combined[0];
+                    Log.d(TAG, "🟡 LOW CONFIDENCE REAL: Real=" + combined[0] + " ~= Spoof=" + combined[2]);
+                } else {
+                    isSpoof = true;
+                    confidence = combined[2];
+                    Log.d(TAG, "🟠 LOW CONFIDENCE SPOOF: Spoof=" + combined[2] + " > Real=" + combined[0]);
                 }
             }
 
-            Log.d(TAG, "Nhãn với xác suất cao nhất: " + label + " với giá trị: " + maxProb);
-
-            // Nhãn 1 là khuôn mặt thật, các nhãn khác là spoof (giống như trong FaceSpoofDetector.kt)
-            boolean isSpoof = label != REAL_FACE_LABEL;
-            float score = combined[label];
-
-            Log.d(TAG, "Kết quả phát hiện spoof: " + (isSpoof ? "SPOOF" : "REAL") + " với độ tin cậy: " + score);
+            Log.d(TAG, "🎯 FINAL RESULT: " + (isSpoof ? "SPOOF" : "REAL") + " with confidence: " + confidence);
 
             long timeMillis = System.currentTimeMillis() - startTime;
-            return new SpoofResult(isSpoof, score, timeMillis);
+            return new SpoofResult(isSpoof, confidence, timeMillis);
 
         } catch (Exception e) {
-            Log.e(TAG, "Lỗi khi phát hiện spoof: " + e.getMessage(), e);
-            // Mặc định trả về không phải spoof trong trường hợp lỗi
+            Log.e(TAG, "Error in spoof detection: " + e.getMessage(), e);
+            // Default to real face on error to avoid blocking users
             return new SpoofResult(false, 0.9f, System.currentTimeMillis() - startTime);
         }
     }
-    
+
+
+
     /**
      * Chuyển đổi ảnh RGB sang BGR
      */
     private Bitmap convertRgbToBgr(Bitmap input) {
         Bitmap output = input.copy(input.getConfig(), true);
-        
+
         for (int i = 0; i < output.getWidth(); i++) {
             for (int j = 0; j < output.getHeight(); j++) {
                 int pixel = output.getPixel(i, j);
@@ -303,28 +347,28 @@ public class FaceSpoofDetector {
                 ));
             }
         }
-        
+
         return output;
     }
-    
+
     /**
      * Apply softmax to array
      */
     private float[] softMax(float[] x) {
         float[] exp = new float[x.length];
         float sum = 0.0f;
-        
+
         // Tính exp và tổng
         for (int i = 0; i < x.length; i++) {
             exp[i] = (float) Math.exp(x[i]);
             sum += exp[i];
         }
-        
+
         // Chuẩn hóa
         for (int i = 0; i < exp.length; i++) {
             exp[i] = exp[i] / sum;
         }
-        
+
         return exp;
     }
 
@@ -373,7 +417,11 @@ public class FaceSpoofDetector {
 
         // Tính toán scale dựa trên logic từ FaceSpoofDetector.kt
         float scale = Math.min(Math.min((imgHeight - 1f) / h, (imgWidth - 1f) / w), bboxScale);
-        Log.d(TAG, "getScaledBox: Calculated scale: " + scale);
+
+        // Giới hạn scale tối đa để tránh crop quá lớn chạm biên gây nhiễu model
+        scale = Math.min(scale, 2.7f);
+
+        Log.d(TAG, "getScaledBox: Calculated scale: " + scale + " (limited to max 2.7)");
 
         float newWidth = w * scale;
         float newHeight = h * scale;
@@ -411,7 +459,7 @@ public class FaceSpoofDetector {
 
         return result;
     }
-    
+
     /**
      * Release resources
      */
@@ -423,4 +471,4 @@ public class FaceSpoofDetector {
             secondModelInterpreter.close();
         }
     }
-} 
+}

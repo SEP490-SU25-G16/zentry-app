@@ -26,8 +26,10 @@ import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.util.Arrays;
 import java.util.Random;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Utility class for generating face embeddings using FaceNet
@@ -43,69 +45,75 @@ public class FaceEmbedding {
     // Output embedding size
     private static final int EMBEDDING_DIM = 512;
     
-    private final Interpreter interpreter;
-    private final ImageProcessor imageProcessor;
+    private Interpreter interpreter;
+    private ImageProcessor imageProcessor;
     private boolean useMockEmbedding = false;
     private final Random random = new Random();
     private final Executor executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Context context;
+    
+    private volatile boolean isInitialized = false;
+    private final CountDownLatch initLatch = new CountDownLatch(1);
     
     public FaceEmbedding(Context context) {
-        Interpreter tempInterpreter = null;
-        ImageProcessor tempProcessor = null;
+        this.context = context.getApplicationContext();
         
-        try {
-            // Log thông tin về assets để debug
-            logAssetsContent(context);
-            
+        // Khởi tạo model bất đồng bộ
+        executor.execute(() -> {
             try {
-                Log.d(TAG, "Đang tải model FaceNet...");
+                // Log thông tin về assets để debug
+                logAssetsContent(context);
                 
-                // Initialize TFLiteInterpreter
-                Interpreter.Options interpreterOptions = new Interpreter.Options();
-                
-                // Thử sử dụng GPU nếu có thể
                 try {
-                    // Sử dụng GPU Delegate
-                    GpuDelegate gpuDelegate = new GpuDelegate();
-                    interpreterOptions.addDelegate(gpuDelegate);
-                    Log.d(TAG, "Đã thêm GPU Delegate");
+                    Log.d(TAG, "Đang tải model FaceNet...");
+                    
+                    // Initialize TFLiteInterpreter
+                    Interpreter.Options interpreterOptions = TFLiteGpuDelegateManager.getInstance().getInterpreterOptions();
+                    
+                    // Tải model từ assets
+                    MappedByteBuffer modelBuffer = FileUtil.loadMappedFile(context, MODEL_FILE);
+                    
+                    // Tạo interpreter
+                    interpreter = new Interpreter(modelBuffer, interpreterOptions);
+                    
+                    // Image processor cho tiền xử lý
+                    imageProcessor = new ImageProcessor.Builder()
+                            .add(new ResizeOp(IMG_SIZE, IMG_SIZE, ResizeOp.ResizeMethod.BILINEAR))
+                            .add(new StandardizeOp())
+                            .build();
+                    
+                    Log.d(TAG, "Đã tải model FaceNet thành công");
+                    
+                    // Kiểm tra model
+                    inspectModel();
+                    
+                    isInitialized = true;
                 } catch (Exception e) {
-                    // Fallback to CPU if GPU is not supported
-                    Log.d(TAG, "Không thể sử dụng GPU, chuyển sang CPU: " + e.getMessage());
-                    interpreterOptions.setNumThreads(4);
+                    Log.e(TAG, "Lỗi khi khởi tạo model TensorFlow Lite: " + e.getMessage(), e);
+                    mainHandler.post(() -> 
+                        Toast.makeText(context, "Lỗi khi tải model face embedding: " + e.getMessage(), Toast.LENGTH_LONG).show()
+                    );
+                    useMockEmbedding = true;
                 }
-                
-                // Tải model từ assets
-                MappedByteBuffer modelBuffer = FileUtil.loadMappedFile(context, MODEL_FILE);
-                
-                // Tạo interpreter
-                tempInterpreter = new Interpreter(modelBuffer, interpreterOptions);
-                
-                // Image processor cho tiền xử lý
-                tempProcessor = new ImageProcessor.Builder()
-                        .add(new ResizeOp(IMG_SIZE, IMG_SIZE, ResizeOp.ResizeMethod.BILINEAR))
-                        .add(new StandardizeOp())
-                        .build();
-                
-                Log.d(TAG, "Đã tải model FaceNet thành công");
             } catch (Exception e) {
-                Log.e(TAG, "Lỗi khi khởi tạo model TensorFlow Lite: " + e.getMessage(), e);
-                Toast.makeText(context, "Lỗi khi tải model face embedding: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                Log.e(TAG, "Lỗi khi kiểm tra file model: " + e.getMessage(), e);
+                mainHandler.post(() -> 
+                    Toast.makeText(context, "Lỗi khi kiểm tra model face embedding: " + e.getMessage(), Toast.LENGTH_LONG).show()
+                );
                 useMockEmbedding = true;
+            } finally {
+                initLatch.countDown();
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Lỗi khi kiểm tra file model: " + e.getMessage(), e);
-            Toast.makeText(context, "Lỗi khi kiểm tra model face embedding: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            useMockEmbedding = true;
-        }
-        
-        this.interpreter = tempInterpreter;
-        this.imageProcessor = tempProcessor;
-
-        if (interpreter != null) {
-            inspectModel();
-        }
+        });
+    }
+    
+    public boolean isInitialized() {
+        return isInitialized && interpreter != null;
+    }
+    
+    public void awaitInitialization(long timeoutMs) throws InterruptedException {
+        initLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
     }
     
     private void logAssetsContent(Context context) {
@@ -136,8 +144,23 @@ public class FaceEmbedding {
      */
     public void getFaceEmbeddingAsync(Bitmap bitmap, EmbeddingCallback callback) {
         executor.execute(() -> {
-            float[] embedding = getFaceEmbedding(bitmap);
-            mainHandler.post(() -> callback.onEmbeddingGenerated(embedding));
+            try {
+                // Ensure model is initialized
+                if (!isInitialized()) {
+                    try {
+                        Log.d(TAG, "Waiting for model initialization...");
+                        awaitInitialization(5000);
+                    } catch (InterruptedException e) {
+                        Log.e(TAG, "Model initialization interrupted", e);
+                    }
+                }
+                
+                float[] embedding = getFaceEmbedding(bitmap);
+                mainHandler.post(() -> callback.onEmbeddingGenerated(embedding));
+            } catch (Exception e) {
+                Log.e(TAG, "Error generating embedding", e);
+                mainHandler.post(() -> callback.onEmbeddingGenerated(generateMockEmbedding()));
+            }
         });
     }
     
