@@ -16,7 +16,6 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import java.util.Random;
 import java.util.TimeZone;
 
 import retrofit2.Call;
@@ -36,6 +35,10 @@ import vn.edu.fpt.zentryapp.service.BLEAttendanceService;
 
 public class LecturerScheduleClassDetailViewModel extends ViewModel {
     private static final String TAG = "ClassDetailViewModel";
+
+    // ✅ THÊM CONSTANT cho timezone conversion
+    private static final long VIETNAM_OFFSET_MS = 7 * 60 * 60 * 1000L; // UTC+7
+
     private BroadcastReceiver attendanceCalculatedReceiver;
     private final MutableLiveData<Boolean> _isLoading = new MutableLiveData<>(false);
     private final MutableLiveData<SessionDetailInfoRound> _sessionInfo = new MutableLiveData<>();
@@ -51,29 +54,12 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
     private String sessionId;
 
     // Public getters
-    public LiveData<Boolean> isLoading() {
-        return _isLoading;
-    }
-
-    public LiveData<SessionDetailInfoRound> sessionInfo() {
-        return _sessionInfo;
-    }
-
-    public LiveData<List<AttendanceRound>> attendanceRounds() {
-        return _attendanceRounds;
-    }
-
-    public LiveData<List<FinalAttendance>> finalAttendance() {
-        return _finalAttendance;
-    }
-
-    public LiveData<String> errorMessage() {
-        return _errorMessage;
-    }
-
-    public LiveData<Boolean> canAddFaceId() {
-        return _canAddFaceId;
-    }
+    public LiveData<Boolean> isLoading() { return _isLoading; }
+    public LiveData<SessionDetailInfoRound> sessionInfo() { return _sessionInfo; }
+    public LiveData<List<AttendanceRound>> attendanceRounds() { return _attendanceRounds; }
+    public LiveData<List<FinalAttendance>> finalAttendance() { return _finalAttendance; }
+    public LiveData<String> errorMessage() { return _errorMessage; }
+    public LiveData<Boolean> canAddFaceId() { return _canAddFaceId; }
 
     public void init(Context context, AuthManager authManager, String sessionId) {
         this.context = context;
@@ -82,7 +68,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
         this.apiService = ApiClient.getClient(context).create(AttendanceApiService.class);
         setupAttendanceCalculatedReceiver();
         loadSessionInfo();
-        loadAttendanceRounds(); // 🔧 Load từ API thay vì mock
+        loadAttendanceRounds();
     }
 
     /**
@@ -95,7 +81,6 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                 if (BLEAttendanceService.ACTION_ATTENDANCE_CALCULATED.equals(intent.getAction())) {
                     String receivedSessionId = intent.getStringExtra(BLEAttendanceService.EXTRA_SESSION_ID);
 
-                    // Chỉ refresh nếu là session hiện tại
                     if (sessionId.equals(receivedSessionId)) {
                         Log.d(TAG, "📢 Received attendance calculated broadcast - refreshing data");
                         refreshData();
@@ -104,7 +89,6 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
             }
         };
 
-        // Register receiver
         IntentFilter filter = new IntentFilter(BLEAttendanceService.ACTION_ATTENDANCE_CALCULATED);
         androidx.localbroadcastmanager.content.LocalBroadcastManager
                 .getInstance(context)
@@ -114,8 +98,6 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
     }
 
     private void loadSessionInfo() {
-        // TODO: Implement session info API call if needed
-        // For now, keep mock data hoặc pass từ navigation args
         SessionDetailInfoRound sessionInfo = generateSessionInfo();
         _sessionInfo.setValue(sessionInfo);
 
@@ -144,7 +126,6 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                             if (apiResponse.isSuccess()) {
                                 List<AttendanceRound> rounds = mapApiDataToAttendanceRounds(apiResponse.getData());
                                 _attendanceRounds.setValue(rounds);
-                                // Load final attendance sau khi có rounds
                                 loadFinalAttendance();
 
                                 Log.d(TAG, "✅ Loaded " + rounds.size() + " attendance rounds");
@@ -152,13 +133,11 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                                 String error = apiResponse.getError() != null ? apiResponse.getError() : "Unknown API error";
                                 _errorMessage.setValue(error);
                                 Log.e(TAG, "❌ API Error: " + error);
-
                             }
                         } else {
                             String error = "HTTP Error: " + response.code();
                             _errorMessage.setValue(error);
                             Log.e(TAG, "❌ " + error);
-
                         }
                     }
 
@@ -168,7 +147,6 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                         String error = "Network Error: " + t.getMessage();
                         _errorMessage.setValue(error);
                         Log.e(TAG, "❌ Network Error", t);
-
                     }
                 });
     }
@@ -189,7 +167,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                 round.setSessionId(apiRound.getSessionId());
                 round.setRoundNumber(apiRound.getRoundNumber());
 
-                // ✅ SỬA: Dùng StartTime từ API và convert sang UTC+7
+                // ✅ FIXED: Convert UTC time sang Vietnam time
                 Date roundTime = parseUtcTimeToLocal(apiRound.getStartTime());
                 round.setTimestamp(roundTime);
 
@@ -215,7 +193,6 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
         return rounds;
     }
 
-
     /**
      * 🕐 PARSE UTC time từ API sang Vietnam timezone (UTC+7)
      */
@@ -236,7 +213,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                 return new Date();
             }
 
-            // ✅ FIX: Convert sang Vietnam timezone
+            // ✅ FIXED: Convert sang Vietnam timezone
             Date vietnamTime = convertUtcToVietnamTime(utcDate);
 
             Log.d(TAG, "Time conversion: " + utcTimeString +
@@ -251,29 +228,13 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
     }
 
     /**
-     * 🌏 CONVERT UTC sang Vietnam time (UTC+7)
+     * 🌏 CONVERT UTC sang Vietnam time (UTC+7) - FIXED VERSION
      */
     private Date convertUtcToVietnamTime(Date utcDate) {
         if (utcDate == null) return new Date();
 
-        // Tạo Calendar với UTC timezone
-        Calendar utcCalendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-        utcCalendar.setTime(utcDate);
-
-        // Tạo Calendar với Vietnam timezone
-        Calendar vietnamCalendar = Calendar.getInstance(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
-        vietnamCalendar.set(Calendar.YEAR, utcCalendar.get(Calendar.YEAR));
-        vietnamCalendar.set(Calendar.MONTH, utcCalendar.get(Calendar.MONTH));
-        vietnamCalendar.set(Calendar.DAY_OF_MONTH, utcCalendar.get(Calendar.DAY_OF_MONTH));
-        vietnamCalendar.set(Calendar.HOUR_OF_DAY, utcCalendar.get(Calendar.HOUR_OF_DAY));
-        vietnamCalendar.set(Calendar.MINUTE, utcCalendar.get(Calendar.MINUTE));
-        vietnamCalendar.set(Calendar.SECOND, utcCalendar.get(Calendar.SECOND));
-        vietnamCalendar.set(Calendar.MILLISECOND, utcCalendar.get(Calendar.MILLISECOND));
-
-        // Add 7 hours for UTC+7
-        vietnamCalendar.add(Calendar.HOUR_OF_DAY, 7);
-
-        return vietnamCalendar.getTime();
+        // ✅ SIMPLE & CORRECT: Cộng thêm 7 giờ
+        return new Date(utcDate.getTime() + VIETNAM_OFFSET_MS);
     }
 
     /**
@@ -285,16 +246,6 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
         return format.format(date);
     }
 
-
-    /**
-     * 🕐 FORMAT time với timezone info cho debugging
-     */
-    private String formatTimeWithTimezone(Date date) {
-        if (date == null) return "null";
-        SimpleDateFormat format = new SimpleDateFormat("HH:mm:ss (Z)", Locale.getDefault());
-        return format.format(date);
-    }
-
     /**
      * Format time for logging
      */
@@ -303,7 +254,6 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
         SimpleDateFormat format = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
         return format.format(date);
     }
-
 
     /**
      * 🔧 XÁC ĐỊNH round type dựa trên vị trí
@@ -322,9 +272,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
      * 🔧 EXTRACT location từ API data
      */
     private String extractLocationFromData(AttendanceRoundData apiRound) {
-        // Có thể extract từ course info hoặc session info
-        // Tạm thời return empty, sẽ được set từ session info
-        return "";
+        return ""; // Will be set từ session info
     }
 
     /**
@@ -376,8 +324,6 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
             return finalAttendanceList;
         }
 
-        SimpleDateFormat isoFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault());
-
         for (FinalAttendanceData apiStudent : apiData) {
             try {
                 FinalAttendance student = new FinalAttendance();
@@ -394,8 +340,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                 boolean isPresent = isStudentPresent(apiStudent.getStatus(), apiStudent.getDetailedAttendanceStatus());
                 student.setFinalStatus(isPresent);
 
-                // TODO: Calculate rounds data nếu cần
-                // Tạm thời set default values, có thể tính toán từ rounds data
+                // Rounds data
                 student.setTotalRounds(getTotalRoundsFromRoundsData());
                 student.setAttendedRounds(isPresent ? student.getTotalRounds() : 0);
 
@@ -418,7 +363,6 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
     private String cleanStudentName(String fullName) {
         if (fullName == null) return "Unknown Student";
 
-        // Remove "- Student" suffix nếu có
         if (fullName.endsWith(" - Student")) {
             return fullName.substring(0, fullName.length() - " - Student".length());
         }
@@ -431,7 +375,6 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
      */
     private String generateStudentCode(String email, String studentId) {
         if (email != null && email.contains("student")) {
-            // Extract số từ email: student453.bob@zentry.edu -> ST453
             try {
                 String[] parts = email.split("\\.");
                 if (parts.length > 0) {
@@ -445,7 +388,6 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
             }
         }
 
-        // Fallback: use last 6 chars of studentId
         if (studentId != null && studentId.length() >= 6) {
             return "ST" + studentId.substring(studentId.length() - 6).toUpperCase();
         }
@@ -457,7 +399,6 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
      * 🔧 XÁC ĐỊNH student có present không
      */
     private boolean isStudentPresent(String status, String detailedStatus) {
-        // Check cả status và detailedStatus
         if ("Present".equalsIgnoreCase(status) || "Attended".equalsIgnoreCase(status)) {
             return true;
         }
@@ -466,7 +407,6 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
             return true;
         }
 
-        // Default là absent
         return false;
     }
 
@@ -478,9 +418,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
         if (rounds != null && !rounds.isEmpty()) {
             return rounds.size();
         }
-
-        // Default fallback
-        return 4;
+        return 4; // Default fallback
     }
 
     /**
@@ -542,5 +480,4 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
             Log.d(TAG, "✅ Attendance calculated receiver unregistered");
         }
     }
-
 }

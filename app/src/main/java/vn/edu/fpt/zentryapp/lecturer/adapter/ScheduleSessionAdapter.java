@@ -2,6 +2,7 @@ package vn.edu.fpt.zentryapp.lecturer.adapter;
 
 import android.app.Dialog;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -12,9 +13,12 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.button.MaterialButton;
@@ -31,6 +35,7 @@ import java.util.TimeZone;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
+import vn.edu.fpt.zentryapp.MainActivity;
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.ApiClient;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
@@ -513,12 +518,48 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
                     return;
                 }
 
-                loadSessionRounds(context, session, userId);
-                Log.d(TAG, "BLE Attendance Service started for session: " + session.getSessionId());
+                // ➕ GET ACTIVITY FROM CONTEXT
+                MainActivity mainActivity = getMainActivityFromContext(context);
+
+                if (mainActivity != null && mainActivity.hasBLEPermissions()) {
+                    // ✅ Có permissions, start service
+                    loadSessionRounds(context, session, userId);
+                    Log.d(TAG, "✅ BLE Attendance Service started with permissions");
+                } else if (mainActivity != null) {
+                    // ❌ Thiếu permissions, request lại
+                    Log.w(TAG, "⚠️ BLE permissions missing, requesting...");
+                    Toast.makeText(context, "Requesting BLE permissions for attendance...",
+                            Toast.LENGTH_SHORT).show();
+
+                    mainActivity.requestBLEPermissions();
+                    Toast.makeText(context, "Please try starting class again after granting permissions",
+                            Toast.LENGTH_LONG).show();
+                } else {
+                    // ❌ Không tìm được MainActivity, start anyway
+                    Log.w(TAG, "⚠️ Cannot find MainActivity, starting service without permission check");
+                    loadSessionRounds(context, session, userId);
+                }
 
             } catch (Exception e) {
                 Log.e(TAG, "Failed to start BLE service", e);
             }
+        }
+
+        private MainActivity getMainActivityFromContext(Context context) {
+            // Try direct cast first
+            if (context instanceof MainActivity) {
+                return (MainActivity) context;
+            }
+
+            // Try to get activity from context wrapper
+            while (context instanceof ContextWrapper) {
+                if (context instanceof MainActivity) {
+                    return (MainActivity) context;
+                }
+                context = ((ContextWrapper) context).getBaseContext();
+            }
+
+            return null;
         }
 
         private void loadSessionRounds(Context context, LecturerScheduleSession session, String userId) {
@@ -566,35 +607,54 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
                 return rounds;
             }
 
-            SimpleDateFormat isoFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault());
+            // ✅ CORRECT: Explicit timezone handling
+            SimpleDateFormat utcFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault());
+            utcFormat.setTimeZone(TimeZone.getTimeZone("UTC")); // Parse as UTC
+
+            SimpleDateFormat vnFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+            vnFormat.setTimeZone(TimeZone.getTimeZone("Asia/Ho_Chi_Minh")); // Display as VN
 
             for (int i = 0; i < apiRounds.size(); i++) {
                 RoundData apiRound = apiRounds.get(i);
 
                 try {
-                    Date startTime = isoFormat.parse(apiRound.getStartTime());
+                    // Parse UTC time
+                    Date utcTime = utcFormat.parse(apiRound.getStartTime());
+
+                    // ✅ MANUAL conversion với Calendar
+                    Calendar utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+                    utcCal.setTime(utcTime);
+
+                    Calendar vnCal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
+                    vnCal.setTimeInMillis(utcCal.getTimeInMillis());
+
+                    Date vietnamTime = vnCal.getTime();
+
                     boolean isLastRound = (i == apiRounds.size() - 1);
 
                     AttendanceModels.AttendanceRound round = new AttendanceModels.AttendanceRound(
                             apiRound.getRoundId(),
-                            startTime,
+                            vietnamTime, // Đã convert đúng sang VN time
                             apiRound.getRoundNumber(),
                             isLastRound
                     );
 
                     rounds.add(round);
 
-                    Log.d(TAG, "Mapped round " + apiRound.getRoundNumber() +
-                            ": " + apiRound.getStartTime() +
-                            " (isLast: " + isLastRound + ")");
+                    Log.d(TAG, "Mapped round " + apiRound.getRoundNumber() + ":");
+                    Log.d(TAG, "  API UTC time: " + apiRound.getStartTime());
+                    Log.d(TAG, "  Vietnam time: " + vnFormat.format(vietnamTime));
+                    Log.d(TAG, "  Is last: " + isLastRound);
 
                 } catch (Exception e) {
                     Log.e(TAG, "Error parsing round " + apiRound.getRoundNumber(), e);
                 }
             }
 
+            Log.d(TAG, "✅ Total rounds mapped: " + rounds.size());
             return rounds;
         }
+
 
         @RequiresApi(api = Build.VERSION_CODES.O)
         private void startBLEServiceWithRounds(Context context, LecturerScheduleSession session,
@@ -606,7 +666,7 @@ public class ScheduleSessionAdapter extends RecyclerView.Adapter<ScheduleSession
                 serviceIntent.putExtra("userId", userId);
                 serviceIntent.putExtra("userRole", "LECTURER");
                 serviceIntent.putExtra("rounds", (Serializable) rounds);
-                context.startForegroundService(serviceIntent);
+                ContextCompat.startForegroundService(context, serviceIntent);
 
                 Log.d(TAG, "✅ BLE Attendance Service started with " + rounds.size() +
                         " rounds for session: " + session.getSessionId());

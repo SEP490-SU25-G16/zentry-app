@@ -4,6 +4,11 @@ import com.google.gson.annotations.SerializedName;
 
 import java.util.List;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+@Getter
+@AllArgsConstructor
 public class RoundsResponse {
     @SerializedName("Success")
     private boolean success;
@@ -16,10 +21,4 @@ public class RoundsResponse {
 
     @SerializedName("Message")
     private String message;
-
-    // Getters
-    public boolean isSuccess() { return success; }
-    public List<RoundData> getData() { return data; }
-    public String getError() { return error; }
-    public String getMessage() { return message; }
 }

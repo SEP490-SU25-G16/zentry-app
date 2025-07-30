@@ -92,13 +92,9 @@ public class LecturerScheduleClassDetailFragment extends Fragment {
     private void setupClickListeners() {
         binding.ivScheduleClassDetailBack.setOnClickListener(v -> navController.navigateUp());
 
-        binding.btnScheduleClassDetailAdd.setOnClickListener(v -> {
-            Toast.makeText(requireContext(), "Create face id", Toast.LENGTH_SHORT).show();
-        });
+        binding.btnScheduleClassDetailAdd.setOnClickListener(v -> Toast.makeText(requireContext(), "Create face id", Toast.LENGTH_SHORT).show());
 
-        binding.btnScheduleClassDetailNotification.setOnClickListener(v -> {
-            Toast.makeText(requireContext(), "Notifications", Toast.LENGTH_SHORT).show();
-        });
+        binding.btnScheduleClassDetailNotification.setOnClickListener(v -> Toast.makeText(requireContext(), "Notifications", Toast.LENGTH_SHORT).show());
     }
 
     private void observeViewModel() {
@@ -110,9 +106,7 @@ public class LecturerScheduleClassDetailFragment extends Fragment {
             }
         });
         // Observer riêng cho button visibility
-        viewModel.canAddFaceId().observe(getViewLifecycleOwner(), canAdd -> {
-            binding.btnScheduleClassDetailAdd.setVisibility(canAdd ? View.VISIBLE : View.GONE);
-        });
+        viewModel.canAddFaceId().observe(getViewLifecycleOwner(), canAdd -> binding.btnScheduleClassDetailAdd.setVisibility(canAdd ? View.VISIBLE : View.GONE));
 
         viewModel.attendanceRounds().observe(getViewLifecycleOwner(), rounds -> {
             if (rounds != null && historyFragment != null) {

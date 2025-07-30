@@ -8,12 +8,20 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
-import android.content.Context;
+import android.bluetooth.le.AdvertiseCallback;
+import android.bluetooth.le.AdvertiseData;
+import android.bluetooth.le.AdvertiseSettings;
+import android.bluetooth.le.BluetoothLeAdvertiser;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanRecord;
+import android.bluetooth.le.ScanResult;
+import android.bluetooth.le.ScanSettings;
 import android.content.Intent;
-import android.net.wifi.WifiInfo;
-import android.net.wifi.WifiManager;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.provider.Settings;
 import android.util.Log;
 
@@ -21,15 +29,17 @@ import androidx.annotation.RequiresApi;
 import androidx.annotation.RequiresPermission;
 import androidx.core.app.NotificationCompat;
 
-import java.net.NetworkInterface;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
 
 import vn.edu.fpt.zentryapp.MainActivity;
@@ -37,486 +47,690 @@ import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerScheduleSession;
 import vn.edu.fpt.zentryapp.student.data.model.response.StudentScheduleSession;
 
+/**
+ * BLE Attendance Service - Quản lý attendance tracking qua Bluetooth Low Energy
+ *
+ * Chức năng chính:
+ * 1. Advertise device ID và room info liên tục
+ * 2. Scan device theo lịch trình (1 giây mỗi round)
+ * 3. Submit attendance data khi có lệnh từ AttendanceRoundScheduler
+ * 4. Calculate attendance (chỉ cho lecturer)
+ */
 public class BLEAttendanceService extends Service {
     private static final String TAG = "BLEAttendanceService";
     private static final String CHANNEL_ID = "BLE_ATTENDANCE_CHANNEL";
-    private static final int NOTIFICATION_ID = 1001;
-
-    // 🔧 SIMPLE broadcast constants
     public static final String ACTION_ATTENDANCE_CALCULATED = "vn.edu.fpt.zentryapp.ATTENDANCE_CALCULATED";
     public static final String EXTRA_SESSION_ID = "sessionId";
+    private static final int NOTIFICATION_ID = 1001;
 
-    // Core components
-    private BLEAttendanceManager bleManager;
-    private AttendanceRoundScheduler roundScheduler;
-    private AttendanceSubmissionHandler submissionHandler;
+    // ======= BLE CONSTANTS =======
+    private static final int COMPANY_ID = 0x1234; // Manufacturer ID cho BLE advertising
+    private static final int ROOM_BYTES_MAX = 10; // Tăng từ 4 lên 10 để hỗ trợ room name dài
+    private static final long SCAN_DURATION_MS = 3000; // Scan trong 1 giây mỗi round
 
-    // State management
+    // ======= BLE COMPONENTS =======
+    private byte[] idBytes; // Device ID đã hash thành 6 bytes
+    private AdvertiseSettings advertiseSettings;
+    private AdvertiseCallback advCallback;
+    private BluetoothLeAdvertiser advertiser;
+    private BluetoothLeScanner scanner;
+    private ScanCallback scanCallback;
+
+    // ======= STATE MANAGEMENT =======
+    // Map lưu devices được phát hiện trong round hiện tại
     private final Map<String, AttendanceModels.ScannedDevice> detectedDevices = new ConcurrentHashMap<>();
-    private AttendanceModels.BLEAdvertiseData currentAdvertiseData;
-    private String sessionId;
-    private String room;
-    private String userId;
-    private AttendanceCalculateHandler calculateHandler; // 🔧 THÊM
-    private String userRole; // 🔧 THÊM để track role
+    // Map theo dõi thời gian phát hiện device cuối cùng (không cần thiết nữa với scan theo lịch)
+    private final Map<String, Long> deviceLastSeen = new ConcurrentHashMap<>();
 
+    // ======= SESSION DATA =======
+    private String sessionId; // ID phiên học
+    private String roomId; // ID phòng học
+    private String userId; // ID người dùng
+    private String userRole; // STUDENT hoặc LECTURER
+    private String deviceId; // Device ID formatted (XX:XX:XX:XX:XX:XX)
+
+    // ======= CORE COMPONENTS =======
+    private AttendanceRoundScheduler roundScheduler; // Quản lý lịch trình các round
+    private AttendanceSubmissionHandler submissionHandler; // Xử lý submit attendance
+    private AttendanceCalculateHandler calculateHandler; // Xử lý calculate attendance
+
+    @SuppressLint("ForegroundServiceType")
     @RequiresApi(api = Build.VERSION_CODES.O)
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_SCAN})
     @Override
     public void onCreate() {
         super.onCreate();
-        Log.d(TAG, "=== BLE ATTENDANCE SERVICE CREATING ===");
-        createNotificationChannel();
+        Log.d(TAG, "=== BLE SERVICE CREATING ===");
 
-        // Initialize components
-        bleManager = new BLEAttendanceManager(this);
+        // Tạo device ID duy nhất từ ANDROID_ID
+        generateDeviceId();
+
+        // Cấu hình BLE advertising settings
+        setupAdvertiseSettings();
+
+        // Cấu hình BLE scanner callback
+        setupScanner();
+
+        // Khởi tạo các handler xử lý attendance
         submissionHandler = new AttendanceSubmissionHandler(this);
         calculateHandler = new AttendanceCalculateHandler(this);
-        Log.d(TAG, "All components initialized successfully");
-        Log.d(TAG, "BLE Manager: " + (bleManager != null ? "Ready" : "Failed"));
-        Log.d(TAG, "Submission Handler: " + (submissionHandler != null ? "Ready" : "Failed"));
-        Log.d(TAG, "Calculate Handler: " + (calculateHandler != null ? "Ready" : "Failed"));
-        Log.d(TAG, "======================================");
+
+        // Tạo notification channel cho foreground service
+        createNotificationChannel();
+        Log.d(TAG, "Service created successfully with device ID: " + deviceId);
     }
 
+    /**
+     * Tạo device ID duy nhất từ ANDROID_ID và hash thành 6 bytes
+     */
+    private void generateDeviceId() {
+        try {
+            @SuppressLint("HardwareIds")
+            String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+            this.idBytes = generateIdBytes(androidId);
+
+            // Format thành XX:XX:XX:XX:XX:XX để dễ đọc
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < idBytes.length; i++) {
+                sb.append(String.format("%02X", idBytes[i]));
+                if (i < idBytes.length - 1) sb.append(":");
+            }
+            this.deviceId = sb.toString();
+
+            Log.d(TAG, "Generated device ID: " + deviceId);
+        } catch (Exception e) {
+            Log.e(TAG, "Error generating device ID", e);
+            this.deviceId = "00:00:00:00:00:00"; // Fallback ID
+        }
+    }
+
+    /**
+     * Hash input string thành 6 bytes để làm device ID
+     */
+    private byte[] generateIdBytes(String input) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));
+            return Arrays.copyOf(hash, 6); // Lấy 6 bytes đầu
+        } catch (Exception e) {
+            // Fallback nếu SHA-256 không available
+            byte[] raw = input.getBytes(StandardCharsets.UTF_8);
+            return Arrays.copyOf(raw, Math.min(6, raw.length));
+        }
+    }
+
+    /**
+     * Cấu hình BLE advertising settings cho performance tối ưu
+     */
+    private void setupAdvertiseSettings() {
+        advertiseSettings = new AdvertiseSettings.Builder()
+                .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY) // Advertise nhanh
+                .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH) // Công suất cao
+                .setConnectable(false) // Không cần kết nối
+                .build();
+
+        // Callback để theo dõi trạng thái advertising
+        advCallback = new AdvertiseCallback() {
+            @Override
+            public void onStartSuccess(AdvertiseSettings settingsInEffect) {
+                Log.d(TAG, "🟢 Advertising started successfully");
+            }
+            @Override
+            public void onStartFailure(int errorCode) {
+                Log.e(TAG, "🔴 Advertising failed: " + getAdvertiseErrorMessage(errorCode));
+            }
+        };
+    }
+
+    /**
+     * Cấu hình BLE scanner callback để xử lý kết quả scan
+     */
+    private void setupScanner() {
+        scanner = BluetoothAdapter.getDefaultAdapter().getBluetoothLeScanner();
+
+        scanCallback = new ScanCallback() {
+            @Override
+            public void onScanResult(int callbackType, ScanResult result) {
+                processScanResult(result);
+            }
+
+            @Override
+            public void onScanFailed(int errorCode) {
+                Log.e(TAG, "🔴 Scan failed: " + getScanErrorMessage(errorCode));
+            }
+        };
+    }
+
+    /**
+     * Xử lý kết quả scan từ một device
+     */
+    private void processScanResult(ScanResult result) {
+
+        ScanRecord rec = result.getScanRecord();
+        if (rec == null) {
+            return;
+        }
+
+        // Tìm Manufacturer Data
+        byte[] payload = rec.getManufacturerSpecificData().get(COMPANY_ID);
+        if (payload == null) {
+            return;
+        }
+
+        if (payload.length < idBytes.length) {
+            Log.d(TAG, "  Payload too short: " + payload.length + " < " + idBytes.length);
+            return;
+        }
+
+        // Parse data
+        byte[] deviceBytes = Arrays.copyOfRange(payload, 0, idBytes.length);
+        byte[] roomBytes = Arrays.copyOfRange(payload, idBytes.length, payload.length);
+
+        String advertisedRoom;
+        if (roomBytes.length >= 4) {
+            byte[] first4Bytes = Arrays.copyOf(roomBytes, 4);
+            advertisedRoom = new String(first4Bytes, StandardCharsets.UTF_8);
+        } else {
+            advertisedRoom = new String(roomBytes, StandardCharsets.UTF_8);
+        }
+
+        // ✅ FIXED: Lấy 4 ký tự đầu của my room để compare
+        String myRoomPrefix = roomId.length() >= 4 ? roomId.substring(0, 4) : roomId;
+
+     //   Log.d(TAG, "  Advertised room (4 chars): '" + advertisedRoom + "'");
+      //  Log.d(TAG, "  My room (4 chars): '" + myRoomPrefix + "'");
+
+        // ✅ Compare 4 ký tự đầu của cả 2 bên
+        if (!advertisedRoom.equals(myRoomPrefix)) {
+        //    Log.d(TAG, "  Room mismatch, ignoring");
+            return;
+        }
+
+        // Format device ID
+        StringBuilder sb = new StringBuilder();
+        for (byte b : deviceBytes) sb.append(String.format("%02X:", b));
+        String scannedDeviceId = sb.substring(0, sb.length() - 1);
+
+        // ✅ FIXED: Sử dụng đúng variable name
+        long now = System.currentTimeMillis();
+        deviceLastSeen.put(scannedDeviceId, now);
+
+        Log.d(TAG, "  Device ID: " + scannedDeviceId);
+        Log.d(TAG, "  RSSI: " + result.getRssi() + " dBm");
+        Log.d(TAG, "✅ Device accepted!");
+
+        // ✅ FIXED: Store detected device với đúng variable name
+        AttendanceModels.ScannedDevice device =
+                new AttendanceModels.ScannedDevice(scannedDeviceId, result.getRssi());
+        detectedDevices.put(scannedDeviceId, device);
+    }
+
+    @SuppressLint("ForegroundServiceType")
+    @RequiresApi(api = Build.VERSION_CODES.O)
     @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_SCAN})
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "=== SERVICE START COMMAND ===");
-        Log.d(TAG, "Intent: " + (intent != null ? "Available" : "NULL"));
-        Log.d(TAG, "Flags: " + flags);
-        Log.d(TAG, "Start ID: " + startId);
-        if (intent == null) {
-            Log.w(TAG, "Intent is null, returning START_STICKY");
-            return START_STICKY;
+
+        // Validate intent
+        if (intent == null || !"START_ATTENDANCE".equals(intent.getAction())) {
+            Log.w(TAG, "Invalid intent, stopping service");
+            stopSelf();
+            return START_NOT_STICKY;
         }
 
-        String action = intent.getAction();
-        Log.d(TAG, "Action: " + action);
-        if (!"START_ATTENDANCE".equals(action)) {
-            Log.w(TAG, "Invalid action, stopping service");
-            stopAttendanceService();
-            return START_STICKY;
-        }
+        // Extract session data từ intent
+        extractSessionData(intent);
 
-        // Extract data from intent
-        String userId = intent.getStringExtra("userId");
-        String userRole = intent.getStringExtra("userRole");
-
-        Log.d(TAG, "User ID: " + userId);
-        Log.d(TAG, "User Role: " + userRole);
-        // rounds thì vẫn getParcelableArrayListExtra / getSerializableExtra như trước
+        // Extract rounds data (đã được convert sang UTC+7 ở mapping layer)
         @SuppressWarnings("unchecked")
         List<AttendanceModels.AttendanceRound> rounds =
                 (List<AttendanceModels.AttendanceRound>) intent.getSerializableExtra("rounds");
-        Log.d(TAG, "Rounds: " + (rounds != null ? rounds.size() + " rounds" : "NULL"));
 
-        if (rounds != null) {
-            for (int i = 0; i < rounds.size(); i++) {
-                AttendanceModels.AttendanceRound round = rounds.get(i);
-                Log.d(TAG, "  Round " + (i + 1) + ": " + round.getRoundNumber());
-            }
-        }
-        // 2) Tạo sessionId + room tuỳ theo role
-        String sessionId;
-        String room;
-
-        if ("STUDENT".equals(userRole)) {
-            Log.d(TAG, "Processing STUDENT session data...");
-            StudentScheduleSession studentScheduleSession = (StudentScheduleSession) intent.getSerializableExtra("session");
-            if (studentScheduleSession != null) {
-                sessionId = studentScheduleSession.getSessionId();
-                room = studentScheduleSession.getRoom();
-                Log.d(TAG, "Student session - ID: " + sessionId + ", Room: " + room);
-            } else {
-                Log.e(TAG, "Student session is NULL!");
-                return START_STICKY;
-            }
-        } else {
-            Log.d(TAG, "Processing LECTURER session data...");
-            LecturerScheduleSession session = (LecturerScheduleSession) intent.getSerializableExtra("session");
-            if (session != null) {
-                sessionId = session.getSessionId();
-                room = session.getRoom();
-                Log.d(TAG, "Lecturer session - ID: " + sessionId + ", Room: " + room);
-            } else {
-                Log.e(TAG, "Lecturer session is NULL!");
-                return START_STICKY;
-            }
-        }
-
-        Log.d(TAG, "Final session data - ID: " + sessionId + ", Room: " + room);
-        Log.d(TAG, "Starting attendance service...");
-
-        startAttendanceService(userId, sessionId, room, rounds);
-
-        Log.d(TAG, "==============================");
-        return START_STICKY;
-    }
-
-
-    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_SCAN})
-    private void startAttendanceService(
-            String userId,
-            String sessionId,
-            String room,
-            List<AttendanceModels.AttendanceRound> rounds) {
-
-        Log.d(TAG, "=== STARTING ATTENDANCE SERVICE ===");
-        Log.d(TAG, "User ID: " + userId);
         Log.d(TAG, "Session ID: " + sessionId);
-        Log.d(TAG, "Room: " + room);
-        Log.d(TAG, "Rounds count: " + (rounds != null ? rounds.size() : 0));
+        Log.d(TAG, "Room: " + roomId);
+        Log.d(TAG, "User: " + userId + " (" + userRole + ")");
+        Log.d(TAG, "Rounds: " + (rounds != null ? rounds.size() : 0));
 
-        this.sessionId = sessionId;
-        this.room = room;
-        this.userId = userId;
-        @SuppressLint("HardwareIds") String deviceMac = getDeviceMacFromAndroidId();
-        currentAdvertiseData = new AttendanceModels.BLEAdvertiseData(
-                deviceMac,  // 🔧 THÊM MAC address
-                room        // roomName
-        );
-        Log.d(TAG, "Device MAC: " + deviceMac);
-        Log.d(TAG, "Created advertise data: " + currentAdvertiseData.toString());
+        // Khởi động attendance service
+        startAttendanceService(rounds);
 
-        // Start foreground service
-        Log.d(TAG, "Starting foreground service...");
-        startForeground(NOTIFICATION_ID, createNotification());
-        Log.d(TAG, "Foreground service started");
-
-        // Start BLE operations
-        Log.d(TAG, "Starting BLE operations...");
-        startBLEOperations();
-
-        // Schedule rounds
-        Log.d(TAG, "Creating round scheduler...");
-        roundScheduler = new AttendanceRoundScheduler(
-                rounds,
-                this::executeRound,
-                this::calculateRound,
-                this::onAllRoundsComplete
-        );
-
-        Log.d(TAG, "Starting round scheduler...");
-        roundScheduler.start();
-
-        Log.d(TAG, "✅ Attendance service started successfully for session: " + sessionId);
-        Log.d(TAG, "===================================");
+        return START_STICKY; // Service sẽ được restart nếu bị kill
     }
 
     /**
-     * 🔧 LẤY MAC TỪ ANDROID ID (THAY THẾ CHO bluetoothAdapter.getAddress())
+     * Extract session data từ intent dựa trên user role
      */
-    @SuppressLint("HardwareIds")
-    private String getDeviceMacFromAndroidId() {
-        Log.d(TAG, "=== GETTING MAC FROM ANDROID ID ===");
+    private void extractSessionData(Intent intent) {
+        userId = intent.getStringExtra("userId");
+        userRole = intent.getStringExtra("userRole");
 
-        try {
-            String androidId = android.provider.Settings.Secure.getString(
-                    this.getContentResolver(), // Hoặc context.getContentResolver() nếu trong class khác
-                    android.provider.Settings.Secure.ANDROID_ID
-            );
-
-            if (androidId == null || androidId.isEmpty()) {
-                Log.w(TAG, "⚠️ Android ID is null or empty, using fallback");
-                return "00:00:00:00:00:00";
+        if ("STUDENT".equals(userRole)) {
+            StudentScheduleSession session = (StudentScheduleSession) intent.getSerializableExtra("session");
+            if (session != null) {
+                sessionId = session.getSessionId();
+                roomId = session.getRoom();
             }
-
-            Log.d(TAG, "📱 Android ID: " + androidId);
-            Log.d(TAG, "📏 Android ID length: " + androidId.length());
-
-            // Đảm bảo có đủ 12 ký tự hex cho MAC (6 bytes = 12 hex chars)
-            String hexString = androidId;
-            if (hexString.length() < 12) {
-                // Nếu thiếu, lặp lại Android ID để đủ 12 ký tự
-                while (hexString.length() < 12) {
-                    hexString += androidId;
-                }
+        } else {
+            LecturerScheduleSession session = (LecturerScheduleSession) intent.getSerializableExtra("session");
+            if (session != null) {
+                sessionId = session.getSessionId();
+                roomId = session.getRoom();
             }
-
-            // Lấy 12 ký tự đầu và format thành MAC
-            String macHex = hexString.substring(0, 12).toUpperCase();
-
-            // Chèn dấu ":" để tạo format MAC chuẩn
-            StringBuilder fakeMac = new StringBuilder();
-            for (int i = 0; i < macHex.length(); i += 2) {
-                if (i > 0) {
-                    fakeMac.append(":");
-                }
-                fakeMac.append(macHex.substring(i, i + 2));
-            }
-
-            String result = fakeMac.toString();
-            Log.d(TAG, "✅ Generated MAC from Android ID: " + result);
-
-            return result;
-
-        } catch (Exception ex) {
-            Log.e(TAG, "❌ Exception while generating MAC from Android ID", ex);
-            return "00:00:00:00:00:00";
         }
     }
 
+    /**
+     * Khởi động attendance service với rounds data
+     */
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_SCAN})
+    private void startAttendanceService(List<AttendanceModels.AttendanceRound> rounds) {
+        Log.d(TAG, "=== STARTING ATTENDANCE SERVICE ===");
 
-    private void calculateRound(AttendanceModels.AttendanceRound round) {
-        Log.d(TAG, "=== CALCULATING ROUND ===");
-        Log.d(TAG, "Round number: " + round.getRoundNumber());
-        Log.d(TAG, "User role: " + userRole);
-        Log.d(TAG, "Round ID: " + round.getRoundId());
+        // Start làm foreground service
+        startForeground(NOTIFICATION_ID, createNotification());
 
-        if (!"LECTURER".equals(userRole)) {
-            Log.d(TAG, "Skipping calculate for non-lecturer role: " + userRole);
+        // Khởi động BLE operations (chỉ advertising, chưa scan)
+        startBLEOperations();
+
+        // Khởi tạo và start round scheduler
+        if (rounds != null && !rounds.isEmpty()) {
+            roundScheduler = new AttendanceRoundScheduler(
+                    rounds,
+                    this::executeRound,      // Callback khi đến giờ execute round
+                    this::calculateRound,    // Callback khi đến giờ calculate round
+                    this::onAllRoundsComplete // Callback khi tất cả rounds hoàn thành
+            );
+            roundScheduler.start();
+            Log.d(TAG, "Round scheduler started with " + rounds.size() + " rounds");
+        } else {
+            Log.w(TAG, "No rounds provided, running in continuous mode");
+        }
+
+        Log.d(TAG, "✅ Attendance service started successfully");
+    }
+
+    /**
+     * Khởi động BLE operations - CHỈ ADVERTISING, KHÔNG SCAN LIÊN TỤC
+     * Scan sẽ được thực hiện theo lịch trình khi executeRound() được gọi
+     */
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_SCAN})
+    private void startBLEOperations() {
+        Log.d(TAG, "=== STARTING BLE OPERATIONS ===");
+
+        // Chỉ start advertising, KHÔNG start scanning liên tục
+        startAdvertising();
+
+        Log.d(TAG, "BLE advertising started, scanning will be scheduled by rounds");
+    }
+
+    /**
+     * Bắt đầu BLE advertising để broadcast device ID và room info
+     */
+    @RequiresPermission(Manifest.permission.BLUETOOTH_ADVERTISE)
+    private void startAdvertising() {
+        // Chuẩn bị room data, truncate nếu quá dài
+        byte[] roomBytes = roomId.getBytes(StandardCharsets.UTF_8);
+        if (roomBytes.length > ROOM_BYTES_MAX) {
+            roomBytes = Arrays.copyOf(roomBytes, ROOM_BYTES_MAX);
+            Log.w(TAG, "Room truncated from '" + roomId + "' to '" +
+                    new String(roomBytes, StandardCharsets.UTF_8) + "'");
+        }
+
+        // Tạo payload = device ID (6 bytes) + room name (≤10 bytes)
+        byte[] advertPayload = new byte[idBytes.length + roomBytes.length];
+        System.arraycopy(idBytes, 0, advertPayload, 0, idBytes.length);
+        System.arraycopy(roomBytes, 0, advertPayload, idBytes.length, roomBytes.length);
+
+        Log.d(TAG, "Advertising payload size: " + advertPayload.length + " bytes");
+        Log.d(TAG, "Room: '" + new String(roomBytes, StandardCharsets.UTF_8) + "'");
+
+        // Stop advertising cũ nếu có
+        if (advertiser != null) {
+            advertiser.stopAdvertising(advCallback);
+        }
+
+        // Start advertising mới
+        advertiser = BluetoothAdapter.getDefaultAdapter().getBluetoothLeAdvertiser();
+        if (advertiser != null) {
+            AdvertiseData data = new AdvertiseData.Builder()
+                    .addManufacturerData(COMPANY_ID, advertPayload)
+                    .setIncludeDeviceName(false) // Không cần device name
+                    .build();
+            advertiser.startAdvertising(advertiseSettings, data, advCallback);
+            Log.d(TAG, "🟢 Advertising started for room: " + roomId);
+        } else {
+            Log.e(TAG, "❌ BLE Advertiser not available");
+        }
+    }
+
+    // ======= SCHEDULED SCANNING (CHỈ KHI CẦN THIẾT) =======
+
+    /**
+     * Bắt đầu scan có thời gian giới hạn (1 giây)
+     * Được gọi bởi executeRound() khi đến thời gian attendance
+     */
+    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
+    private void startScheduledScan() {
+        Log.d(TAG, "🔍 STARTING SCHEDULED SCAN (1 second)");
+
+        if (scanner == null) {
+            Log.e(TAG, "❌ Scanner not available");
             return;
         }
 
-        Log.d(TAG, "Calculating attendance for round " + round.getRoundNumber());
+        // Clear kết quả scan cũ cho round mới
+        detectedDevices.clear();
+        deviceLastSeen.clear();
 
-        // Lấy roundId từ round object (cần thêm field này vào AttendanceModels.AttendanceRound)
-        String roundId = round.getRoundId();
+        // Cấu hình scan settings cho performance cao
+        ScanSettings scanSettings = new ScanSettings.Builder()
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY) // Scan nhanh
+                .setReportDelay(0) // Báo kết quả ngay lập tức
+                .build();
 
-        calculateHandler.calculateRoundAttendance(sessionId, roundId,
+        // Bắt đầu scan
+        scanner.startScan(null, scanSettings, scanCallback);
+        Log.d(TAG, "✅ Scheduled scan started");
+
+        // Tự động stop scan sau SCAN_DURATION_MS (1 giây)
+        new Handler(Looper.getMainLooper()).postDelayed(this::stopScheduledScan, SCAN_DURATION_MS);
+    }
+
+    /**
+     * Dừng scheduled scan và log kết quả
+     */
+    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
+    private void stopScheduledScan() {
+        if (scanner != null) {
+            scanner.stopScan(scanCallback);
+            Log.d(TAG, "🛑 Scheduled scan stopped after " + SCAN_DURATION_MS + "ms");
+            Log.d(TAG, "📊 Scan results: " + detectedDevices.size() + " devices found");
+        }
+    }
+
+    /**
+     * Broadcast scan result cho UI components (nếu cần)
+     */
+    private void broadcastScanResult(String deviceId, int rssi, String room) {
+        Intent intent = new Intent("vn.edu.fpt.zentryapp.SCAN_RESULT");
+        intent.putExtra("id", deviceId);
+        intent.putExtra("rssi", rssi);
+        intent.putExtra("room", room);
+        sendBroadcast(intent);
+    }
+
+    // ======= ROUND EXECUTION (ĐƯỢC GỌI BỞI SCHEDULER) =======
+
+    /**
+     * Execute attendance round - được gọi bởi AttendanceRoundScheduler
+     * Timeline: Round execution time + 10s = scan time
+     */
+    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
+    private void executeRound(AttendanceModels.AttendanceRound round) {
+        Log.d(TAG, "=== EXECUTING ROUND " + round.getRoundNumber() + " ===");
+
+        // Bắt đầu scan 1 giây để collect devices
+        startScheduledScan();
+
+        // Đợi scan hoàn thành (1s + 100ms buffer) rồi mới process results
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            performRoundExecution(round);
+        }, SCAN_DURATION_MS + 100); // +100ms buffer để đảm bảo scan đã dừng
+    }
+
+    /**
+     * Xử lý kết quả scan và submit attendance
+     */
+    private void performRoundExecution(AttendanceModels.AttendanceRound round) {
+        Log.d(TAG, "📝 PROCESSING SCAN RESULTS FOR ROUND " + round.getRoundNumber());
+
+        // Lấy top devices theo RSSI từ kết quả scan vừa rồi
+        List<AttendanceModels.ScannedDevice> topDevices = getTopDevicesByRssi(detectedDevices.size());
+
+        Log.d(TAG, "Round " + round.getRoundNumber() + ": " + topDevices.size() + " devices detected");
+        for (AttendanceModels.ScannedDevice device : topDevices) {
+            Log.d(TAG, "  " + device.getMacAddress() + " RSSI: " + device.getRssi());
+        }
+
+        String timestamp = createUtcTimestamp();
+
+        // Tạo attendance submission object
+        AttendanceModels.AttendanceSubmission submission = new AttendanceModels.AttendanceSubmission(
+                deviceId, sessionId, topDevices, timestamp);
+
+        // Submit attendance qua API
+        submissionHandler.submitAttendance(submission, new AttendanceCallbacks.AttendanceSubmissionCallback() {
+            @Override
+            public void onSubmissionSuccess(AttendanceModels.AttendanceSubmission submission) {
+                Log.d(TAG, "✅ Round " + round.getRoundNumber() + " submitted successfully");
+            }
+
+            @Override
+            public void onSubmissionFailure(int roundNumber, String error) {
+                Log.e(TAG, "❌ Round " + roundNumber + " submission failed: " + error);
+            }
+        });
+    }
+
+    /**
+     * Tạo UTC timestamp đúng format cho API
+     */
+    private String createUtcTimestamp() {
+        SimpleDateFormat utcFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault());
+        utcFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+
+        // ✅ FIXED: Lùi 7 giờ để có UTC time thật
+        Date nowVN = new Date(); // Current VN time
+        Date nowUTC = new Date(nowVN.getTime());
+
+        String utcTimestamp = utcFormat.format(nowUTC);
+
+        Log.d(TAG, "VN time: " + nowVN);
+        Log.d(TAG, "UTC time: " + nowUTC);
+        Log.d(TAG, "Created UTC timestamp: " + utcTimestamp);
+
+        return utcTimestamp;
+    }
+
+
+
+    /**
+     * Calculate attendance round - chỉ lecturer mới thực hiện
+     * Được gọi 30s sau khi scan round hoàn thành
+     */
+    private void calculateRound(AttendanceModels.AttendanceRound round) {
+        // Chỉ lecturer mới calculate attendance
+        if (!"LECTURER".equals(userRole)) return;
+
+        Log.d(TAG, "🧮 CALCULATING ROUND " + round.getRoundNumber());
+
+        // Gọi API calculate attendance cho round này
+        calculateHandler.calculateRoundAttendance(sessionId, round.getRoundId(),
                 new AttendanceCallbacks.CalculateAttendanceCallback() {
                     @Override
                     public void onCalculateSuccess(String roundId, int attendedCount, String message) {
-                        Log.d(TAG, "✅ CALCULATION SUCCESS");
-                        Log.d(TAG, "  Round ID: " + roundId);
-                        Log.d(TAG, "  Attended count: " + attendedCount);
-                        Log.d(TAG, "  Message: " + message);
-                        Log.d(TAG, "  Round number: " + round.getRoundNumber());
-
+                        Log.d(TAG, "✅ Round " + round.getRoundNumber() + " calculated: " +
+                                attendedCount + " students attended");
+                        // Broadcast để thông báo UI
                         sendAttendanceCalculatedBroadcast();
                     }
 
                     @Override
                     public void onCalculateFailure(String roundId, String error) {
-                        Log.e(TAG, "❌ CALCULATION FAILED");
-                        Log.e(TAG, "  Round ID: " + roundId);
-                        Log.e(TAG, "  Round number: " + round.getRoundNumber());
-                        Log.e(TAG, "  Error: " + error);
+                        Log.e(TAG, "❌ Round " + round.getRoundNumber() + " calculate failed: " + error);
                     }
                 });
     }
 
+    // ======= UTILITY METHODS =======
+
     /**
-     * 🔧 SIMPLE broadcast - chỉ notify có update
+     * Lấy top N devices theo RSSI cao nhất
+     */
+    private List<AttendanceModels.ScannedDevice> getTopDevicesByRssi(int count) {
+        List<AttendanceModels.ScannedDevice> allDevices = new ArrayList<>(detectedDevices.values());
+        // Sort theo RSSI giảm dần (RSSI cao hơn = gần hơn)
+        allDevices.sort((a, b) -> Integer.compare(b.getRssi(), a.getRssi()));
+
+        // Lấy top N devices
+        List<AttendanceModels.ScannedDevice> topDevices = new ArrayList<>();
+        for (int i = 0; i < Math.min(allDevices.size(), count); i++) {
+            topDevices.add(allDevices.get(i));
+        }
+        return topDevices;
+    }
+
+    /**
+     * Broadcast thông báo attendance đã được calculate
      */
     private void sendAttendanceCalculatedBroadcast() {
         Intent broadcastIntent = new Intent(ACTION_ATTENDANCE_CALCULATED);
         broadcastIntent.putExtra(EXTRA_SESSION_ID, sessionId);
 
+        // Send local broadcast
         androidx.localbroadcastmanager.content.LocalBroadcastManager
-                .getInstance(this)
-                .sendBroadcast(broadcastIntent);
+                .getInstance(this).sendBroadcast(broadcastIntent);
 
-        Log.d(TAG, "📢 Broadcasted attendance calculated for session: " + sessionId);
+        Log.d(TAG, "📢 Sent attendance calculated broadcast for session: " + sessionId);
     }
-
-    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_SCAN})
-    private void startBLEOperations() {
-        Log.d(TAG, "=== STARTING BLE OPERATIONS ===");
-
-        // Start advertising
-        Log.d(TAG, "Starting BLE advertising...");
-        bleManager.startAdvertising(currentAdvertiseData, new AttendanceCallbacks.BLEOperationCallback() {
-            @Override
-            public void onSuccess() {
-                Log.d(TAG, "✅ BLE Advertising started successfully in service");
-            }
-
-            @Override
-            public void onFailure(String error) {
-                Log.e(TAG, "❌ BLE Advertising failed in service: " + error);
-            }
-        });
-
-
-        // Start scanning
-        Log.d(TAG, "Starting BLE scanning for room: " + room);
-        bleManager.startScanning(room, new AttendanceCallbacks.DeviceDetectionCallback() {
-            @Override
-            public void onDeviceDetected(AttendanceModels.ScannedDevice device) {
-                handleDeviceDetected(device);
-            }
-
-            @Override
-            public void onDeviceLost(String deviceId) {
-                handleDeviceLost(deviceId);
-            }
-        });
-
-        Log.d(TAG, "BLE operations started");
-        Log.d(TAG, "===============================");
-    }
-
-    @RequiresPermission(Manifest.permission.BLUETOOTH_ADVERTISE)
-    private void executeRound(AttendanceModels.AttendanceRound round) {
-        Log.d(TAG, "=== EXECUTING ROUND ===");
-        Log.d(TAG, "Round number: " + round.getRoundNumber());
-        Log.d(TAG, "Round ID: " + round.getRoundId());
-        Log.d(TAG, "Is last round: " + round.isLastRound());
-        Log.d(TAG, "Execution time: " + round.getExecutionTime());
-
-        // Collect current detected devices
-        List<AttendanceModels.ScannedDevice> currentDevices = new ArrayList<>(detectedDevices.values());
-        Log.d(TAG, "Current detected devices: " + currentDevices.size());
-
-        for (int i = 0; i < currentDevices.size(); i++) {
-            AttendanceModels.ScannedDevice device = currentDevices.get(i);
-            Log.d(TAG, "  Device " + (i + 1) + ": " + device.getMacAddress() + " (RSSI: " + device.getRssi() + " dBm)");
-        }
-        @SuppressLint("HardwareIds")
-        String deviceMac = getDeviceMacFromAndroidId();
-        String timestamp = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
-                .format(new Date());
-
-        Log.d(TAG, "Submitter MAC: " + deviceMac);
-        Log.d(TAG, "Session ID: " + sessionId);
-        Log.d(TAG, "Timestamp: " + timestamp);
-
-        AttendanceModels.AttendanceSubmission submission = new AttendanceModels.AttendanceSubmission(
-                deviceMac,
-                sessionId,
-                currentDevices,
-                timestamp
-        );
-
-        Log.d(TAG, "Created submission: " + submission.toString());
-        Log.d(TAG, "Submitting attendance...");
-
-        submissionHandler.submitAttendance(submission, new AttendanceCallbacks.AttendanceSubmissionCallback() {
-            @Override
-            public void onSubmissionSuccess(AttendanceModels.AttendanceSubmission submission) {
-                Log.d(TAG, "✅ SUBMISSION SUCCESS");
-                Log.d(TAG, "  Session ID: " + submission.getSessionId());
-                Log.d(TAG, "  Submitted devices: " + submission.getScannedDevices().size());
-                Log.d(TAG, "  Submitter MAC: " + submission.getSubmitterDeviceMacAddress());
-                Log.d(TAG, "  Timestamp: " + submission.getTimestamp());
-
-                // Clear detected devices after successful submission
-                int previousSize = detectedDevices.size();
-                detectedDevices.clear();
-                Log.d(TAG, "Cleared " + previousSize + " detected devices from cache");
-            }
-
-            @Override
-            public void onSubmissionFailure(int roundNumber, String error) {
-                Log.e(TAG, "❌ SUBMISSION FAILED");
-                Log.e(TAG, "  Round number: " + roundNumber);
-                Log.e(TAG, "  Error: " + error);
-                Log.e(TAG, "  Detected devices count: " + detectedDevices.size());
-            }
-        });
-
-
-        // If last round, stop advertising
-        if (round.isLastRound()) {
-            Log.d(TAG, "🏁 Last round completed, stopping advertising...");
-            bleManager.stopAdvertising();
-            Log.d(TAG, "Advertising stopped after last round");
-        }
-
-        Log.d(TAG, "====================");
-    }
-
+    /**
+     * Callback khi tất cả rounds hoàn thành
+     */
     @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_SCAN})
     private void onAllRoundsComplete() {
         Log.d(TAG, "=== ALL ROUNDS COMPLETED ===");
-        Log.d(TAG, "Session ID: " + sessionId);
-        Log.d(TAG, "Final detected devices: " + detectedDevices.size());
-        Log.d(TAG, "Stopping attendance service...");
-
         stopAttendanceService();
-
-        Log.d(TAG, "============================");
     }
 
-    private void handleDeviceDetected(AttendanceModels.ScannedDevice device) {
-        Log.d(TAG, "📱 DEVICE DETECTED");
-        Log.d(TAG, "  MAC: " + device.getMacAddress());
-        Log.d(TAG, "  RSSI: " + device.getRssi() + " dBm");
+    // ======= ERROR HELPERS =======
 
-        boolean isNewDevice = !detectedDevices.containsKey(device.getMacAddress());
-        detectedDevices.put(device.getMacAddress(), device);
-
-        Log.d(TAG, "  Status: " + (isNewDevice ? "NEW" : "UPDATED"));
-        Log.d(TAG, "  Total detected: " + detectedDevices.size());
-
-        if (isNewDevice) {
-            Log.d(TAG, "  🆕 First time detecting this device");
-        } else {
-            Log.d(TAG, "  🔄 Updated existing device");
+    /**
+     * Convert BLE advertise error code thành human-readable message
+     */
+    private String getAdvertiseErrorMessage(int errorCode) {
+        switch (errorCode) {
+            case AdvertiseCallback.ADVERTISE_FAILED_ALREADY_STARTED: return "Already started";
+            case AdvertiseCallback.ADVERTISE_FAILED_DATA_TOO_LARGE: return "Data too large";
+            case AdvertiseCallback.ADVERTISE_FAILED_FEATURE_UNSUPPORTED: return "Feature unsupported";
+            case AdvertiseCallback.ADVERTISE_FAILED_INTERNAL_ERROR: return "Internal error";
+            case AdvertiseCallback.ADVERTISE_FAILED_TOO_MANY_ADVERTISERS: return "Too many advertisers";
+            default: return "Unknown error (" + errorCode + ")";
         }
     }
 
-    private void handleDeviceLost(String deviceId) {
-        Log.d(TAG, "📱 DEVICE LOST");
-        Log.d(TAG, "  Device ID: " + deviceId);
-
-        boolean wasPresent = detectedDevices.containsKey(deviceId);
-        detectedDevices.remove(deviceId);
-
-        Log.d(TAG, "  Was present: " + wasPresent);
-        Log.d(TAG, "  Remaining detected: " + detectedDevices.size());
+    /**
+     * Convert BLE scan error code thành human-readable message
+     */
+    private String getScanErrorMessage(int errorCode) {
+        switch (errorCode) {
+            case ScanCallback.SCAN_FAILED_ALREADY_STARTED: return "Already started";
+            case ScanCallback.SCAN_FAILED_APPLICATION_REGISTRATION_FAILED: return "App registration failed";
+            case ScanCallback.SCAN_FAILED_FEATURE_UNSUPPORTED: return "Feature unsupported";
+            case ScanCallback.SCAN_FAILED_INTERNAL_ERROR: return "Internal error";
+            default: return "Unknown error (" + errorCode + ")";
+        }
     }
 
+    // ======= SERVICE CLEANUP =======
+
+    /**
+     * Dừng attendance service và cleanup tất cả resources
+     */
     @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_SCAN})
     private void stopAttendanceService() {
         Log.d(TAG, "=== STOPPING ATTENDANCE SERVICE ===");
 
-        // Stop BLE operations
-        Log.d(TAG, "Stopping BLE operations...");
-        bleManager.stopAdvertising();
-        bleManager.stopScanning();
-        Log.d(TAG, "BLE operations stopped");
-
-        // Stop scheduler
-        if (roundScheduler != null) {
-            Log.d(TAG, "Stopping round scheduler...");
-            roundScheduler.stop();
-            Log.d(TAG, "Round scheduler stopped");
-        } else {
-            Log.w(TAG, "Round scheduler was null");
+        // Dừng BLE operations
+        if (advertiser != null) {
+            advertiser.stopAdvertising(advCallback);
+            Log.d(TAG, "✅ Advertising stopped");
+        }
+        if (scanner != null) {
+            scanner.stopScan(scanCallback);
+            Log.d(TAG, "✅ Scanning stopped");
         }
 
+        // Dừng scheduler
+        if (roundScheduler != null) {
+            roundScheduler.stop();
+            Log.d(TAG, "✅ Round scheduler stopped");
+        }
+
+        // Clear data
+        detectedDevices.clear();
+        deviceLastSeen.clear();
+
         // Stop foreground service
-        Log.d(TAG, "Stopping foreground service...");
         stopForeground(true);
         stopSelf();
-        Log.d(TAG, "Service stopped");
 
-        Log.d(TAG, "✅ Attendance service stopped completely");
-        Log.d(TAG, "===================================");
+        Log.d(TAG, "✅ Service stopped completely");
     }
 
+    @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_SCAN})
+    @Override
+    public void onDestroy() {
+        Log.d(TAG, "=== SERVICE DESTROYING ===");
+        super.onDestroy();
+
+        // Đảm bảo cleanup nếu service bị destroy đột ngột
+        if (advertiser != null) advertiser.stopAdvertising(advCallback);
+        if (scanner != null) scanner.stopScan(scanCallback);
+        if (roundScheduler != null) roundScheduler.stop();
+    }
+
+    /**
+     * Xử lý khi user swipe away app từ recent apps
+     */
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        Log.d(TAG, "Task removed, stopping service");
+        stopForeground(true);
+        stopSelf();
+        super.onTaskRemoved(rootIntent);
+    }
+
+    // ======= NOTIFICATION FOR FOREGROUND SERVICE =======
+
+    /**
+     * Tạo notification cho foreground service
+     */
     private Notification createNotification() {
         Intent notificationIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent,
                 PendingIntent.FLAG_IMMUTABLE);
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Điểm danh BLE đang hoạt động")
-                .setContentText("Đang phát tín hiệu cho phòng: " + room)
+                .setContentTitle("BLE Attendance Active")
+                .setContentText("Room: " + roomId + " | Status: Running")
                 .setSmallIcon(R.drawable.ic_bluetooth)
                 .setContentIntent(pendingIntent)
-                .setOngoing(true)
+                .setOngoing(true) // Không thể swipe away
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .build();
     }
 
+    /**
+     * Tạo notification channel (Android 8.0+)
+     */
     @RequiresApi(api = Build.VERSION_CODES.O)
     private void createNotificationChannel() {
         NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
-                "Đang điểm danh",
-                NotificationManager.IMPORTANCE_LOW
-        );
-        channel.setDescription("Đang trong quá trình điểm danh và theo dõi bằng BLE");
+                "BLE Attendance Service",
+                NotificationManager.IMPORTANCE_LOW);
+        channel.setDescription("BLE attendance tracking service");
+        channel.setShowBadge(false);
 
         NotificationManager manager = getSystemService(NotificationManager.class);
-        manager.createNotificationChannel(channel);
+        if (manager != null) {
+            manager.createNotificationChannel(channel);
+        }
     }
 
     @Override
     public IBinder onBind(Intent intent) {
-        return null;
+        return null; // Service không hỗ trợ binding
     }
 }

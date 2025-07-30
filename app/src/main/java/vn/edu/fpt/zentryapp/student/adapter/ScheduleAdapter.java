@@ -1,11 +1,16 @@
 package vn.edu.fpt.zentryapp.student.adapter;
 
+import android.Manifest;
 import android.app.Dialog;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.net.Uri;
 import android.os.Build;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -16,6 +21,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.button.MaterialButton;
@@ -27,10 +33,12 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.TimeZone;
 
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
+import vn.edu.fpt.zentryapp.MainActivity;
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.ApiClient;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
@@ -218,8 +226,6 @@ public class ScheduleAdapter extends RecyclerView.Adapter<ScheduleAdapter.ViewHo
             dialog.setCancelable(true);
             dialog.show();
         }
-
-        // 🔧 REFACTOR: Load rounds từ API trước khi start BLE service
         @RequiresApi(api = Build.VERSION_CODES.O)
         private void startStudentBLEService(Context context, StudentScheduleSession studentScheduleSession) {
             try {
@@ -230,12 +236,104 @@ public class ScheduleAdapter extends RecyclerView.Adapter<ScheduleAdapter.ViewHo
                     Toast.makeText(context, "Không thể xác định thông tin sinh viên", Toast.LENGTH_SHORT).show();
                     return;
                 }
+                MainActivity mainActivity = getMainActivityFromContext(context);
 
-                loadStudentSessionRounds(context, studentScheduleSession, userId);
+                if (mainActivity != null && mainActivity.hasBLEPermissions()) {
+                    // ✅ Có permissions, load rounds và start service
+                    loadStudentSessionRounds(context, studentScheduleSession, userId);
+                    Log.d(TAG, "✅ Student BLE service starting with permissions");
+                } else if (mainActivity != null) {
+                    // ❌ Thiếu permissions, request lại
+                    Log.w(TAG, "⚠️ Student BLE permissions missing, requesting...");
+                    Toast.makeText(context, "🔒 Requesting BLE permissions for attendance...",
+                            Toast.LENGTH_SHORT).show();
+
+                    mainActivity.requestBLEPermissions();
+                    Toast.makeText(context, "Please grant permissions and try joining class again",
+                            Toast.LENGTH_LONG).show();
+                } else {
+                    // ❌ Không tìm được MainActivity, fallback to static check
+                    Log.w(TAG, "⚠️ Cannot find MainActivity, using static permission check");
+
+                    if (hasStaticBLEPermissions(context)) {
+                        // Start service với static permission check
+                        loadStudentSessionRounds(context, studentScheduleSession, userId);
+                        Log.d(TAG, "✅ Student BLE service started with static permission check");
+                    } else {
+                        // Show settings instruction
+                        Toast.makeText(context,
+                                "BLE permissions required. Please grant in Settings and try again.",
+                                Toast.LENGTH_LONG).show();
+                        openAppSettings(context);
+                    }
+                }
 
             } catch (Exception e) {
                 Log.e(TAG, "Failed to start Student BLE service", e);
                 Toast.makeText(context, "Lỗi khi tham gia lớp học", Toast.LENGTH_SHORT).show();
+            }
+        }
+
+        // ➕ HELPER METHOD để tìm MainActivity từ context chain
+        private MainActivity getMainActivityFromContext(Context context) {
+            // Try direct cast first
+            if (context instanceof MainActivity) {
+                return (MainActivity) context;
+            }
+
+            // Try to get activity from context wrapper
+            while (context instanceof ContextWrapper) {
+                if (context instanceof MainActivity) {
+                    return (MainActivity) context;
+                }
+                context = ((ContextWrapper) context).getBaseContext();
+            }
+
+            Log.d(TAG, "MainActivity not found in context chain");
+            return null;
+        }
+
+        // ➕ STATIC PERMISSION CHECK (fallback khi không tìm được MainActivity)
+        private boolean hasStaticBLEPermissions(Context context) {
+            // Check Location permission
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                    != PackageManager.PERMISSION_GRANTED) {
+                Log.d(TAG, "ACCESS_FINE_LOCATION permission missing");
+                return false;
+            }
+
+            // Check Android 12+ BLE permissions
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN)
+                        != PackageManager.PERMISSION_GRANTED) {
+                    Log.d(TAG, "BLUETOOTH_SCAN permission missing");
+                    return false;
+                }
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_ADVERTISE)
+                        != PackageManager.PERMISSION_GRANTED) {
+                    Log.d(TAG, "BLUETOOTH_ADVERTISE permission missing");
+                    return false;
+                }
+            }
+
+            Log.d(TAG, "All BLE permissions granted");
+            return true;
+        }
+
+        // ➕ OPEN APP SETTINGS (fallback khi không thể request permissions)
+        private void openAppSettings(Context context) {
+            try {
+                Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                Uri uri = Uri.fromParts("package", context.getPackageName(), null);
+                intent.setData(uri);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(intent);
+
+                Log.d(TAG, "Opened app settings for permission grant");
+            } catch (Exception e) {
+                Log.e(TAG, "Cannot open app settings", e);
+                Toast.makeText(context, "Please manually grant BLE permissions in Settings",
+                        Toast.LENGTH_LONG).show();
             }
         }
 
@@ -282,45 +380,54 @@ public class ScheduleAdapter extends RecyclerView.Adapter<ScheduleAdapter.ViewHo
                     });
         }
 
-        /**
-         * 🔧 MAP API rounds sang AttendanceModels.AttendanceRound (tương tự lecturer)
-         */
         private List<AttendanceModels.AttendanceRound> mapApiRoundsToAttendanceRounds(List<RoundData> apiRounds) {
             List<AttendanceModels.AttendanceRound> rounds = new ArrayList<>();
+            if (apiRounds == null || apiRounds.isEmpty()) return rounds;
 
-            if (apiRounds == null || apiRounds.isEmpty()) {
-                return rounds;
-            }
+            // ✅ Setup formatters với timezone rõ ràng
+            SimpleDateFormat utcFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault());
+            utcFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
 
-            SimpleDateFormat isoFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault());
+            SimpleDateFormat vnFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+            vnFormat.setTimeZone(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
 
             for (int i = 0; i < apiRounds.size(); i++) {
                 RoundData apiRound = apiRounds.get(i);
-
                 try {
-                    Date startTime = isoFormat.parse(apiRound.getStartTime());
-                    boolean isLastRound = (i == apiRounds.size() - 1);
+                    String utcString = apiRound.getStartTime(); // "2025-07-30T19:26:07Z"
+
+                    // ✅ FIXED: Parse UTC time chính xác
+                    Date utcDate = utcFormat.parse(utcString);
+
+                    // ✅ FIXED: Convert sang VN time với simple offset
+                    final long VN_OFFSET = 15 * 1000L; // 15 s
+                    Date vnDate = new Date(utcDate.getTime() + VN_OFFSET);
 
                     AttendanceModels.AttendanceRound round = new AttendanceModels.AttendanceRound(
-                            apiRound.getRoundId(),        // roundId
-                            startTime,                    // executionTime
-                            apiRound.getRoundNumber(),    // roundNumber
-                            isLastRound                   // isLastRound
+                            apiRound.getRoundId(),
+                            vnDate,
+                            apiRound.getRoundNumber(),
+                            (i == apiRounds.size() - 1)
                     );
 
                     rounds.add(round);
 
-                    Log.d(TAG, "Student mapped round " + apiRound.getRoundNumber() +
-                            ": " + apiRound.getStartTime() +
-                            " (isLast: " + isLastRound + ")");
+                    // ✅ Enhanced logging để debug
+                    Log.d(TAG, "Round " + apiRound.getRoundNumber() + ":");
+                    Log.d(TAG, "  UTC string: " + utcString);
+                    Log.d(TAG, "  UTC parsed: " + utcFormat.format(utcDate));
+                    Log.d(TAG, "  VN time: " + vnFormat.format(vnDate));
+                    Log.d(TAG, "  Offset applied: +7h");
 
                 } catch (Exception e) {
-                    Log.e(TAG, "Error parsing student round " + apiRound.getRoundNumber(), e);
+                    Log.e(TAG, "Error parsing round " + apiRound.getRoundNumber(), e);
                 }
             }
 
+            Log.d(TAG, "✅ Total rounds mapped: " + rounds.size());
             return rounds;
         }
+
 
         /**
          * 🔧 START BLE service với rounds từ API
@@ -335,7 +442,7 @@ public class ScheduleAdapter extends RecyclerView.Adapter<ScheduleAdapter.ViewHo
                 serviceIntent.putExtra("userId", userId);
                 serviceIntent.putExtra("userRole", "STUDENT"); // 🔧 Student role
                 serviceIntent.putExtra("rounds", (Serializable) rounds);
-                context.startForegroundService(serviceIntent);
+                ContextCompat.startForegroundService(context, serviceIntent);
 
                 Log.d(TAG, "✅ Student BLE Service started with " + rounds.size() +
                         " rounds for session: " + studentScheduleSession.getSessionId());

@@ -325,6 +325,7 @@ public class AttendanceCalculateHandler {
         Log.e(TAG, "  Status code: " + response.code());
         Log.e(TAG, "  Status message: '" + response.message() + "'");
         Log.e(TAG, "  Round ID: " + roundId);
+        Log.e(TAG, "  Request URL: " + response.raw().request().url());
 
         // Try to log error body
         try {

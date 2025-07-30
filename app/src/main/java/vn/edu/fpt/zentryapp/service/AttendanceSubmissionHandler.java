@@ -3,6 +3,8 @@ package vn.edu.fpt.zentryapp.service;
 import android.content.Context;
 import android.util.Log;
 
+import java.util.List;
+
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -224,17 +226,32 @@ public class AttendanceSubmissionHandler {
                                    Response<AttendanceApiResponse> response,
                                    AttendanceModels.AttendanceSubmission submission,
                                    AttendanceCallbacks.AttendanceSubmissionCallback callback) {
-        // Log response headers
-        if (response.headers() != null) {
-            Log.d(TAG, "  Response headers count: " + response.headers().size());
-            for (String name : response.headers().names()) {
-                Log.d(TAG, "    " + name + ": " + response.headers().get(name));
-            }
-        }
+
 
         if (response.isSuccessful()) {
             handleSuccessfulResponse(response, submission, callback);
         } else {
+            Log.d(TAG, "📤 ATTENDANCE SUBMISSION INFO:");
+            if (submission != null) {
+                Log.d(TAG, "  Submitter MAC: " + submission.getSubmitterDeviceMacAddress());
+                Log.d(TAG, "  Session ID: " + submission.getSessionId());
+                Log.d(TAG, "  Timestamp: " + submission.getTimestamp());
+
+                // Log danh sách scanned devices
+                List<AttendanceModels.ScannedDevice> scannedDevices = submission.getScannedDevices();
+                if (scannedDevices != null && !scannedDevices.isEmpty()) {
+                    Log.d(TAG, "  Scanned devices count: " + scannedDevices.size());
+                    for (int i = 0; i < scannedDevices.size(); i++) {
+                        AttendanceModels.ScannedDevice device = scannedDevices.get(i);
+                        Log.d(TAG, "    Device " + (i + 1) + " - MAC: " + device.getMacAddress() + ", RSSI: " + device.getRssi());
+                    }
+                } else {
+                    Log.d(TAG, " No scanned devices");
+                }
+            } else {
+                Log.w(TAG, "Submission is null");
+            }
+
             handleErrorResponse(response, callback);
         }
     }
@@ -287,10 +304,12 @@ public class AttendanceSubmissionHandler {
     private void handleErrorResponse(Response<AttendanceApiResponse> response,
                                      AttendanceCallbacks.AttendanceSubmissionCallback callback) {
 
+
+
         Log.e(TAG, "❌ HTTP ERROR RESPONSE");
         Log.e(TAG, "  Status code: " + response.code());
         Log.e(TAG, "  Status message: '" + response.message() + "'");
-
+        Log.e(TAG, "  Request URL: " + response.raw().request().url());
         // Try to log error body if available
         try {
             if (response.errorBody() != null) {
