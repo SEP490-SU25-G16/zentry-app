@@ -293,6 +293,8 @@ public class OvalFaceOverlayView extends View {
      */
     public void setOvalColor(int color) {
         ovalPaint.setColor(color);
+        // Reset path effect to ensure solid lines unless explicitly changed
+        ovalPaint.setPathEffect(null);
         invalidate();
     }
     
@@ -302,4 +304,4 @@ public class OvalFaceOverlayView extends View {
     public RectF getOvalRect() {
         return ovalRect;
     }
-} 
+}

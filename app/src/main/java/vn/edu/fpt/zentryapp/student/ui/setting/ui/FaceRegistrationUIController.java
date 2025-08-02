@@ -1,13 +1,12 @@
 package vn.edu.fpt.zentryapp.student.ui.setting.ui;
 
 import android.view.View;
-import android.widget.ProgressBar;
-import android.widget.TextView;
 
 import androidx.core.content.ContextCompat;
 
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentSettingRegisterFaceIdBinding;
+import vn.edu.fpt.zentryapp.student.data.service.FaceProcessingState;
 import vn.edu.fpt.zentryapp.student.ui.components.OvalFaceOverlayView;
 import vn.edu.fpt.zentryapp.student.ui.setting.state.FaceRegistrationState;
 
@@ -113,28 +112,53 @@ public class FaceRegistrationUIController {
         
         switch (state) {
             case FACE_REAL:
+                faceOverlayView.setOvalColor(ContextCompat.getColor(
+                    faceOverlayView.getContext(), R.color.success_green));
+                faceOverlayView.updateState(FaceProcessingState.FACE_REAL, state.getDefaultMessage());
+                break;
+
             case FACE_STABLE:
                 faceOverlayView.setOvalColor(ContextCompat.getColor(
                     faceOverlayView.getContext(), R.color.success_green));
+                faceOverlayView.updateState(FaceProcessingState.FACE_STABLE, state.getDefaultMessage());
                 break;
                 
             case FACE_SPOOFED:
             case FAILED_SPOOF:
                 faceOverlayView.setOvalColor(ContextCompat.getColor(
                     faceOverlayView.getContext(), R.color.error_red));
+                faceOverlayView.updateState(FaceProcessingState.FACE_SPOOFED, state.getDefaultMessage());
                 break;
                 
             case FACE_STABILIZING:
                 faceOverlayView.setOvalColor(ContextCompat.getColor(
                     faceOverlayView.getContext(), R.color.processing_blue));
+                faceOverlayView.updateState(FaceProcessingState.FACE_STABILIZING, state.getDefaultMessage());
                 faceOverlayView.startProgressAnimation(700); // 0.7 seconds
                 break;
-                
-            case NO_FACE:
+
             case FACE_DETECTED:
+                faceOverlayView.setOvalColor(ContextCompat.getColor(
+                    faceOverlayView.getContext(), R.color.warning_yellow));
+                faceOverlayView.updateState(FaceProcessingState.FACE_DETECTED, state.getDefaultMessage());
+                break;
+
+            case NO_FACE:
+                faceOverlayView.setOvalColor(ContextCompat.getColor(
+                    faceOverlayView.getContext(), R.color.white));
+                faceOverlayView.updateState(FaceProcessingState.NO_FACE, state.getDefaultMessage());
+                break;
+
+            case FACE_OUT_OF_BOUNDS:
+                faceOverlayView.setOvalColor(ContextCompat.getColor(
+                    faceOverlayView.getContext(), R.color.warning_yellow));
+                faceOverlayView.updateState(FaceProcessingState.FACE_DETECTED, state.getDefaultMessage());
+                break;
+
             default:
                 faceOverlayView.setOvalColor(ContextCompat.getColor(
                     faceOverlayView.getContext(), R.color.white));
+                faceOverlayView.updateState(FaceProcessingState.READY, state.getDefaultMessage());
                 break;
         }
     }
@@ -159,9 +183,16 @@ public class FaceRegistrationUIController {
         switch (state) {
             case INITIALIZING:
                 showScreen(UIScreenState.LOADING);
+                // Make sure loading overlay is visible during initialization
+                showLoadingOverlay(true);
                 break;
                 
             case READY:
+                // When ready, ensure we show the camera and hide loading overlay
+                showScreen(UIScreenState.CAMERA);
+                showLoadingOverlay(false);
+                break;
+                
             case NO_FACE:
             case FACE_DETECTED:
             case FACE_REAL:
@@ -170,6 +201,8 @@ public class FaceRegistrationUIController {
                 if (currentScreenState != UIScreenState.CAMERA) {
                     showScreen(UIScreenState.CAMERA);
                 }
+                // Ensure loading overlay is hidden during these states
+                showLoadingOverlay(false);
                 break;
                 
             case PROCESSING:

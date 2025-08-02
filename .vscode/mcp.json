@@ -1,0 +1,52 @@
+{
+  "servers": {
+    "serena": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/oraios/serena",
+        "serena-mcp-server",
+        "--project",
+        "d:/FU/S9.SU25/SEP490/zentry app src/zentry-app"
+      ]
+    },
+
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    },
+
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "d:/FU/S9.SU25/SEP490/zentry-app"
+      ]
+    },
+
+    "memory-bank": {
+      "command": "npx",
+      "args": ["-y", "@allpepper/memory-bank-mcp"],
+      "env": {
+        "MEMORY_BANK_ROOT": "d:/FU/S9.SU25/SEP490/zentry-memory-bank"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "memory_bank_read",
+        "memory_bank_write",
+        "memory_bank_update",
+        "list_projects",
+        "list_project_files"
+      ]
+    },
+    "websearch-google": {
+      "command": "npx",
+      "args": ["-y", "mnhlt/websearch-mcp"],
+      "env": {
+        "API_URL": "http://localhost:3001",
+        "MAX_SEARCH_RESULT": "5"
+      }
+    }
+  }
+}

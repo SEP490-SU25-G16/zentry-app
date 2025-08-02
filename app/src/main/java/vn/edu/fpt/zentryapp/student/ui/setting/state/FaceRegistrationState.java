@@ -44,7 +44,10 @@ public enum FaceRegistrationState {
     
     // Timeout states
     TIMEOUT_DETECTION("Face detection timeout"),
-    TIMEOUT_REGISTRATION("Registration timeout");
+    TIMEOUT_REGISTRATION("Registration timeout"),
+
+    FACE_OUT_OF_BOUNDS("Position face in oval guide"),
+    FACE_WARNING("Warning: possible spoof detected");
     
     private final String defaultMessage;
     

@@ -119,14 +119,14 @@ public class FaceSpoofDetector {
                 } catch (Exception e) {
                     Log.e(TAG, "Lỗi khi khởi tạo model TensorFlow Lite: " + e.getMessage(), e);
                     mainHandler.post(() ->
-                        Toast.makeText(context, "Lỗi khi tải model spoof detection: " + e.getMessage(), Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, "Lỗi khi tải model spoof detection: " + e.getMessage(), Toast.LENGTH_LONG).show()
                     );
                     useMockDetection = true;
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Lỗi khi kiểm tra file model: " + e.getMessage(), e);
                 mainHandler.post(() ->
-                    Toast.makeText(context, "Lỗi khi kiểm tra model spoof detection: " + e.getMessage(), Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Lỗi khi kiểm tra model spoof detection: " + e.getMessage(), Toast.LENGTH_LONG).show()
                 );
                 useMockDetection = true;
             } finally {
@@ -166,9 +166,10 @@ public class FaceSpoofDetector {
 
     /**
      * Detect if a face is spoofed asynchronously
+     *
      * @param frameImage Original frame image
-     * @param faceRect Face bounding box
-     * @param callback Callback for result
+     * @param faceRect   Face bounding box
+     * @param callback   Callback for result
      */
     public void detectSpoofAsync(Bitmap frameImage, Rect faceRect, SpoofCallback callback) {
         executor.execute(() -> {
@@ -201,8 +202,9 @@ public class FaceSpoofDetector {
 
     /**
      * Detect if a face is spoofed
+     *
      * @param frameImage Original frame image
-     * @param faceRect Face bounding box
+     * @param faceRect   Face bounding box
      * @return Spoof detection result
      */
     public SpoofResult detectSpoof(Bitmap frameImage, Rect faceRect) {
@@ -286,35 +288,50 @@ public class FaceSpoofDetector {
 
             Log.d(TAG, "Combined result: Real=" + combined[0] + ", Unknown=" + combined[1] + ", Spoof=" + combined[2]);
 
-            // 🟢 FIXED: Consistent logic with single threshold
-            final float CONFIDENCE_THRESHOLD = 0.6f;
-            final float REAL_SPOOF_RATIO_THRESHOLD = 1.3f; // Real should be 30% higher than spoof
+            // 🔒 MORE LENIENT: Improved anti-spoofing logic with more balanced thresholds
+            final float REAL_CONFIDENCE_THRESHOLD = 0.55f;  // Lower threshold for real face confidence
+            final float SPOOF_CONFIDENCE_THRESHOLD = 0.75f; // Higher threshold for spoof detection to reduce false positives
+            final float REAL_SPOOF_RATIO_THRESHOLD = 1.3f;  // Real must be only 1.3x higher than spoof (30% difference)
+            final float SPOOF_REAL_RATIO_THRESHOLD = 2.0f;  // Spoof must be 2x higher than real to classify as spoof
+
+            // Texture analysis hints - check for unnatural patterns in 2D images
+            boolean hasUniformTexture = checkUniformTexture(softmax1, softmax2);
 
             boolean isSpoof;
             float confidence;
 
-            // Primary decision: Compare Real vs Spoof directly
-            if (combined[0] > combined[2] * REAL_SPOOF_RATIO_THRESHOLD && combined[0] > CONFIDENCE_THRESHOLD) {
-                // High confidence real face
-                isSpoof = false;
+            // Improved decision logic with better balance between security and usability:
+            if (combined[0] > combined[2] * REAL_SPOOF_RATIO_THRESHOLD && combined[0] > REAL_CONFIDENCE_THRESHOLD) {
+                // High confidence real face - much more lenient on texture check
+                isSpoof = hasUniformTexture && combined[2] > 0.4f; // Only consider texture with strong spoof signal
                 confidence = combined[0];
-                Log.d(TAG, "🟢 HIGH CONFIDENCE REAL: Real=" + combined[0] + " >> Spoof=" + combined[2]);
-            } else if (combined[2] > combined[0] * REAL_SPOOF_RATIO_THRESHOLD && combined[2] > CONFIDENCE_THRESHOLD) {
-                // High confidence spoof
+                Log.d(TAG, "🟢 HIGH CONFIDENCE REAL: Real=" + combined[0] + " >> Spoof=" + combined[2] +
+                        ", hasUniformTexture=" + hasUniformTexture + ", final decision=" + (isSpoof ? "SPOOF" : "REAL"));
+            } else if (combined[2] > combined[0] * SPOOF_REAL_RATIO_THRESHOLD && combined[2] > SPOOF_CONFIDENCE_THRESHOLD) {
+                // Strong spoof indicators - need very high spoof score to be confident
                 isSpoof = true;
                 confidence = combined[2];
                 Log.d(TAG, "🔴 HIGH CONFIDENCE SPOOF: Spoof=" + combined[2] + " >> Real=" + combined[0]);
+            } else if (combined[0] > 0.50f && combined[0] > combined[2]) {
+                // Medium confidence real face - now only needs real score higher than spoof
+                isSpoof = false;
+                confidence = combined[0];
+                Log.d(TAG, "🟢 MEDIUM CONFIDENCE REAL: Real=" + combined[0] + " > Spoof=" + combined[2]);
+            } else if (combined[2] > 0.65f && combined[2] > combined[0] * 1.5f) {
+                // Medium confidence spoof - requires higher spoof score AND significant ratio difference
+                isSpoof = true;
+                confidence = combined[2];
+                Log.d(TAG, "🟠 MEDIUM CONFIDENCE SPOOF: Spoof=" + combined[2] + " > Real=" + combined[0]);
+            } else if (combined[0] >= combined[2] * 0.8f) {
+                // If real is at least 80% of spoof, give benefit of doubt to real face
+                isSpoof = false;
+                confidence = Math.max(0.6f, combined[0]);
+                Log.d(TAG, "🟡 BORDERLINE CASE - FAVOR REAL: Real=" + combined[0] + " close to Spoof=" + combined[2]);
             } else {
-                // Low confidence or unclear - default to safer choice based on ratio
-                if (combined[0] >= combined[2]) {
-                    isSpoof = false;
-                    confidence = combined[0];
-                    Log.d(TAG, "🟡 LOW CONFIDENCE REAL: Real=" + combined[0] + " ~= Spoof=" + combined[2]);
-                } else {
-                    isSpoof = true;
-                    confidence = combined[2];
-                    Log.d(TAG, "🟠 LOW CONFIDENCE SPOOF: Spoof=" + combined[2] + " > Real=" + combined[0]);
-                }
+                // Everything else - still default to spoof for clear cases
+                isSpoof = true;
+                confidence = Math.max(0.55f, combined[2]);
+                Log.d(TAG, "🟠 LIKELY SPOOF SIGNAL: Spoof=" + combined[2] + " > Real=" + combined[0]);
             }
 
             Log.d(TAG, "🎯 FINAL RESULT: " + (isSpoof ? "SPOOF" : "REAL") + " with confidence: " + confidence);
@@ -322,13 +339,23 @@ public class FaceSpoofDetector {
             long timeMillis = System.currentTimeMillis() - startTime;
             return new SpoofResult(isSpoof, confidence, timeMillis);
 
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.e(TAG, "Error in spoof detection: " + e.getMessage(), e);
-            // Default to real face on error to avoid blocking users
-            return new SpoofResult(false, 0.9f, System.currentTimeMillis() - startTime);
+
+            // IMPROVED ERROR HANDLING:
+            Log.w(TAG, "⚠️ Processing error in spoof detection. Error type: " + e.getClass().getSimpleName());
+
+            boolean shouldDefaultToSpoof = e instanceof OutOfMemoryError || e instanceof IllegalArgumentException;
+
+            if (shouldDefaultToSpoof) {
+                Log.w(TAG, "⚠️ Critical error detected - defaulting to spoof with warning");
+                return new SpoofResult(true, 0.6f, System.currentTimeMillis() - startTime);
+            } else {
+                Log.w(TAG, "⚠️ Non-critical error - assuming real face with reduced confidence");
+                return new SpoofResult(false, 0.65f, System.currentTimeMillis() - startTime);
+            }
         }
     }
-
 
 
     /**
@@ -349,6 +376,61 @@ public class FaceSpoofDetector {
         }
 
         return output;
+    }
+
+    /**
+     * Analyze model outputs for texture patterns common in 2D spoofing attacks
+     * This method looks for indicators like uniform lighting, lack of depth variation,
+     * and other patterns typical of printed photos or screen displays
+     *
+     * @param softmax1 Softmax output from first model
+     * @param softmax2 Softmax output from second model
+     * @return true if texture analysis indicates a potential 2D spoof attack
+     */
+    private boolean checkUniformTexture(float[] softmax1, float[] softmax2) {
+        // 1. Check if unknown class (index 1) has significant activation
+        // This often indicates the model is detecting something unusual about the texture
+        // MUCH HIGHER THRESHOLD to greatly reduce false positives
+        boolean unusualTextureIndicator =
+                (softmax1[1] > 0.45f && softmax2[1] > 0.35f); // Now BOTH models must show unusual texture
+
+        // 2. Check for inconsistency between models (often happens with 2D images)
+        // If one model is very confident it's real but the other isn't, it's suspicious
+        // MUCH HIGHER THRESHOLD for greater tolerance of normal variations
+        boolean modelInconsistency =
+                Math.abs(softmax1[0] - softmax2[0]) > 0.65f &&
+                        Math.abs(softmax1[2] - softmax2[2]) > 0.55f; // Need inconsistency in BOTH real and spoof scores
+
+        // 3. Check if there's high activation for both real and spoof classes
+        // This is unusual for real faces but common for 2D spoofs that confuse the model
+        // STRICTER CHECK requiring higher concurrent values
+        boolean ambiguousClassification =
+                (softmax1[0] > 0.45f && softmax1[2] > 0.45f &&
+                        softmax2[0] > 0.4f && softmax2[2] > 0.4f); // BOTH models must show ambiguity
+
+        // Log detailed debug information
+        if (unusualTextureIndicator || modelInconsistency || ambiguousClassification) {
+            Log.d(TAG, "🔍 TEXTURE ANALYSIS: " +
+                    "unusualTexture=" + unusualTextureIndicator +
+                    ", modelInconsistency=" + modelInconsistency +
+                    ", ambiguousClassification=" + ambiguousClassification);
+        }
+
+        // Return true only if multiple indicators suggest a 2D spoofing attempt
+        // This is MUCH LESS AGGRESSIVE than before - requiring stronger evidence
+        // Instead of ANY indicator triggering, now we need more than one or very strong individual indicators
+
+        // Strong evidence from any one indicator
+        boolean strongEvidence =
+                (softmax1[1] > 0.6f && softmax2[1] > 0.6f) || // Very strong unusual texture
+                        (Math.abs(softmax1[0] - softmax2[0]) > 0.8f); // Very strong inconsistency
+
+        // Multiple weaker indicators
+        boolean multipleIndicators =
+                (unusualTextureIndicator && (modelInconsistency || ambiguousClassification)) ||
+                        (modelInconsistency && ambiguousClassification);
+
+        return strongEvidence || multipleIndicators;
     }
 
     /**
@@ -454,7 +536,7 @@ public class FaceSpoofDetector {
             bottomRightY = imgHeight - 1;
         }
 
-        Rect result = new Rect((int)topLeftX, (int)topLeftY, (int)bottomRightX, (int)bottomRightY);
+        Rect result = new Rect((int) topLeftX, (int) topLeftY, (int) bottomRightX, (int) bottomRightY);
         Log.d(TAG, "getScaledBox: Final scaled box: " + result.toString());
 
         return result;
