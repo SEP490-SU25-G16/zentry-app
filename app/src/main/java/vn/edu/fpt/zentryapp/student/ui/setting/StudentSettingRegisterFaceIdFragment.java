@@ -384,14 +384,20 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
     }
 
     /**
-     * Handle enhanced spoof detection result with improved security
+     * Enhanced spoof result handling with better real face detection
      */
     private void handleEnhancedSpoofResult(SpoofDetectionManager.SpoofDetectionResult result, Rect boundingBox) {
         if (!isAdded() || stateManager.getCurrentState().isFinalState()) {
             return;
         }
 
-        // Handle spoof detection with higher security threshold
+        Log.d(TAG, "🔍 Enhanced spoof result: isSpoof=" + result.isSpoof + 
+              ", confidence=" + result.confidence + 
+              ", level=" + result.confidenceLevel + 
+              ", shouldProceed=" + result.shouldProceed + 
+              ", explanation=" + result.explanation);
+
+        // Handle spoof detection with improved thresholds
         if (result.isSpoof) {
             // For high or medium confidence spoof detections, immediately transition to spoofed state
             if (result.confidenceLevel == SpoofDetectionManager.ConfidenceLevel.HIGH || 
@@ -401,7 +407,7 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
                 return;
             }
             
-            // For lower confidence, show warning but don't fail immediately
+            // For lower confidence spoof, show warning but don't fail immediately
             if (stateManager.getCurrentState() != FaceRegistrationState.FACE_WARNING) {
                 stateManager.transitionTo(FaceRegistrationState.FACE_WARNING, result.explanation);
             }
@@ -409,37 +415,73 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
             return;
         }
 
-        // For real face detections
+        // 🆕 IMPROVED: Better handling for real face detections
         if (!result.isSpoof) {
-            // Update state
-            if (stateManager.getCurrentState() != FaceRegistrationState.FACE_REAL &&
+            // Update state based on confidence level
+            if (result.confidenceLevel == SpoofDetectionManager.ConfidenceLevel.HIGH) {
+                if (stateManager.getCurrentState() != FaceRegistrationState.FACE_REAL &&
                     stateManager.getCurrentState() != FaceRegistrationState.FACE_STABILIZING) {
-                stateManager.transitionTo(FaceRegistrationState.FACE_REAL, "Real face detected");
+                    stateManager.transitionTo(FaceRegistrationState.FACE_REAL, "High confidence real face detected");
+                }
+            } else if (result.confidenceLevel == SpoofDetectionManager.ConfidenceLevel.MEDIUM) {
+                if (stateManager.getCurrentState() != FaceRegistrationState.FACE_REAL &&
+                    stateManager.getCurrentState() != FaceRegistrationState.FACE_STABILIZING) {
+                    stateManager.transitionTo(FaceRegistrationState.FACE_REAL, "Real face detected");
+                }
+            } else {
+                // Low confidence real face - show guidance
+                if (stateManager.getCurrentState() != FaceRegistrationState.FACE_WARNING) {
+                    stateManager.transitionTo(FaceRegistrationState.FACE_WARNING, 
+                        "Low confidence detection - please improve lighting and position");
+                }
+                resetFaceTracker();
+                return;
             }
 
-            // Process based on should proceed flag
+            // 🆕 IMPROVED: Process based on should proceed flag with better feedback
             if (result.shouldProceed) {
                 stateManager.transitionTo(FaceRegistrationState.FACE_STABLE, "Ready to capture!");
             } else {
+                // Provide better guidance based on explanation
+                String guidance = result.explanation;
+                if (guidance.contains("need")) {
+                    // Extract frame count needed
+                    if (guidance.contains("1 more frame")) {
+                        guidance = "Almost there! Hold steady for 1 more frame";
+                    } else if (guidance.contains("2 more frames")) {
+                        guidance = "Keep holding! Need 2 more frames";
+                    } else {
+                        guidance = "Hold steady! " + guidance;
+                    }
+                }
+                
+                if (stateManager.getCurrentState() != FaceRegistrationState.FACE_STABILIZING) {
+                    stateManager.transitionTo(FaceRegistrationState.FACE_STABILIZING, guidance);
+                }
                 trackFaceStability(boundingBox);
             }
         }
     }
 
     /**
-     * Fallback basic spoof handling (increased security thresholds)
+     * Fallback basic spoof handling (improved for better real face detection)
      */
     private void handleBasicSpoofResult(boolean isSpoof, float spoofScore, Rect boundingBox) {
         Log.d(TAG, "🔧 Using basic spoof detection: isSpoof=" + isSpoof + ", score=" + spoofScore);
 
-        // Enhanced security thresholds
-        if (isSpoof && spoofScore > 0.65f) {  // Lowered from 0.7f for more sensitivity
+        // 🆕 IMPROVED: More lenient thresholds for real face detection
+        if (isSpoof && spoofScore > 0.70f) {  // Increased from 0.65f for better security
             stateManager.transitionTo(FaceRegistrationState.FACE_SPOOFED,
                     "Spoof detected! Please use a real face.");
             resetFaceTracker();
-        } else if (!isSpoof && spoofScore > 0.75f) {  // Increased from 0.6f for more security
+        } else if (!isSpoof && spoofScore > 0.60f) {  // Reduced from 0.75f for better real face detection
             stateManager.transitionTo(FaceRegistrationState.FACE_REAL, "Real face detected");
             trackFaceStability(boundingBox);
+        } else if (!isSpoof && spoofScore > 0.40f) {  // 🆕 NEW: Allow lower confidence real faces
+            // Low confidence real face - show guidance
+            stateManager.transitionTo(FaceRegistrationState.FACE_WARNING, 
+                "Low confidence detection - please improve lighting and position");
+            resetFaceTracker();
         } else {
             // Uncertain cases now show warning
             stateManager.transitionTo(FaceRegistrationState.FACE_WARNING, 

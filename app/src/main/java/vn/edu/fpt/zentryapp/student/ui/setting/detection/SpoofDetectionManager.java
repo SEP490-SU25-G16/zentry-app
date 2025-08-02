@@ -9,19 +9,24 @@ import vn.edu.fpt.zentryapp.student.data.service.FaceSpoofDetector;
 public class SpoofDetectionManager {
     private static final String TAG = "SpoofDetectionManager";
 
-    // 🔧 ENHANCED ANTI-SPOOFING THRESHOLDS
-    private static final float HIGH_CONFIDENCE_THRESHOLD = 0.85f;    // Increased from 0.75f
-    private static final float MEDIUM_CONFIDENCE_THRESHOLD = 0.70f;  // Increased from 0.55f
-    private static final float LOW_CONFIDENCE_THRESHOLD = 0.50f;     // Increased from 0.35f
+    // 🔧 IMPROVED ANTI-SPOOFING THRESHOLDS - More lenient for real faces
+    private static final float HIGH_CONFIDENCE_THRESHOLD = 0.85f;    // Keep high for security
+    private static final float MEDIUM_CONFIDENCE_THRESHOLD = 0.60f;  // Reduced from 0.70f for better real face detection
+    private static final float LOW_CONFIDENCE_THRESHOLD = 0.40f;     // Reduced from 0.50f for better real face detection
 
-    private static final float REAL_SPOOF_RATIO_STRICT = 2.0f;  // Increased from 1.7f
-    private static final float REAL_SPOOF_RATIO_LENIENT = 1.5f; // Increased from 1.3f
+    private static final float REAL_SPOOF_RATIO_STRICT = 2.0f;  // Keep strict for security
+    private static final float REAL_SPOOF_RATIO_LENIENT = 1.5f; // Keep lenient for real faces
 
-    // Streak counting with stricter requirements
-    private static final int SPOOF_CONFIRMATION_LIMIT = 2;      // No change - 2 frames to confirm spoof
-    private static final int REAL_CONFIRMATION_LIMIT = 5;      // Increased from 2 to 5 frames
-    private static final int MAX_SPOOF_WARNINGS = 3;           // No change - 3 warnings max
-    private static final int CONSECUTIVE_FRAME_REQUIREMENT = 4; // Increased from 2 to 4 consistent frames
+    // 🎯 IMPROVED STREAK REQUIREMENTS - More lenient for real faces
+    private static final int SPOOF_CONFIRMATION_LIMIT = 2;      // Keep strict for spoof detection
+    private static final int REAL_CONFIRMATION_LIMIT = 3;      // Reduced from 5 to 3 frames for real face
+    private static final int MAX_SPOOF_WARNINGS = 3;           // Keep same
+    private static final int CONSECUTIVE_FRAME_REQUIREMENT = 3; // Reduced from 4 to 3 frames
+
+    // 🆕 NEW REAL FACE INDICATORS
+    private static final int REAL_FACE_RECOVERY_THRESHOLD = 2;  // Frames needed for recovery
+    private static final float NATURAL_MOVEMENT_THRESHOLD = 0.15f; // Variance threshold for natural movement
+    private static final int MIN_REAL_FACE_FRAMES = 2;         // Minimum frames for real face confirmation
 
     private final FaceSpoofDetector detector;
 
@@ -30,6 +35,11 @@ public class SpoofDetectionManager {
     private int realStreak = 0;
     private int spoofWarningCount = 0;
     private int lowConfidenceCount = 0;
+    
+    // 🆕 NEW REAL FACE TRACKING
+    private int realFaceRecoveryCount = 0;
+    private float lastRealFaceConfidence = 0.0f;
+    private boolean hasOvalBoundary = false;
 
     // Frame history for temporal analysis
     private static final int FRAME_HISTORY_SIZE = 8;
@@ -94,7 +104,8 @@ public class SpoofDetectionManager {
      */
     public void setOvalBoundary(android.graphics.RectF ovalRect) {
         this.ovalBoundary = ovalRect;
-        Log.d(TAG, "Oval boundary set: " + ovalRect);
+        this.hasOvalBoundary = (ovalRect != null);
+        Log.d(TAG, "Oval boundary set: " + ovalRect + ", hasOvalBoundary: " + hasOvalBoundary);
     }
 
     /**
@@ -150,7 +161,7 @@ public class SpoofDetectionManager {
     }
 
     /**
-     * Make secure decision based on multiple criteria with enhanced security
+     * Enhanced decision logic with better real face detection
      */
     private SpoofDetectionResult makeSecureDecision(boolean rawIsSpoof, float rawConfidence, ConfidenceLevel level) {
         String explanation;
@@ -163,16 +174,22 @@ public class SpoofDetectionManager {
         // Check for abnormal confidence patterns
         boolean suspiciousConfidencePattern = checkForAbnormalConfidencePattern();
         
-        // Debug logging
-        Log.d(TAG, String.format("🔍 Decision: rawIsSpoof=%b, confidence=%.4f, level=%s, realStreak=%d, replayAttack=%b, suspiciousPattern=%b",
-                rawIsSpoof, rawConfidence, level, realStreak, possibleReplayAttack, suspiciousConfidencePattern));
+        // 🆕 NEW: Check for natural movement patterns (real face indicator)
+        boolean hasNaturalMovement = checkForNaturalMovement(rawConfidence);
         
-        // 🟢 HIGH CONFIDENCE CASES - Much more lenient for real faces
+        // 🆕 NEW: Check for oval boundary compliance (security indicator)
+        boolean isOvalCompliant = hasOvalBoundary && ovalBoundary != null;
+        
+        // Debug logging
+        Log.d(TAG, String.format("🔍 Decision: rawIsSpoof=%b, confidence=%.4f, level=%s, realStreak=%d, replayAttack=%b, suspiciousPattern=%b, naturalMovement=%b, ovalCompliant=%b",
+                rawIsSpoof, rawConfidence, level, realStreak, possibleReplayAttack, suspiciousConfidencePattern, hasNaturalMovement, isOvalCompliant));
+        
+        // 🟢 HIGH CONFIDENCE CASES - More lenient for real faces
         if (level == ConfidenceLevel.HIGH) {
             if (!rawIsSpoof) {
                 // High confidence real face - trust the model more
                 finalIsSpoof = false;
-                // Much more lenient - only need 2 consecutive confirmations for high confidence
+                // More lenient - only need 2 consecutive confirmations for high confidence
                 shouldProceed = realStreak >= 2;
                 explanation = "High confidence real face detected" + 
                     (shouldProceed ? "" : " - need " + (2 - realStreak) + " more frames");
@@ -183,15 +200,20 @@ public class SpoofDetectionManager {
                 explanation = "High confidence spoof detected";
             }
         }
-        // 🟡 MEDIUM CONFIDENCE CASES - More lenient
+        // 🟡 MEDIUM CONFIDENCE CASES - Much more lenient for real faces
         else if (level == ConfidenceLevel.MEDIUM) {
             if (!rawIsSpoof && !possibleReplayAttack && !suspiciousConfidencePattern) {
                 // Medium confidence real with no suspicious indicators
                 finalIsSpoof = false;
-                // More lenient - only need 3 consecutive confirmations
-                shouldProceed = realStreak >= 3;
-                explanation = "Medium confidence real face - hold steady" +
-                    (shouldProceed ? "" : " - need " + (3 - realStreak) + " more frames");
+                // 🆕 IMPROVED: More lenient for real faces with natural movement
+                if (hasNaturalMovement && isOvalCompliant) {
+                    shouldProceed = realStreak >= 1; // Only need 1 frame if natural movement detected
+                    explanation = "Medium confidence real face with natural movement - proceed";
+                } else {
+                    shouldProceed = realStreak >= 2; // Need 2 frames otherwise
+                    explanation = "Medium confidence real face - hold steady" +
+                        (shouldProceed ? "" : " - need " + (2 - realStreak) + " more frames");
+                }
             } else if (rawIsSpoof && !possibleReplayAttack && !suspiciousConfidencePattern) {
                 // Medium confidence spoof but no suspicious patterns
                 finalIsSpoof = true;
@@ -210,15 +232,21 @@ public class SpoofDetectionManager {
                 }
             }
         }
-        // 🔴 LOW AND VERY LOW CONFIDENCE CASES - More lenient
+        // 🔴 LOW AND VERY LOW CONFIDENCE CASES - More lenient with recovery
         else {
             lowConfidenceCount++;
 
-            if (lowConfidenceCount > 15 && !rawIsSpoof && !possibleReplayAttack && !suspiciousConfidencePattern) {
-                // More lenient - only need 4 consecutive confirmations for low confidence
+            // 🆕 IMPROVED: Better recovery logic for real faces
+            if (lowConfidenceCount > 10 && !rawIsSpoof && !possibleReplayAttack && !suspiciousConfidencePattern) {
+                // More lenient - only need 3 consecutive confirmations for low confidence
                 finalIsSpoof = false;
-                shouldProceed = realStreak >= 4;
+                shouldProceed = realStreak >= 3;
                 explanation = "Low confidence detection - please improve lighting or camera position";
+            } else if (hasNaturalMovement && isOvalCompliant && !rawIsSpoof) {
+                // 🆕 NEW: Allow real face with natural movement even at low confidence
+                finalIsSpoof = false;
+                shouldProceed = realStreak >= 2;
+                explanation = "Real face detected with natural movement";
             } else {
                 // Default to spoof for low confidence
                 finalIsSpoof = true;
@@ -461,12 +489,43 @@ public class SpoofDetectionManager {
     }
 
     /**
-     * Update streak counters
+     * 🆕 NEW: Check for natural movement patterns (real face indicator)
+     */
+    private boolean checkForNaturalMovement(float currentConfidence) {
+        if (frameHistory.size() < 3) {
+            return false; // Not enough data
+        }
+        
+        // Calculate confidence variance
+        float variance = calculateConfidenceVariance();
+        
+        // Natural movement typically has moderate variance (not too stable, not too erratic)
+        boolean hasNaturalVariance = variance > 0.01f && variance < NATURAL_MOVEMENT_THRESHOLD;
+        
+        // Check for gradual confidence changes (natural) vs sudden changes (replay)
+        boolean hasGradualChanges = true;
+        float lastConfidence = lastRealFaceConfidence;
+        
+        for (FrameData frame : frameHistory) {
+            float confidenceDiff = Math.abs(frame.confidence - lastConfidence);
+            if (confidenceDiff > 0.3f) { // Sudden large changes indicate replay
+                hasGradualChanges = false;
+                break;
+            }
+            lastConfidence = frame.confidence;
+        }
+        
+        return hasNaturalVariance && hasGradualChanges;
+    }
+
+    /**
+     * 🆕 IMPROVED: Update streak counters with better recovery logic
      */
     private void updateStreaks(SpoofDetectionResult result) {
         if (result.isSpoof) {
             spoofStreak++;
             realStreak = 0;
+            realFaceRecoveryCount = 0; // Reset recovery
 
             if (result.confidenceLevel == ConfidenceLevel.HIGH || result.confidenceLevel == ConfidenceLevel.MEDIUM) {
                 spoofWarningCount++;
@@ -474,18 +533,26 @@ public class SpoofDetectionManager {
         } else {
             realStreak++;
             spoofStreak = 0;
+            lastRealFaceConfidence = result.confidence;
 
-            // Reset warning count on good real face detection
+            // 🆕 IMPROVED: Better recovery logic for real faces
             if (result.confidenceLevel == ConfidenceLevel.HIGH) {
-                spoofWarningCount = Math.max(0, spoofWarningCount - 1);
-                lowConfidenceCount = Math.max(0, lowConfidenceCount - 2); // Faster recovery
+                spoofWarningCount = Math.max(0, spoofWarningCount - 2); // Faster recovery
+                lowConfidenceCount = Math.max(0, lowConfidenceCount - 3); // Much faster recovery
+                realFaceRecoveryCount++;
             } else if (result.confidenceLevel == ConfidenceLevel.MEDIUM) {
-                lowConfidenceCount = Math.max(0, lowConfidenceCount - 1); // Slower recovery
+                spoofWarningCount = Math.max(0, spoofWarningCount - 1); // Normal recovery
+                lowConfidenceCount = Math.max(0, lowConfidenceCount - 2); // Faster recovery
+                realFaceRecoveryCount++;
+            } else {
+                // Low confidence real face - slower recovery
+                lowConfidenceCount = Math.max(0, lowConfidenceCount - 1);
+                realFaceRecoveryCount++;
             }
         }
 
-        Log.d(TAG, String.format("📊 Streaks: Real=%d, Spoof=%d, Warnings=%d, LowConf=%d",
-                realStreak, spoofStreak, spoofWarningCount, lowConfidenceCount));
+        Log.d(TAG, String.format("📊 Streaks: Real=%d, Spoof=%d, Warnings=%d, LowConf=%d, Recovery=%d",
+                realStreak, spoofStreak, spoofWarningCount, lowConfidenceCount, realFaceRecoveryCount));
     }
 
     /**
@@ -511,6 +578,9 @@ public class SpoofDetectionManager {
         realStreak = 0;
         spoofWarningCount = 0;
         lowConfidenceCount = 0;
+        // 🆕 NEW: Reset real face tracking
+        realFaceRecoveryCount = 0;
+        lastRealFaceConfidence = 0.0f;
         frameHistory.clear();
         lastResult = null;
         Log.d(TAG, "Detection manager reset");
@@ -520,7 +590,7 @@ public class SpoofDetectionManager {
      * Get current streak info for debugging
      */
     public String getStreakInfo() {
-        return String.format("Real: %d, Spoof: %d, Warnings: %d",
-                realStreak, spoofStreak, spoofWarningCount);
+        return String.format("Real: %d, Spoof: %d, Warnings: %d, Recovery: %d",
+                realStreak, spoofStreak, spoofWarningCount, realFaceRecoveryCount);
     }
 }

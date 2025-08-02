@@ -7,7 +7,7 @@
         "git+https://github.com/oraios/serena",
         "serena-mcp-server",
         "--project",
-        "d:/FU/S9.SU25/SEP490/zentry app src/zentry-app"
+        "d:/FU/S9.SU25/SEP490/zentry_app_src/zentry-app"
       ]
     },
 
@@ -21,7 +21,7 @@
       "args": [
         "-y",
         "@modelcontextprotocol/server-filesystem",
-        "d:/FU/S9.SU25/SEP490/zentry-app"
+        "d:/FU/S9.SU25/SEP490/zentry_app_src/zentry-app"
       ]
     },
 
