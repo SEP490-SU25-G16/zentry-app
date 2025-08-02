@@ -25,8 +25,10 @@ import java.util.Locale;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentSettingUpdateFaceIdBinding;
 import vn.edu.fpt.zentryapp.student.data.service.FaceIdService;
+import vn.edu.fpt.zentryapp.student.data.service.FaceIdServiceManager;
 import vn.edu.fpt.zentryapp.student.ui.components.CameraView;
-import vn.edu.fpt.zentryapp.student.ui.components.FaceOverlayView;
+import vn.edu.fpt.zentryapp.student.ui.components.OvalFaceOverlayView;
+import vn.edu.fpt.zentryapp.student.ui.setting.detection.SpoofDetectionManager;
 
 public class StudentSettingUpdateFaceIdFragment extends Fragment {
 
@@ -35,10 +37,15 @@ public class StudentSettingUpdateFaceIdFragment extends Fragment {
     
     private FragmentStudentSettingUpdateFaceIdBinding binding;
     private FaceIdService faceIdService;
+    private SpoofDetectionManager spoofDetectionManager;
     private CameraView cameraView;
-    private FaceOverlayView faceOverlayView;
+    private OvalFaceOverlayView faceOverlayView;
     private boolean isCameraStarted = false;
     private boolean isProcessing = false;
+    
+    // Current frame data
+    private Bitmap currentFrameBitmap;
+    private Rect currentFaceRect;
 
     @Nullable
     @Override
@@ -50,215 +57,345 @@ public class StudentSettingUpdateFaceIdFragment extends Fragment {
     }
 
     @Override
-    public void onViewCreated(@NonNull View view,
-                              @Nullable Bundle savedInstanceState) {
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-
+        
+        setupViews();
+        setupClickListeners();
+        
         // Initialize FaceIdService
-        faceIdService = new FaceIdService(requireContext());
+        initializeFaceIdService();
+    }
+    
+    private void setupViews() {
+        // Setup camera view
+        cameraView = new CameraView(requireContext());
+        binding.flCameraContainer.addView(cameraView);
         
-        // Set up back button
+        // Setup overlay view with enhanced oval UI
+        faceOverlayView = new OvalFaceOverlayView(requireContext());
+        binding.flCameraContainer.addView(faceOverlayView);
+    }
+    
+    private void setupClickListeners() {
         binding.ivBack.setOnClickListener(v -> requireActivity().onBackPressed());
-
-        // Set last update time
-        String lastUpdateTime = getLastUpdateTime();
-        binding.tvLastUpdate.setText("Last update: " + lastUpdateTime);
+        binding.btnCancel.setOnClickListener(v -> requireActivity().onBackPressed());
         
-        // Set up camera view
-        setupCameraView();
-        
-        // Set up face overlay view
-        setupFaceOverlayView();
-        
-        // Set up update button
-        binding.btnUpdateFace.setOnClickListener(v -> {
-            if (isCameraStarted && !isProcessing) {
-                captureAndUpdateFace();
-            } else {
-                Toast.makeText(requireContext(), "Camera not ready", Toast.LENGTH_SHORT).show();
+        binding.btnUpdate.setOnClickListener(v -> {
+            if (!isProcessing) {
+                updateFaceId();
             }
         });
+    }
+    
+    private void initializeFaceIdService() {
+        binding.progressBar.setVisibility(View.VISIBLE);
+        binding.tvStatus.setText("Initializing...");
         
-        // Request camera permission if needed
-        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA) 
+        FaceIdServiceManager.getInstance().initialize(requireContext(), new FaceIdServiceManager.InitCallback() {
+            @Override
+            public void onInitialized(FaceIdService service) {
+                if (!isAdded()) return;
+                
+                faceIdService = service;
+                
+                // Initialize SpoofDetectionManager with enhanced security
+                if (faceIdService.getFaceSpoofDetector() != null) {
+                    spoofDetectionManager = new SpoofDetectionManager(faceIdService.getFaceSpoofDetector());
+                    // Set the oval boundary for enhanced security validation
+                    if (faceOverlayView != null) {
+                        spoofDetectionManager.setOvalBoundary(faceOverlayView.getOvalRect());
+                    }
+                }
+                
+                binding.progressBar.setVisibility(View.GONE);
+                binding.tvStatus.setText("Look at the camera");
+                
+                checkCameraPermissionAndStart();
+            }
+            
+            @Override
+            public void onError(String message) {
+                if (!isAdded()) return;
+                
+                binding.progressBar.setVisibility(View.GONE);
+                binding.tvStatus.setText("Initialization failed");
+                
+                showErrorDialog("Failed to initialize face detection", message);
+            }
+        });
+    }
+    
+    private void checkCameraPermissionAndStart() {
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(requireActivity(), 
-                    new String[]{Manifest.permission.CAMERA}, 
+            ActivityCompat.requestPermissions(requireActivity(),
+                    new String[]{Manifest.permission.CAMERA},
                     CAMERA_PERMISSION_REQUEST_CODE);
         } else {
             startCamera();
         }
     }
     
-    private String getLastUpdateTime() {
-        // Get last update time from SharedPreferences
-        long lastUpdateTimestamp = requireContext().getSharedPreferences("prefs", 0)
-                .getLong("faceid_last_update", System.currentTimeMillis());
-        
-        // Format the timestamp
-        SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, yyyy   /   HH:mm", Locale.US);
-        return dateFormat.format(new Date(lastUpdateTimestamp)).toUpperCase();
-    }
-    
-    private void setupCameraView() {
-        // Create camera view
-        cameraView = new CameraView(requireContext());
-        
-        // Add camera view to container
-        binding.flCameraContainer.addView(cameraView);
-    }
-    
-    private void setupFaceOverlayView() {
-        // Create face overlay view
-        faceOverlayView = new FaceOverlayView(requireContext());
-        
-        // Add face overlay view to container
-        binding.flCameraContainer.addView(faceOverlayView);
-    }
-    
     private void startCamera() {
-        if (cameraView != null) {
-            cameraView.startCamera(getViewLifecycleOwner());
+        if (isCameraStarted) {
+            return;
+        }
+        
+        try {
+            cameraView.startCamera(getViewLifecycleOwner(), this::processFrame);
             isCameraStarted = true;
+            binding.tvStatus.setText("Position your face in the oval");
+        } catch (Exception e) {
+            showErrorDialog("Camera Error", "Failed to start camera: " + e.getMessage());
         }
     }
     
-    private void captureAndUpdateFace() {
-        isProcessing = true;
-        binding.progressBarUpdateFaceId.setVisibility(View.VISIBLE);
-        binding.btnUpdateFace.setEnabled(false);
+    private void processFrame(Bitmap bitmap) {
+        if (faceIdService == null || isProcessing) {
+            return;
+        }
         
-        // Capture photo
-        cameraView.capturePhoto(new CameraView.CaptureCallback() {
+        currentFrameBitmap = bitmap;
+        
+        // Process frame with oval boundary validation for enhanced security
+        faceIdService.processContinuousFrame(bitmap, faceOverlayView.getOvalRect(), 
+                new FaceIdService.ContinuousProcessingCallback() {
             @Override
-            public void onCaptured(Bitmap bitmap) {
-                // Process face image
-                processFaceImage(bitmap);
-            }
-            
-            @Override
-            public void onError(String message) {
-                showError("Failed to capture image: " + message);
-                resetProcessingState();
-            }
-        });
-    }
-    
-    private void processFaceImage(Bitmap bitmap) {
-        // Process face image
-        faceIdService.processFaceImage(bitmap, new FaceIdService.FaceDetectionCallback() {
-            @Override
-            public void onFaceDetected(Bitmap faceBitmap, Rect boundingBox) {
-                // Show face detection result
-                faceOverlayView.setFaceDetectionResult(boundingBox, false, "Face detected");
+            public void onFaceDetected(Rect boundingBox, boolean isSpoof, float spoofScore) {
+                currentFaceRect = boundingBox;
                 
-                // Update face ID
-                updateFaceId(faceBitmap);
+                // Update face position in overlay for user guidance
+                if (faceOverlayView != null) {
+                    boolean isGoodPosition = faceOverlayView.updateFacePosition(boundingBox);
+                    
+                    // If position is bad, don't proceed with further processing
+                    if (!isGoodPosition) {
+                        binding.tvStatus.setText("Position your face properly in the oval");
+                        binding.btnUpdate.setEnabled(false);
+                        return;
+                    }
+                }
                 
-                // Update avatar preview
-                binding.ivFaceAvatar.setImageBitmap(faceBitmap);
+                // Use enhanced spoof detection with increased security
+                if (spoofDetectionManager != null) {
+                    spoofDetectionManager.analyzeFrame(bitmap, boundingBox, result -> {
+                        handleSpoofResult(result, boundingBox);
+                    });
+                } else {
+                    // Fallback to basic spoof detection with stricter thresholds
+                    if (isSpoof || spoofScore > 0.65f) {  // Lowered from 0.7f for more sensitivity
+                        binding.tvStatus.setText("Spoof detected! Please use your real face.");
+                        binding.btnUpdate.setEnabled(false);
+                    } else if (!isSpoof && spoofScore < 0.15f) {  // Decreased from 0.3f for more security
+                        binding.tvStatus.setText("Face detected. Ready to update!");
+                        binding.btnUpdate.setEnabled(true);
+                    } else {
+                        binding.tvStatus.setText("Uncertain detection. Please improve lighting and position.");
+                        binding.btnUpdate.setEnabled(false);
+                    }
+                }
             }
             
             @Override
             public void onNoFaceDetected() {
-                showError("No face detected. Please try again.");
-                resetProcessingState();
+                currentFaceRect = null;
+                binding.tvStatus.setText("No face detected. Look at the camera.");
+                binding.btnUpdate.setEnabled(false);
+                
+                if (faceOverlayView != null) {
+                    faceOverlayView.clear();
+                }
             }
             
             @Override
             public void onMultipleFacesDetected() {
-                showError("Multiple faces detected. Please ensure only one face is in the frame.");
-                resetProcessingState();
+                currentFaceRect = null;
+                binding.tvStatus.setText("Multiple faces detected. Only one face should be visible.");
+                binding.btnUpdate.setEnabled(false);
+                
+                if (faceOverlayView != null) {
+                    faceOverlayView.clear();
+                }
             }
             
             @Override
             public void onError(String errorMessage) {
-                showError(errorMessage);
-                resetProcessingState();
+                binding.tvStatus.setText("Detection error: " + errorMessage);
+                binding.btnUpdate.setEnabled(false);
             }
         });
     }
     
-    private void updateFaceId(Bitmap faceBitmap) {
-        // Get user ID from auth manager
-        String userId = AuthManager.getInstance(requireContext()).getCurrentUserId();
+    /**
+     * Handle enhanced spoof detection result with improved security
+     */
+    private void handleSpoofResult(SpoofDetectionManager.SpoofDetectionResult result, Rect boundingBox) {
+        if (!isAdded()) {
+            return;
+        }
+
+        // Handle spoof detection with higher security threshold
+        if (result.isSpoof) {
+            binding.tvStatus.setText(result.explanation);
+            binding.btnUpdate.setEnabled(false);
+            return;
+        }
+
+        // For real face detections
+        if (!result.isSpoof) {
+            // Check face position using oval view
+            boolean isInGoodPosition = faceOverlayView != null && 
+                                      faceOverlayView.validateFaceWithinOval(boundingBox);
+            
+            if (!isInGoodPosition) {
+                binding.tvStatus.setText("Position your face properly in the oval");
+                binding.btnUpdate.setEnabled(false);
+                return;
+            }
+            
+            // Enable update button for real faces with good position
+            if (result.shouldProceed) {
+                binding.tvStatus.setText("Real face detected. Ready to update!");
+                binding.btnUpdate.setEnabled(true);
+            } else {
+                binding.tvStatus.setText("Keep your face steady");
+                binding.btnUpdate.setEnabled(false);
+            }
+        }
+    }
+    
+    private void updateFaceId() {
+        if (currentFrameBitmap == null || currentFaceRect == null) {
+            showErrorDialog("Update Failed", "No face detected");
+            return;
+        }
         
-        // Update face ID
-        faceIdService.updateFaceId(faceBitmap, userId, new FaceIdService.FaceIdCallback() {
-            @Override
-            public void onSuccess(String message) {
-                // Save current time as last update time
-                long currentTime = System.currentTimeMillis();
-                requireContext().getSharedPreferences("prefs", 0)
-                        .edit()
-                        .putLong("faceid_last_update", currentTime)
-                        .apply();
-                
-                // Show success message
-                showSuccessAndUpdateUI(message);
+        // Final validation of face position
+        if (faceOverlayView != null) {
+            boolean isInGoodPosition = faceOverlayView.validateFaceWithinOval(currentFaceRect);
+            if (!isInGoodPosition) {
+                binding.tvStatus.setText("Please position your face properly in the oval");
+                return;
             }
-            
-            @Override
-            public void onFailure(String errorMessage) {
-                showError(errorMessage);
-                resetProcessingState();
-            }
-        });
-    }
-    
-    private void showSuccessAndUpdateUI(String message) {
-        requireActivity().runOnUiThread(() -> {
-            // Hide progress bar
-            binding.progressBarUpdateFaceId.setVisibility(View.GONE);
-            binding.btnUpdateFace.setEnabled(true);
-            
-            // Update last update time
-            String lastUpdateTime = getLastUpdateTime();
-            binding.tvLastUpdate.setText("Last update: " + lastUpdateTime);
-            
-            // Show success dialog
-            new AlertDialog.Builder(requireContext())
-                    .setTitle("Success")
-                    .setMessage(message)
-                    .setPositiveButton("OK", null)
-                    .show();
-            
+        }
+        
+        isProcessing = true;
+        binding.progressBar.setVisibility(View.VISIBLE);
+        binding.tvStatus.setText("Updating your Face ID...");
+        binding.btnUpdate.setEnabled(false);
+        
+        String userId = AuthManager.getInstance(requireContext()).getCurrentUserId();
+        if (userId == null || userId.isEmpty()) {
             isProcessing = false;
-        });
+            binding.progressBar.setVisibility(View.GONE);
+            showErrorDialog("Update Failed", "User not logged in");
+            return;
+        }
+        
+        // Stop camera while processing
+        stopCamera();
+        
+        // Get current time for update record
+        String updateTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                .format(new Date());
+        
+        // Update face ID with enhanced security validation using oval boundary
+        faceIdService.captureAndRegisterFace(
+                currentFrameBitmap, 
+                currentFaceRect, 
+                faceOverlayView != null ? faceOverlayView.getOvalRect() : null,
+                userId, 
+                new FaceIdService.FaceIdCallback() {
+                    @Override
+                    public void onSuccess(String message) {
+                        if (!isAdded()) return;
+                        
+                        isProcessing = false;
+                        binding.progressBar.setVisibility(View.GONE);
+                        
+                        showSuccessDialog("Face ID Updated", 
+                                "Your Face ID was successfully updated on " + updateTime);
+                    }
+                    
+                    @Override
+                    public void onFailure(String errorMessage) {
+                        if (!isAdded()) return;
+                        
+                        isProcessing = false;
+                        binding.progressBar.setVisibility(View.GONE);
+                        
+                        if (errorMessage.contains("spoof") || errorMessage.contains("Spoof")) {
+                            showErrorDialog("Security Alert", 
+                                    "Spoof detection triggered. Please ensure you're using a real face.");
+                        } else if (errorMessage.contains("Network")) {
+                            showErrorDialog("Network Error", 
+                                    "Could not connect to the server. Please check your connection.");
+                        } else {
+                            showErrorDialog("Update Failed", errorMessage);
+                        }
+                        
+                        // Restart camera
+                        startCamera();
+                    }
+                });
     }
     
-    private void showError(String message) {
-        requireActivity().runOnUiThread(() -> {
-            Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show();
-            resetProcessingState();
-        });
+    private void showSuccessDialog(String title, String message) {
+        new AlertDialog.Builder(requireContext())
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton("OK", (dialog, which) -> {
+                    if (isAdded()) {
+                        requireActivity().onBackPressed();
+                    }
+                })
+                .setCancelable(false)
+                .show();
     }
     
-    private void resetProcessingState() {
-        isProcessing = false;
-        binding.progressBarUpdateFaceId.setVisibility(View.GONE);
-        binding.btnUpdateFace.setEnabled(true);
-        faceOverlayView.clear();
+    private void showErrorDialog(String title, String message) {
+        new AlertDialog.Builder(requireContext())
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .show();
+    }
+    
+    private void stopCamera() {
+        try {
+            if (cameraView != null) {
+                cameraView.stopCamera();
+            }
+        } catch (Exception e) {
+            // Ignore
+        } finally {
+            isCameraStarted = false;
+        }
     }
     
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
         if (requestCode == CAMERA_PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startCamera();
             } else {
-                Toast.makeText(requireContext(), "Camera permission is required", Toast.LENGTH_LONG).show();
+                showErrorDialog("Permission Required", 
+                        "Camera permission is required to update Face ID");
+                
+                // Go back if permission denied
                 requireActivity().onBackPressed();
             }
         }
     }
-
+    
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        if (cameraView != null) {
-            cameraView.stopCamera();
-        }
+        
+        // Clean up
+        stopCamera();
         binding = null;
     }
 }

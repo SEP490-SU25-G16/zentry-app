@@ -40,22 +40,6 @@ import vn.edu.fpt.zentryapp.student.ui.setting.state.FaceRegistrationStateManage
 import vn.edu.fpt.zentryapp.student.ui.setting.success.FaceIdSuccessActivity;
 import vn.edu.fpt.zentryapp.student.ui.setting.ui.FaceRegistrationUIController;
 
-/**
- * 🔧 REFACTORED Face ID Registration Fragment với Clean Architecture
- *
- * ✅ FIXES:
- * - State machine với thread-safe transitions
- * - Unified confidence thresholds
- * - Separated UI success flow và background sync
- * - Proper error handling và retry mechanism
- * - Clean separation of concerns
- *
- * 📋 ARCHITECTURE:
- * - StateManager: Thread-safe state machine
- * - SpoofDetectionManager: Enhanced spoof detection với consistent logic
- * - UIController: Clean UI state management
- * - Success Activity: Separate success screen với background sync
- */
 public class StudentSettingRegisterFaceIdFragment extends Fragment {
     private static final String TAG = "RegisterFaceIdFragment";
     private static final int CAMERA_PERMISSION_REQUEST_CODE = 100;
@@ -104,19 +88,19 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
      * 🏗️ Initialize all core components
      */
     private void initializeComponents() {
-        // 1. State Manager với callback
+        // 1. State Manager with callback
         stateManager = new FaceRegistrationStateManager();
         stateManager.setStateChangeListener(this::onStateChanged);
 
-        // 2. Camera và Overlay
+        // 2. Camera and Overlay
         setupCameraAndOverlay();
 
         // 3. UI Controller
         uiController = new FaceRegistrationUIController(binding, faceOverlayView);
         uiController.showScreen(FaceRegistrationUIController.UIScreenState.SETUP);
 
-        // 4. Face Tracker với optimized settings
-        faceTracker = new FaceTracker(8); // ~0.27 seconds for stability
+        // 4. Face Tracker with optimized settings for stability
+        faceTracker = new FaceTracker(10); // Increased from 8 to 10 frames for better stability (~ 0.33 seconds)
 
         Log.d(TAG, "📦 All components initialized successfully");
     }
@@ -146,7 +130,7 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
     }
 
     /**
-     * 🔄 State change callback từ StateManager
+     * 🔄 State change callback from StateManager
      */
     private void onStateChanged(FaceRegistrationState state, String message) {
         if (!isAdded() || binding == null) {
@@ -181,7 +165,7 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
                 break;
 
             case FACE_STABLE:
-                // 🎯 Capture sau delay ngắn
+                // 🎯 Capture after a short delay
                 mainHandler.postDelayed(() -> {
                     if (stateManager.getCurrentState() == FaceRegistrationState.FACE_STABLE) {
                         captureAndRegisterFace();
@@ -209,7 +193,7 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
     }
 
     /**
-     * Initialize FaceIdService và related components
+     * Initialize FaceIdService and related components
      */
     private void initializeFaceIdService() {
         stateManager.transitionTo(FaceRegistrationState.INITIALIZING, "Loading AI models...");
@@ -229,7 +213,7 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
 
                 faceIdService = service;
 
-                // Initialize SpoofDetectionManager với FaceSpoofDetector
+                // Initialize SpoofDetectionManager with FaceSpoofDetector
                 initializeSpoofDetection();
 
                 checkCameraPermissionAndStart();
@@ -248,12 +232,16 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
     }
 
     /**
-     * Initialize spoof detection với FaceSpoofDetector
+     * Initialize spoof detection with FaceSpoofDetector
      */
     private void initializeSpoofDetection() {
         if (faceIdService != null && faceIdService.getFaceSpoofDetector() != null) {
             spoofDetectionManager = new SpoofDetectionManager(faceIdService.getFaceSpoofDetector());
-            Log.d(TAG, "✅ SpoofDetectionManager initialized");
+            // Set the oval boundary for enhanced security validation
+            if (faceOverlayView != null) {
+                spoofDetectionManager.setOvalBoundary(faceOverlayView.getOvalRect());
+            }
+            Log.d(TAG, "✅ SpoofDetectionManager initialized with oval boundary");
         } else {
             Log.w(TAG, "⚠️ FaceSpoofDetector not available, using fallback detection");
         }
@@ -271,7 +259,7 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
     }
 
     /**
-     * 📷 Start camera và begin processing
+     * 📷 Start camera and begin processing
      */
     private void startCamera() {
         // First check if fragment is still attached
@@ -326,28 +314,41 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
     }
 
     /**
-     * 🔍 Process camera frame với enhanced logic
+     * 🔍 Process camera frame with enhanced security logic
      */
     private void processFrame(Bitmap bitmap) {
         currentFrameBitmap = bitmap;
 
-        // Skip nếu chưa ready
+        // Skip if not ready
         if (faceIdService == null) {
             return;
         }
 
-        // Skip nếu đã final state
+        // Skip if already in final state
         if (stateManager.getCurrentState().isFinalState()) {
             return;
         }
 
-        // Process frame
-        faceIdService.processContinuousFrame(bitmap, new FaceIdService.ContinuousProcessingCallback() {
+        // Process frame with oval boundary validation
+        faceIdService.processContinuousFrame(bitmap, faceOverlayView.getOvalRect(), 
+                new FaceIdService.ContinuousProcessingCallback() {
             @Override
             public void onFaceDetected(Rect boundingBox, boolean isSpoof, float spoofScore) {
                 currentFaceRect = boundingBox;
+                
+                // Update face position in overlay for user guidance
+                if (faceOverlayView != null) {
+                    boolean isGoodPosition = faceOverlayView.updateFacePosition(boundingBox);
+                    
+                    // If position is bad, don't proceed with further processing
+                    if (!isGoodPosition && stateManager.getCurrentState() != FaceRegistrationState.FACE_OUT_OF_BOUNDS) {
+                        stateManager.transitionTo(FaceRegistrationState.FACE_OUT_OF_BOUNDS, 
+                                "Position your face properly in the oval");
+                        return;
+                    }
+                }
 
-                // 🔧 Use enhanced spoof detection nếu available
+                // 🔧 Use enhanced spoof detection if available
                 if (spoofDetectionManager != null) {
                     spoofDetectionManager.analyzeFrame(bitmap, boundingBox, result -> {
                         handleEnhancedSpoofResult(result, boundingBox);
@@ -383,19 +384,32 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
     }
 
     /**
-     * Handle enhanced spoof detection result
+     * Handle enhanced spoof detection result with improved security
      */
     private void handleEnhancedSpoofResult(SpoofDetectionManager.SpoofDetectionResult result, Rect boundingBox) {
         if (!isAdded() || stateManager.getCurrentState().isFinalState()) {
             return;
         }
 
-        if (result.isSpoof && result.confidenceLevel == SpoofDetectionManager.ConfidenceLevel.HIGH) {
-            stateManager.transitionTo(FaceRegistrationState.FACE_SPOOFED, result.explanation);
+        // Handle spoof detection with higher security threshold
+        if (result.isSpoof) {
+            // For high or medium confidence spoof detections, immediately transition to spoofed state
+            if (result.confidenceLevel == SpoofDetectionManager.ConfidenceLevel.HIGH || 
+                result.confidenceLevel == SpoofDetectionManager.ConfidenceLevel.MEDIUM) {
+                stateManager.transitionTo(FaceRegistrationState.FACE_SPOOFED, result.explanation);
+                resetFaceTracker();
+                return;
+            }
+            
+            // For lower confidence, show warning but don't fail immediately
+            if (stateManager.getCurrentState() != FaceRegistrationState.FACE_WARNING) {
+                stateManager.transitionTo(FaceRegistrationState.FACE_WARNING, result.explanation);
+            }
             resetFaceTracker();
             return;
         }
 
+        // For real face detections
         if (!result.isSpoof) {
             // Update state
             if (stateManager.getCurrentState() != FaceRegistrationState.FACE_REAL &&
@@ -413,23 +427,29 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
     }
 
     /**
-     * Fallback basic spoof handling
+     * Fallback basic spoof handling (increased security thresholds)
      */
     private void handleBasicSpoofResult(boolean isSpoof, float spoofScore, Rect boundingBox) {
         Log.d(TAG, "🔧 Using basic spoof detection: isSpoof=" + isSpoof + ", score=" + spoofScore);
 
-        if (isSpoof && spoofScore > 0.7f) {
+        // Enhanced security thresholds
+        if (isSpoof && spoofScore > 0.65f) {  // Lowered from 0.7f for more sensitivity
             stateManager.transitionTo(FaceRegistrationState.FACE_SPOOFED,
                     "Spoof detected! Please use a real face.");
             resetFaceTracker();
-        } else if (!isSpoof && spoofScore > 0.6f) {
+        } else if (!isSpoof && spoofScore > 0.75f) {  // Increased from 0.6f for more security
             stateManager.transitionTo(FaceRegistrationState.FACE_REAL, "Real face detected");
             trackFaceStability(boundingBox);
+        } else {
+            // Uncertain cases now show warning
+            stateManager.transitionTo(FaceRegistrationState.FACE_WARNING, 
+                    "Uncertain detection. Please improve lighting and position.");
+            resetFaceTracker();
         }
     }
 
     /**
-     * Track face stability
+     * Track face stability with enhanced metrics
      */
     private void trackFaceStability(Rect boundingBox) {
         if (faceTracker != null) {
@@ -441,6 +461,11 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
                     int percentage = Math.round(progress * 100);
                     stateManager.transitionTo(FaceRegistrationState.FACE_STABILIZING,
                             "Hold still... " + percentage + "%");
+                    
+                    // Update progress animation in overlay
+                    if (faceOverlayView != null && percentage > 0) {
+                        faceOverlayView.startProgressAnimation(3000); // 3 second animation
+                    }
                 }
 
                 @Override
@@ -457,13 +482,18 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
 
                     stateManager.transitionTo(FaceRegistrationState.FACE_REAL,
                             "Keep your face steady");
+                    
+                    // Stop progress animation
+                    if (faceOverlayView != null) {
+                        faceOverlayView.stopProgressAnimation();
+                    }
                 }
             });
         }
     }
 
     /**
-     * 📸 Capture và register face
+     * 📸 Capture and register face with enhanced security validation
      */
     private void captureAndRegisterFace() {
         // Check if fragment is still attached
@@ -508,8 +538,12 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
         final Rect capturedFaceRect = currentFaceRect;
         final String finalUserId = userId;
 
-        // 🎯 Register face với proper error handling
-        faceIdService.captureAndRegisterFace(capturedBitmap, capturedFaceRect, finalUserId,
+        // 🎯 Register face with enhanced security validation
+        faceIdService.captureAndRegisterFace(
+                capturedBitmap, 
+                capturedFaceRect,
+                faceOverlayView != null ? faceOverlayView.getOvalRect() : null,
+                finalUserId,
                 new FaceIdService.FaceIdCallback() {
                     @Override
                     public void onSuccess(String message) {
@@ -532,6 +566,9 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
                         Log.e(TAG, "❌ Registration failed: " + errorMessage);
                         if (errorMessage.contains("Network error")) {
                             handleNetworkError(errorMessage);
+                        } else if (errorMessage.contains("spoof") || errorMessage.contains("Spoof")) {
+                            stateManager.transitionTo(FaceRegistrationState.FAILED_SPOOF,
+                                    "Registration failed: " + errorMessage);
                         } else {
                             stateManager.transitionTo(FaceRegistrationState.FAILED_OTHER,
                                     "Registration failed: " + errorMessage);
@@ -641,7 +678,7 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
     }
 
     /**
-     * ❌ Handle error states với retry
+     * ❌ Handle error states with retry
      */
     private void handleErrorState(FaceRegistrationState state) {
         // Ensure camera is stopped to prevent infinite loop
@@ -659,11 +696,19 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
             handleNetworkError(errorMessage);
             return;
         }
+        
+        // Custom message for spoof detection failures
+        String message = state.getDefaultMessage();
+        if (state == FaceRegistrationState.FAILED_SPOOF) {
+            message = "Spoof detection triggered. Please ensure you're using a real face and not a photo or video.\n\nWould you like to try again?";
+        } else {
+            message = message + "\n\nWould you like to try again?";
+        }
 
         // For other errors, show regular retry dialog
         new AlertDialog.Builder(requireContext())
                 .setTitle("Registration Failed")
-                .setMessage(state.getDefaultMessage() + "\n\nWould you like to try again?")
+                .setMessage(message)
                 .setPositiveButton("Retry", (dialog, which) -> {
                     // Check if fragment is still attached before proceeding
                     if (!isAdded()) {
@@ -775,6 +820,10 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
         }
 
         resetFaceTracker();
+        
+        if (faceOverlayView != null) {
+            faceOverlayView.clear();
+        }
 
         // Clear data
         currentFrameBitmap = null;

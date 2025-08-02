@@ -27,10 +27,8 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Utility class for face spoof detection
- * Adapted from the OnDevice-Face-Recognition-Android project
- */
+import lombok.Getter;
+
 public class FaceSpoofDetector {
     private static final String TAG = "FaceSpoofDetector";
     private static final String MODEL_FILE_1 = "spoof_model_scale_2_7.tflite";
@@ -40,7 +38,28 @@ public class FaceSpoofDetector {
     private static final float SCALE_2 = 4.0f;
     private static final int INPUT_IMAGE_DIM = 80;
     private static final int OUTPUT_DIM = 3;
-    private static final int REAL_FACE_LABEL = 0;  // Fix: Index 0 should be real face as per comment
+    private static final int REAL_FACE_LABEL = 0;  // Index 0 should be real face as per comment
+
+    // Updated confidence thresholds - much more lenient now
+    private static final float REAL_CONFIDENCE_THRESHOLD = 0.65f; // Reduced from 0.75f to allow more real faces
+    private static final float SPOOF_CONFIDENCE_THRESHOLD = 0.85f; // Higher threshold for spoofing (was 0.80f)
+    private static final float REAL_SPOOF_RATIO_THRESHOLD = 1.5f;  // Real must be 1.5x higher than spoof (was 2.0f)
+    private static final float SPOOF_REAL_RATIO_THRESHOLD = 2.0f;  // Spoof must be 2.0x higher than real (was 1.5f)
+
+    // Temporal variance parameters - much more lenient now
+    private static final float MIN_POSITION_VARIANCE = 0.0005f; // Was 0.001f - Less minimum movement required
+    private static final float MAX_POSITION_VARIANCE = 0.05f;   // Was 0.03f - Allow more movement
+    private static final float MIN_SIZE_VARIANCE = 0.0001f;     // Was 0.0005f - Less minimum size variance required
+    private static final float MAX_SIZE_VARIANCE = 0.04f;       // Was 0.02f - Allow more size variance
+
+    // Face-oval ratio constants - much more lenient now
+    private static final float MIN_FACE_OVAL_RATIO = 0.40f;    // Face should be at least 40% of oval (was 50%)
+    private static final float MAX_FACE_OVAL_RATIO = 0.95f;    // Face should be at most 95% of oval (was 85%)
+    private static final float MAX_FACE_OUTSIDE_RATIO = 1.0f/8.0f; // Max extension outside oval (was 1/15)
+
+    // Frame history for temporal analysis
+    private static final int FRAME_HISTORY_SIZE = 8;
+    private final java.util.Queue<TemporalFrameData> frameHistory = new java.util.LinkedList<>();
 
     // Debug: Log output meanings
     // Based on the logs and model behavior:
@@ -59,9 +78,26 @@ public class FaceSpoofDetector {
     private volatile boolean isInitialized = false;
     private final CountDownLatch initLatch = new CountDownLatch(1);
 
+    /**
+     * Class to track temporal data for analysis
+     */
+    private static class TemporalFrameData {
+        final float[] combinedResult;
+        final Rect faceRect;
+        final long timestamp;
+        
+        TemporalFrameData(float[] combinedResult, Rect faceRect) {
+            this.combinedResult = combinedResult.clone();
+            this.faceRect = new Rect(faceRect);
+            this.timestamp = System.currentTimeMillis();
+        }
+    }
+
     public static class SpoofResult {
         private final boolean isSpoof;
+        @Getter
         private final float score;
+        @Getter
         private final long timeMillis;
 
         public SpoofResult(boolean isSpoof, float score, long timeMillis) {
@@ -74,59 +110,57 @@ public class FaceSpoofDetector {
             return isSpoof;
         }
 
-        public float getScore() {
+        public float getConfidence() {
+            // The 'score' field already represents the confidence of the spoof detection.
+            // This method provides a more explicit getter for it.
             return score;
-        }
-
-        public long getTimeMillis() {
-            return timeMillis;
         }
     }
 
     public FaceSpoofDetector(Context context) {
         this.context = context.getApplicationContext();
 
-        // Khởi tạo model bất đồng bộ
+        // Initialize model asynchronously
         executor.execute(() -> {
             try {
-                // Log thông tin về assets để debug
+                // Log asset information for debugging
                 logAssetsContent(context);
 
                 try {
-                    Log.d(TAG, "Đang tải các file model...");
+                    Log.d(TAG, "Loading model files...");
 
                     // Initialize TFLiteInterpreter
                     Interpreter.Options interpreterOptions = TFLiteGpuDelegateManager.getInstance().getInterpreterOptions();
 
-                    // Tải các model từ assets
+                    // Load models from assets
                     MappedByteBuffer model1Buffer = FileUtil.loadMappedFile(context, MODEL_FILE_1);
                     MappedByteBuffer model2Buffer = FileUtil.loadMappedFile(context, MODEL_FILE_2);
 
-                    Log.d(TAG, "Model 1 đã tải, kích thước: " + model1Buffer.capacity() + " bytes");
-                    Log.d(TAG, "Model 2 đã tải, kích thước: " + model2Buffer.capacity() + " bytes");
+                    Log.d(TAG, "Model 1 loaded, size: " + model1Buffer.capacity() + " bytes");
+                    Log.d(TAG, "Model 2 loaded, size: " + model2Buffer.capacity() + " bytes");
 
-                    // Tạo interpreter
+                    // Create interpreters
                     firstModelInterpreter = new Interpreter(model1Buffer, interpreterOptions);
                     secondModelInterpreter = new Interpreter(model2Buffer, interpreterOptions);
 
-                    // Tạo image processor cho tiền xử lý
+                    // Create image processor for preprocessing
                     imageTensorProcessor = new ImageProcessor.Builder()
                             .add(new CastOp(DataType.FLOAT32))
                             .build();
 
-                    Log.d(TAG, "Đã tải các model thành công");
+                    Log.d(TAG, "Models loaded successfully");
                     isInitialized = true;
                 } catch (Exception e) {
-                    Log.e(TAG, "Lỗi khi khởi tạo model TensorFlow Lite: " + e.getMessage(), e);
+                    Log.e(TAG, "Error initializing TensorFlow Lite model: " + e.getMessage(), e);
                     mainHandler.post(() ->
-                            Toast.makeText(context, "Lỗi khi tải model spoof detection: " + e.getMessage(), Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, "Error loading spoof detection model: " + e.getMessage(), Toast.LENGTH_LONG).show()
                     );
                     useMockDetection = true;
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Lỗi khi kiểm tra file model: " + e.getMessage(), e);
+                Log.e(TAG, "Error checking model files: " + e.getMessage(), e);
                 mainHandler.post(() ->
-                        Toast.makeText(context, "Lỗi khi kiểm tra model spoof detection: " + e.getMessage(), Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Error checking spoof detection model: " + e.getMessage(), Toast.LENGTH_LONG).show()
                 );
                 useMockDetection = true;
             } finally {
@@ -146,32 +180,33 @@ public class FaceSpoofDetector {
     private void logAssetsContent(Context context) {
         try {
             String[] files = context.getAssets().list("");
-            Log.d(TAG, "Nội dung thư mục assets: " + Arrays.toString(files));
+            Log.d(TAG, "Assets directory content: " + Arrays.toString(files));
 
-            // Kiểm tra chi tiết về các file model
+            // Check details about model files
             for (String file : files) {
                 if (file.endsWith(".tflite")) {
                     try {
                         MappedByteBuffer buffer = FileUtil.loadMappedFile(context, file);
-                        Log.d(TAG, "File model: " + file + ", kích thước: " + buffer.capacity() + " bytes");
+                        Log.d(TAG, "Model file: " + file + ", size: " + buffer.capacity() + " bytes");
                     } catch (Exception e) {
-                        Log.e(TAG, "Lỗi khi kiểm tra file model " + file + ": " + e.getMessage(), e);
+                        Log.e(TAG, "Error checking model file " + file + ": " + e.getMessage(), e);
                     }
                 }
             }
         } catch (IOException e) {
-            Log.e(TAG, "Lỗi khi liệt kê thư mục assets: " + e.getMessage(), e);
+            Log.e(TAG, "Error listing assets directory: " + e.getMessage(), e);
         }
     }
 
     /**
-     * Detect if a face is spoofed asynchronously
+     * Detect if a face is spoofed asynchronously with oval boundary validation
      *
      * @param frameImage Original frame image
      * @param faceRect   Face bounding box
+     * @param ovalRect   Oval guide boundaries (optional, can be null)
      * @param callback   Callback for result
      */
-    public void detectSpoofAsync(Bitmap frameImage, Rect faceRect, SpoofCallback callback) {
+    public void detectSpoofAsync(Bitmap frameImage, Rect faceRect, android.graphics.RectF ovalRect, SpoofCallback callback) {
         executor.execute(() -> {
             try {
                 // Ensure model is initialized
@@ -184,13 +219,20 @@ public class FaceSpoofDetector {
                     }
                 }
 
-                SpoofResult result = detectSpoof(frameImage, faceRect);
+                SpoofResult result = detectSpoof(frameImage, faceRect, ovalRect);
                 mainHandler.post(() -> callback.onResult(result));
             } catch (Exception e) {
                 Log.e(TAG, "Error in spoof detection", e);
-                mainHandler.post(() -> callback.onResult(new SpoofResult(false, 0.95f, 0)));
+                mainHandler.post(() -> callback.onResult(new SpoofResult(true, 0.75f, 0))); // Default to spoof on error for security
             }
         });
+    }
+
+    /**
+     * Legacy method for backward compatibility
+     */
+    public void detectSpoofAsync(Bitmap frameImage, Rect faceRect, SpoofCallback callback) {
+        detectSpoofAsync(frameImage, faceRect, null, callback);
     }
 
     /**
@@ -201,25 +243,34 @@ public class FaceSpoofDetector {
     }
 
     /**
+     * Get frame history for external analysis
+     * @return Queue of temporal frame data
+     */
+    public java.util.Queue<TemporalFrameData> getFrameHistory() {
+        return new java.util.LinkedList<>(frameHistory);
+    }
+
+    /**
      * Detect if a face is spoofed
      *
      * @param frameImage Original frame image
      * @param faceRect   Face bounding box
+     * @param ovalRect   Oval guide boundaries (optional, can be null)
      * @return Spoof detection result
      */
-    public SpoofResult detectSpoof(Bitmap frameImage, Rect faceRect) {
+    public SpoofResult detectSpoof(Bitmap frameImage, Rect faceRect, android.graphics.RectF ovalRect) {
         long startTime = System.currentTimeMillis();
 
-        // Nếu đang sử dụng mock detection hoặc interpreter không được khởi tạo, luôn trả về không phải spoof
+        // If using mock detection or interpreter not initialized, always return not spoof
         if (useMockDetection || firstModelInterpreter == null || secondModelInterpreter == null || imageTensorProcessor == null) {
             Log.d(TAG, "Using mock spoof detection (always return real face)");
             return new SpoofResult(false, 0.95f, System.currentTimeMillis() - startTime);
         }
 
         try {
-            Log.d(TAG, "Bắt đầu phát hiện spoof với bounding box: " + faceRect.toString());
+            Log.d(TAG, "Starting spoof detection with bounding box: " + faceRect.toString());
 
-            // Cắt và scale ảnh khuôn mặt với hai hằng số đã cho
+            // Crop and scale face image with the two given constants
             Bitmap croppedImage1 = crop(
                     frameImage,
                     faceRect,
@@ -228,11 +279,11 @@ public class FaceSpoofDetector {
                     INPUT_IMAGE_DIM
             );
 
-            Log.d(TAG, "Đã cắt ảnh 1 với scale " + SCALE_1 + ", kích thước: " + croppedImage1.getWidth() + "x" + croppedImage1.getHeight());
+            Log.d(TAG, "Cropped image 1 with scale " + SCALE_1 + ", size: " + croppedImage1.getWidth() + "x" + croppedImage1.getHeight());
 
-            // Chuyển RGB sang BGR
+            // Convert RGB to BGR
             Bitmap bgrImage1 = convertRgbToBgr(croppedImage1);
-            Log.d(TAG, "Đã chuyển ảnh 1 sang BGR");
+            Log.d(TAG, "Converted image 1 to BGR");
 
             Bitmap croppedImage2 = crop(
                     frameImage,
@@ -242,99 +293,115 @@ public class FaceSpoofDetector {
                     INPUT_IMAGE_DIM
             );
 
-            Log.d(TAG, "Đã cắt ảnh 2 với scale " + SCALE_2 + ", kích thước: " + croppedImage2.getWidth() + "x" + croppedImage2.getHeight());
+            Log.d(TAG, "Cropped image 2 with scale " + SCALE_2 + ", size: " + croppedImage2.getWidth() + "x" + croppedImage2.getHeight());
 
-            // Chuyển RGB sang BGR
+            // Convert RGB to BGR
             Bitmap bgrImage2 = convertRgbToBgr(croppedImage2);
-            Log.d(TAG, "Đã chuyển ảnh 2 sang BGR");
+            Log.d(TAG, "Converted image 2 to BGR");
 
-            // Xử lý ảnh
+            // Process images
             TensorImage tensorImage1 = TensorImage.fromBitmap(bgrImage1);
             TensorImage tensorImage2 = TensorImage.fromBitmap(bgrImage2);
 
             tensorImage1 = imageTensorProcessor.process(tensorImage1);
             tensorImage2 = imageTensorProcessor.process(tensorImage2);
 
-            Log.d(TAG, "Đã xử lý tensor image");
+            Log.d(TAG, "Processed tensor images");
 
-            // Lấy buffer từ TensorImage
+            // Get buffers from TensorImages
             ByteBuffer input1 = tensorImage1.getBuffer();
             ByteBuffer input2 = tensorImage2.getBuffer();
 
-            // Chuẩn bị output buffer
+            // Prepare output buffers
             float[][] output1 = new float[1][OUTPUT_DIM];
             float[][] output2 = new float[1][OUTPUT_DIM];
 
-            // Chạy inference
+            // Run inference
             firstModelInterpreter.run(input1, output1);
             secondModelInterpreter.run(input2, output2);
 
-            Log.d(TAG, "Đã chạy inference");
+            Log.d(TAG, "Ran inference");
             Log.d(TAG, "Output model 1: [" + output1[0][0] + ", " + output1[0][1] + ", " + output1[0][2] + "]");
             Log.d(TAG, "Output model 2: [" + output2[0][0] + ", " + output2[0][1] + ", " + output2[0][2] + "]");
 
-            // Áp dụng softmax cho outputs
+            // Apply softmax to outputs
             float[] softmax1 = softMax(output1[0]);
             float[] softmax2 = softMax(output2[0]);
 
             Log.d(TAG, "Softmax model 1: [" + softmax1[0] + ", " + softmax1[1] + ", " + softmax1[2] + "]");
             Log.d(TAG, "Softmax model 2: [" + softmax2[0] + ", " + softmax2[1] + ", " + softmax2[2] + "]");
 
-            // Kết hợp kết quả - dựa trên logic từ FaceSpoofDetector.kt
-            float[] combined = new float[OUTPUT_DIM];
-            for (int i = 0; i < OUTPUT_DIM; i++) {
-                combined[i] = (softmax1[i] + softmax2[i]) / 2.0f;
-            }
+            // Combine results - with weighted combining instead of simple averaging
+            float[] combined = weightedCombineResults(softmax1, softmax2);
 
             Log.d(TAG, "Combined result: Real=" + combined[0] + ", Unknown=" + combined[1] + ", Spoof=" + combined[2]);
 
-            // 🔒 MORE LENIENT: Improved anti-spoofing logic with more balanced thresholds
-            final float REAL_CONFIDENCE_THRESHOLD = 0.55f;  // Lower threshold for real face confidence
-            final float SPOOF_CONFIDENCE_THRESHOLD = 0.75f; // Higher threshold for spoof detection to reduce false positives
-            final float REAL_SPOOF_RATIO_THRESHOLD = 1.3f;  // Real must be only 1.3x higher than spoof (30% difference)
-            final float SPOOF_REAL_RATIO_THRESHOLD = 2.0f;  // Spoof must be 2x higher than real to classify as spoof
-
-            // Texture analysis hints - check for unnatural patterns in 2D images
+            // Store frame data for temporal analysis
+            TemporalFrameData currentFrame = new TemporalFrameData(combined, faceRect);
+            updateFrameHistory(currentFrame);
+            
+            // 🔒 ENHANCED MULTI-LAYER DETECTION
+            
+            // Layer 1: Enhanced AI model analysis with weighted combining
+            boolean modelIndicatesSpoof = evaluateModelResults(combined);
+            
+            // Layer 2: Advanced texture analysis for 2D patterns
             boolean hasUniformTexture = checkUniformTexture(softmax1, softmax2);
-
+            
+            // Layer 3: Liveness detection through temporal variance
+            boolean hasNaturalMovement = checkTemporalVariance();
+            
+            // Layer 4: Strict oval boundary validation
+            boolean isWithinOvalBoundary = validateOvalBoundary(faceRect, ovalRect);
+            
+            // 🎯 IMPROVED DECISION LOGIC - More balanced and ML model priority - MUCH more lenient now
             boolean isSpoof;
             float confidence;
 
-            // Improved decision logic with better balance between security and usability:
-            if (combined[0] > combined[2] * REAL_SPOOF_RATIO_THRESHOLD && combined[0] > REAL_CONFIDENCE_THRESHOLD) {
-                // High confidence real face - much more lenient on texture check
-                isSpoof = hasUniformTexture && combined[2] > 0.4f; // Only consider texture with strong spoof signal
-                confidence = combined[0];
-                Log.d(TAG, "🟢 HIGH CONFIDENCE REAL: Real=" + combined[0] + " >> Spoof=" + combined[2] +
-                        ", hasUniformTexture=" + hasUniformTexture + ", final decision=" + (isSpoof ? "SPOOF" : "REAL"));
-            } else if (combined[2] > combined[0] * SPOOF_REAL_RATIO_THRESHOLD && combined[2] > SPOOF_CONFIDENCE_THRESHOLD) {
-                // Strong spoof indicators - need very high spoof score to be confident
-                isSpoof = true;
-                confidence = combined[2];
-                Log.d(TAG, "🔴 HIGH CONFIDENCE SPOOF: Spoof=" + combined[2] + " >> Real=" + combined[0]);
-            } else if (combined[0] > 0.50f && combined[0] > combined[2]) {
-                // Medium confidence real face - now only needs real score higher than spoof
+            // Case 1: Strong ML model confidence for real face - prioritize model results
+            if (combined[0] > 0.65f && !modelIndicatesSpoof) { // Reduced from 0.70
                 isSpoof = false;
                 confidence = combined[0];
-                Log.d(TAG, "🟢 MEDIUM CONFIDENCE REAL: Real=" + combined[0] + " > Spoof=" + combined[2]);
-            } else if (combined[2] > 0.65f && combined[2] > combined[0] * 1.5f) {
-                // Medium confidence spoof - requires higher spoof score AND significant ratio difference
-                isSpoof = true;
-                confidence = combined[2];
-                Log.d(TAG, "🟠 MEDIUM CONFIDENCE SPOOF: Spoof=" + combined[2] + " > Real=" + combined[0]);
-            } else if (combined[0] >= combined[2] * 0.8f) {
-                // If real is at least 80% of spoof, give benefit of doubt to real face
-                isSpoof = false;
-                confidence = Math.max(0.6f, combined[0]);
-                Log.d(TAG, "🟡 BORDERLINE CASE - FAVOR REAL: Real=" + combined[0] + " close to Spoof=" + combined[2]);
-            } else {
-                // Everything else - still default to spoof for clear cases
-                isSpoof = true;
-                confidence = Math.max(0.55f, combined[2]);
-                Log.d(TAG, "🟠 LIKELY SPOOF SIGNAL: Spoof=" + combined[2] + " > Real=" + combined[0]);
+                Log.d(TAG, "🟢 HIGH CONFIDENCE REAL: Strong ML model confidence");
             }
-
-            Log.d(TAG, "🎯 FINAL RESULT: " + (isSpoof ? "SPOOF" : "REAL") + " with confidence: " + confidence);
+            // Case 2: Good ML confidence + at least valid position OR natural movement
+            else if (combined[0] > 0.60f && !modelIndicatesSpoof && (isWithinOvalBoundary || hasNaturalMovement)) {
+                isSpoof = false;
+                confidence = combined[0];
+                Log.d(TAG, "🟢 GOOD CONFIDENCE REAL: ML model + partial validation");
+            }
+            // Case 3: Decent ML confidence - we trust the model more now
+            else if (combined[0] > 0.58f && !modelIndicatesSpoof) {
+                isSpoof = false;
+                confidence = combined[0];
+                Log.d(TAG, "🟢 ACCEPTABLE REAL: ML model result trusted");
+            }
+            // Case 4: Strong spoof indicators - multiple red flags
+            else if ((modelIndicatesSpoof && hasUniformTexture) || 
+                     (modelIndicatesSpoof && !hasNaturalMovement && !isWithinOvalBoundary)) {
+                isSpoof = true;
+                confidence = Math.max(0.80f, combined[2]);
+                Log.d(TAG, "🔴 HIGH CONFIDENCE SPOOF: Multiple strong indicators");
+            }
+            // Case 5: More lenient on unclear cases - default to real unless strong spoof
+            else if (combined[0] > 0.40f && combined[2] < 0.60f) {
+                isSpoof = false;
+                confidence = Math.max(0.58f, combined[0]);
+                Log.d(TAG, "� LIKELY REAL: Benefit of the doubt");
+            }
+            // Case 6: Default to spoof for very unclear cases
+            else {
+                isSpoof = true;
+                confidence = Math.max(0.65f, combined[2]);
+                Log.d(TAG, "🟠 LIKELY SPOOF: Failed validation checks");
+            }
+            
+            Log.d(TAG, "🎯 FINAL RESULT: " + (isSpoof ? "SPOOF" : "REAL") + 
+                    " with confidence: " + confidence +
+                    ", modelSpoof=" + modelIndicatesSpoof + 
+                    ", uniformTexture=" + hasUniformTexture +
+                    ", naturalMovement=" + hasNaturalMovement +
+                    ", withinOval=" + isWithinOvalBoundary);
 
             long timeMillis = System.currentTimeMillis() - startTime;
             return new SpoofResult(isSpoof, confidence, timeMillis);
@@ -349,17 +416,358 @@ public class FaceSpoofDetector {
 
             if (shouldDefaultToSpoof) {
                 Log.w(TAG, "⚠️ Critical error detected - defaulting to spoof with warning");
-                return new SpoofResult(true, 0.6f, System.currentTimeMillis() - startTime);
+                return new SpoofResult(true, 0.75f, System.currentTimeMillis() - startTime);
             } else {
-                Log.w(TAG, "⚠️ Non-critical error - assuming real face with reduced confidence");
-                return new SpoofResult(false, 0.65f, System.currentTimeMillis() - startTime);
+                Log.w(TAG, "⚠️ Non-critical error - still defaulting to spoof with lower confidence");
+                return new SpoofResult(true, 0.65f, System.currentTimeMillis() - startTime);
             }
         }
     }
 
+    /**
+     * Legacy method for backward compatibility
+     */
+    public SpoofResult detectSpoof(Bitmap frameImage, Rect faceRect) {
+        return detectSpoof(frameImage, faceRect, null);
+    }
 
     /**
-     * Chuyển đổi ảnh RGB sang BGR
+     * Weighted combine of model results giving more weight to the model that is more confident
+     */
+    private float[] weightedCombineResults(float[] softmax1, float[] softmax2) {
+        float[] combined = new float[OUTPUT_DIM];
+        
+        // Calculate confidence level of each model
+        float confidence1 = Math.max(softmax1[0], softmax1[2]); // Max of real or spoof
+        float confidence2 = Math.max(softmax2[0], softmax2[2]); // Max of real or spoof
+        
+        // Calculate weights based on confidence
+        float totalConfidence = confidence1 + confidence2;
+        float weight1 = totalConfidence > 0 ? confidence1 / totalConfidence : 0.5f;
+        float weight2 = totalConfidence > 0 ? confidence2 / totalConfidence : 0.5f;
+        
+        // Ensure weights sum to 1
+        float sum = weight1 + weight2;
+        weight1 /= sum;
+        weight2 /= sum;
+        
+        // Apply weighted combine
+        for (int i = 0; i < OUTPUT_DIM; i++) {
+            combined[i] = (softmax1[i] * weight1) + (softmax2[i] * weight2);
+        }
+        
+        return combined;
+    }
+
+    /**
+     * Evaluate model results with weighted combining
+     */
+    private boolean evaluateModelResults(float[] combined) {
+        return (combined[2] > SPOOF_CONFIDENCE_THRESHOLD && combined[2] > combined[0] * SPOOF_REAL_RATIO_THRESHOLD) ||
+               (combined[2] > 0.70f && combined[2] > combined[0]);
+    }
+
+    /**
+     * Update frame history for temporal analysis
+     */
+    private void updateFrameHistory(TemporalFrameData currentFrame) {
+        frameHistory.add(currentFrame);
+        if (frameHistory.size() > FRAME_HISTORY_SIZE) {
+            frameHistory.poll();
+        }
+    }
+
+    /**
+     * Check for natural micro-movements that indicate liveness
+     */
+    private boolean checkTemporalVariance() {
+        if (frameHistory.size() < 3) {
+            return true; // Not enough data, assume natural
+        }
+        
+        // Calculate variance in face position and size
+        float positionVariance = calculatePositionVariance();
+        float sizeVariance = calculateSizeVariance();
+        
+        // Real faces have natural micro-movements
+        boolean hasNaturalMovement = positionVariance >= MIN_POSITION_VARIANCE && 
+                                     positionVariance <= MAX_POSITION_VARIANCE &&
+                                     sizeVariance >= MIN_SIZE_VARIANCE &&
+                                     sizeVariance <= MAX_SIZE_VARIANCE;
+                                     
+        Log.d(TAG, "📊 TEMPORAL ANALYSIS: posVar=" + positionVariance + 
+                  ", sizeVar=" + sizeVariance + 
+                  ", natural=" + hasNaturalMovement);
+                  
+        return hasNaturalMovement;
+    }
+
+    /**
+     * Calculate variance in face position across frames
+     */
+    private float calculatePositionVariance() {
+        if (frameHistory.size() < 2) {
+            return 0.01f; // Default value if not enough data
+        }
+        
+        float sumX = 0;
+        float sumY = 0;
+        float sumSqX = 0;
+        float sumSqY = 0;
+        int count = 0;
+        
+        for (TemporalFrameData frame : frameHistory) {
+            float centerX = frame.faceRect.exactCenterX();
+            float centerY = frame.faceRect.exactCenterY();
+            
+            sumX += centerX;
+            sumY += centerY;
+            sumSqX += centerX * centerX;
+            sumSqY += centerY * centerY;
+            count++;
+        }
+        
+        float meanX = sumX / count;
+        float meanY = sumY / count;
+        float varianceX = (sumSqX / count) - (meanX * meanX);
+        float varianceY = (sumSqY / count) - (meanY * meanY);
+        
+        // Normalize by face size
+        TemporalFrameData lastFrame = getLastFrame();
+        if (lastFrame != null) {
+            float faceSize = Math.max(lastFrame.faceRect.width(), lastFrame.faceRect.height());
+            varianceX /= (faceSize * faceSize);
+            varianceY /= (faceSize * faceSize);
+        }
+        
+        return (varianceX + varianceY) / 2;
+    }
+
+    /**
+     * Calculate variance in face size across frames
+     */
+    private float calculateSizeVariance() {
+        if (frameHistory.size() < 2) {
+            return 0.005f; // Default value if not enough data
+        }
+        
+        float sumW = 0;
+        float sumH = 0;
+        float sumSqW = 0;
+        float sumSqH = 0;
+        int count = 0;
+        
+        for (TemporalFrameData frame : frameHistory) {
+            float width = frame.faceRect.width();
+            float height = frame.faceRect.height();
+            
+            sumW += width;
+            sumH += height;
+            sumSqW += width * width;
+            sumSqH += height * height;
+            count++;
+        }
+        
+        float meanW = sumW / count;
+        float meanH = sumH / count;
+        float varianceW = (sumSqW / count) - (meanW * meanW);
+        float varianceH = (sumSqH / count) - (meanH * meanH);
+        
+        // Normalize by face size
+        TemporalFrameData lastFrame = getLastFrame();
+        if (lastFrame != null) {
+            float faceWidth = lastFrame.faceRect.width();
+            float faceHeight = lastFrame.faceRect.height();
+            varianceW /= (faceWidth * faceWidth);
+            varianceH /= (faceHeight * faceHeight);
+        }
+        
+        return (varianceW + varianceH) / 2;
+    }
+
+    /**
+     * Get the last frame from history
+     */
+    private TemporalFrameData getLastFrame() {
+        if (frameHistory.isEmpty()) {
+            return null;
+        }
+        
+        // Convert queue to array and get last element
+        TemporalFrameData[] frames = frameHistory.toArray(new TemporalFrameData[0]);
+        return frames[frames.length - 1];
+    }
+
+    /**
+     * Check for abnormal classification patterns across frames
+     * Real faces show gradual, natural changes while spoofs often show abrupt changes
+     */
+    private boolean checkAbnormalPatternAcrossFrames() {
+        if (frameHistory.size() < 4) {
+            return false; // Not enough data
+        }
+        
+        // Convert queue to array for easier processing
+        TemporalFrameData[] frames = frameHistory.toArray(new TemporalFrameData[0]);
+        
+        // Count classification flips (real->spoof->real)
+        int classificationFlips = 0;
+        for (int i = 1; i < frames.length; i++) {
+            if ((frames[i-1].combinedResult[0] > frames[i-1].combinedResult[2] && 
+                 frames[i].combinedResult[0] < frames[i].combinedResult[2]) ||
+                (frames[i-1].combinedResult[0] < frames[i-1].combinedResult[2] && 
+                 frames[i].combinedResult[0] > frames[i].combinedResult[2])) {
+                classificationFlips++;
+            }
+        }
+        
+        // Calculate confidence stability (suspicious if too stable)
+        float confidenceVariance = calculateConfidenceVariance();
+        boolean suspiciouslyStableConfidence = confidenceVariance < 0.001f;
+        
+        // Calculate pattern score
+        boolean abnormalPattern = classificationFlips > 2 || suspiciouslyStableConfidence;
+        
+        Log.d(TAG, "📊 PATTERN ANALYSIS: flips=" + classificationFlips + 
+                  ", confVariance=" + confidenceVariance + 
+                  ", abnormal=" + abnormalPattern);
+                  
+        return abnormalPattern;
+    }
+
+    /**
+     * Calculate variance in confidence scores across frames
+     */
+    private float calculateConfidenceVariance() {
+        if (frameHistory.size() < 2) {
+            return 0.01f; // Default value if not enough data
+        }
+        
+        float sum = 0;
+        float sumSq = 0;
+        int count = 0;
+        
+        // Calculate for real face confidence (index 0)
+        for (TemporalFrameData frame : frameHistory) {
+            sum += frame.combinedResult[0];
+            sumSq += frame.combinedResult[0] * frame.combinedResult[0];
+            count++;
+        }
+        
+        float mean = sum / count;
+        float variance = (sumSq / count) - (mean * mean);
+        
+        return variance;
+    }
+
+    /**
+     * Validate if face is properly within oval boundaries
+     */
+    private boolean validateOvalBoundary(Rect faceRect, android.graphics.RectF ovalRect) {
+        if (ovalRect == null) {
+            return true; // No oval to check against
+        }
+        
+        // Calculate ellipse parameters
+        float centerX = ovalRect.centerX();
+        float centerY = ovalRect.centerY();
+        float a = ovalRect.width() / 2; // semi-major axis
+        float b = ovalRect.height() / 2; // semi-minor axis
+        
+        // Check if face center is within ellipse
+        float faceCenterX = faceRect.exactCenterX();
+        float faceCenterY = faceRect.exactCenterY();
+        
+        // Ellipse equation: (x-h)²/a² + (y-k)²/b² ≤ 1
+        float ellipseValue = (float) (
+            Math.pow(faceCenterX - centerX, 2) / Math.pow(a, 2) +
+            Math.pow(faceCenterY - centerY, 2) / Math.pow(b, 2)
+        );
+        
+        // Check face size relative to oval
+        float faceWidth = faceRect.width();
+        float faceHeight = faceRect.height();
+        float widthRatio = faceWidth / ovalRect.width();
+        float heightRatio = faceHeight / ovalRect.height();
+        
+        // Check if any part of face extends too far outside oval
+        boolean tooFarOutside = 
+            faceRect.left < ovalRect.left - (ovalRect.width() * MAX_FACE_OUTSIDE_RATIO) ||
+            faceRect.right > ovalRect.right + (ovalRect.width() * MAX_FACE_OUTSIDE_RATIO) ||
+            faceRect.top < ovalRect.top - (ovalRect.height() * MAX_FACE_OUTSIDE_RATIO) ||
+            faceRect.bottom > ovalRect.bottom + (ovalRect.height() * MAX_FACE_OUTSIDE_RATIO);
+        
+        boolean isWithinEllipse = ellipseValue <= 1.5; // More lenient - was 2.0
+        boolean hasSuitableSize = 
+            widthRatio >= 0.35f && // More lenient - was 0.40f
+            widthRatio <= 1.0f && // More lenient - was 0.95f
+            heightRatio >= 0.35f && // More lenient - was 0.40f
+            heightRatio <= 1.0f; // More lenient - was 0.95f
+        
+        Log.d(TAG, "🔍 OVAL VALIDATION: ellipseValue=" + String.format("%.6f", ellipseValue) +
+                  ", inEllipse=" + isWithinEllipse + " (≤1.5)" + // Updated log to match actual threshold
+                  ", goodSize=" + hasSuitableSize + 
+                  ", notOutside=" + !tooFarOutside +
+                  ", widthRatio=" + String.format("%.3f", widthRatio) +
+                  ", heightRatio=" + String.format("%.3f", heightRatio));
+                  
+        return isWithinEllipse && hasSuitableSize && !tooFarOutside;
+    }
+
+    /**
+     * Enhanced texture analysis for detecting 2D patterns in spoofing attacks
+     * This method analyzes texture patterns to identify characteristics of printed photos,
+     * screen displays, and other 2D replay attacks
+     */
+    private boolean checkUniformTexture(float[] softmax1, float[] softmax2) {
+        // 1. Higher thresholds for unusual texture detection
+        boolean unusualTextureIndicator =
+                (softmax1[1] > 0.55f && softmax2[1] > 0.45f); // Both models must show unusual texture
+        
+        // 2. Check for inconsistency between models
+        boolean modelInconsistency =
+                Math.abs(softmax1[0] - softmax2[0]) > 0.70f &&
+                Math.abs(softmax1[2] - softmax2[2]) > 0.60f; 
+        
+        // 3. Check for ambiguous classification
+        boolean ambiguousClassification =
+                (softmax1[0] > 0.50f && softmax1[2] > 0.50f &&
+                 softmax2[0] > 0.45f && softmax2[2] > 0.45f);
+        
+        // 4. NEW: Check for abnormal classification pattern across frames
+        boolean abnormalPattern = checkAbnormalPatternAcrossFrames();
+        
+        // 5. NEW: Analyze texture variance in recent frames
+        boolean lowTextureVariance = calculateConfidenceVariance() < 0.0015f;
+        
+        // Log detailed information for debugging
+        if (unusualTextureIndicator || modelInconsistency || ambiguousClassification || 
+            abnormalPattern || lowTextureVariance) {
+            Log.d(TAG, "🔍 TEXTURE ANALYSIS: " +
+                    "unusualTexture=" + unusualTextureIndicator +
+                    ", modelInconsistency=" + modelInconsistency +
+                    ", ambiguousClassification=" + ambiguousClassification +
+                    ", abnormalPattern=" + abnormalPattern +
+                    ", lowTextureVariance=" + lowTextureVariance);
+        }
+        
+        // Return true if multiple strong indicators suggest a 2D spoofing attempt
+        boolean strongEvidence =
+                (softmax1[1] > 0.70f && softmax2[1] > 0.70f) || // Very strong unusual texture
+                (Math.abs(softmax1[0] - softmax2[0]) > 0.85f);  // Very strong inconsistency
+        
+        // Multiple weaker indicators
+        boolean multipleIndicators =
+                (unusualTextureIndicator && (modelInconsistency || ambiguousClassification)) ||
+                (modelInconsistency && ambiguousClassification) ||
+                (abnormalPattern && (unusualTextureIndicator || lowTextureVariance)) ||
+                (lowTextureVariance && (unusualTextureIndicator || modelInconsistency));
+        
+        return strongEvidence || multipleIndicators;
+    }
+
+    /**
+     * Convert RGB image to BGR
      */
     private Bitmap convertRgbToBgr(Bitmap input) {
         Bitmap output = input.copy(input.getConfig(), true);
@@ -379,74 +787,19 @@ public class FaceSpoofDetector {
     }
 
     /**
-     * Analyze model outputs for texture patterns common in 2D spoofing attacks
-     * This method looks for indicators like uniform lighting, lack of depth variation,
-     * and other patterns typical of printed photos or screen displays
-     *
-     * @param softmax1 Softmax output from first model
-     * @param softmax2 Softmax output from second model
-     * @return true if texture analysis indicates a potential 2D spoof attack
-     */
-    private boolean checkUniformTexture(float[] softmax1, float[] softmax2) {
-        // 1. Check if unknown class (index 1) has significant activation
-        // This often indicates the model is detecting something unusual about the texture
-        // MUCH HIGHER THRESHOLD to greatly reduce false positives
-        boolean unusualTextureIndicator =
-                (softmax1[1] > 0.45f && softmax2[1] > 0.35f); // Now BOTH models must show unusual texture
-
-        // 2. Check for inconsistency between models (often happens with 2D images)
-        // If one model is very confident it's real but the other isn't, it's suspicious
-        // MUCH HIGHER THRESHOLD for greater tolerance of normal variations
-        boolean modelInconsistency =
-                Math.abs(softmax1[0] - softmax2[0]) > 0.65f &&
-                        Math.abs(softmax1[2] - softmax2[2]) > 0.55f; // Need inconsistency in BOTH real and spoof scores
-
-        // 3. Check if there's high activation for both real and spoof classes
-        // This is unusual for real faces but common for 2D spoofs that confuse the model
-        // STRICTER CHECK requiring higher concurrent values
-        boolean ambiguousClassification =
-                (softmax1[0] > 0.45f && softmax1[2] > 0.45f &&
-                        softmax2[0] > 0.4f && softmax2[2] > 0.4f); // BOTH models must show ambiguity
-
-        // Log detailed debug information
-        if (unusualTextureIndicator || modelInconsistency || ambiguousClassification) {
-            Log.d(TAG, "🔍 TEXTURE ANALYSIS: " +
-                    "unusualTexture=" + unusualTextureIndicator +
-                    ", modelInconsistency=" + modelInconsistency +
-                    ", ambiguousClassification=" + ambiguousClassification);
-        }
-
-        // Return true only if multiple indicators suggest a 2D spoofing attempt
-        // This is MUCH LESS AGGRESSIVE than before - requiring stronger evidence
-        // Instead of ANY indicator triggering, now we need more than one or very strong individual indicators
-
-        // Strong evidence from any one indicator
-        boolean strongEvidence =
-                (softmax1[1] > 0.6f && softmax2[1] > 0.6f) || // Very strong unusual texture
-                        (Math.abs(softmax1[0] - softmax2[0]) > 0.8f); // Very strong inconsistency
-
-        // Multiple weaker indicators
-        boolean multipleIndicators =
-                (unusualTextureIndicator && (modelInconsistency || ambiguousClassification)) ||
-                        (modelInconsistency && ambiguousClassification);
-
-        return strongEvidence || multipleIndicators;
-    }
-
-    /**
      * Apply softmax to array
      */
     private float[] softMax(float[] x) {
         float[] exp = new float[x.length];
         float sum = 0.0f;
 
-        // Tính exp và tổng
+        // Calculate exp and sum
         for (int i = 0; i < x.length; i++) {
             exp[i] = (float) Math.exp(x[i]);
             sum += exp[i];
         }
 
-        // Chuẩn hóa
+        // Normalize
         for (int i = 0; i < exp.length; i++) {
             exp[i] = exp[i] / sum;
         }
@@ -455,13 +808,13 @@ public class FaceSpoofDetector {
     }
 
     /**
-     * Crop and scale face region - dựa trên logic từ FaceSpoofDetector.kt
+     * Crop and scale face region
      */
     private Bitmap crop(Bitmap origImage, Rect bbox, float bboxScale, int targetWidth, int targetHeight) {
         int srcWidth = origImage.getWidth();
         int srcHeight = origImage.getHeight();
 
-        Log.d(TAG, "Crop: Ảnh gốc kích thước " + srcWidth + "x" + srcHeight + ", bbox: " + bbox.toString());
+        Log.d(TAG, "Crop: Original image size " + srcWidth + "x" + srcHeight + ", bbox: " + bbox.toString());
 
         // Scale bounding box
         Rect scaledBox = getScaledBox(srcWidth, srcHeight, bbox, bboxScale);
@@ -486,7 +839,7 @@ public class FaceSpoofDetector {
     }
 
     /**
-     * Scale bounding box - dựa trên logic từ FaceSpoofDetector.kt
+     * Scale bounding box
      */
     private Rect getScaledBox(int imgWidth, int imgHeight, Rect box, float bboxScale) {
         int x = box.left;
@@ -497,10 +850,10 @@ public class FaceSpoofDetector {
         Log.d(TAG, "getScaledBox: Input - imgWidth: " + imgWidth + ", imgHeight: " + imgHeight +
                 ", box: " + box.toString() + ", scale: " + bboxScale);
 
-        // Tính toán scale dựa trên logic từ FaceSpoofDetector.kt
+        // Calculate scale
         float scale = Math.min(Math.min((imgHeight - 1f) / h, (imgWidth - 1f) / w), bboxScale);
 
-        // Giới hạn scale tối đa để tránh crop quá lớn chạm biên gây nhiễu model
+        // Limit maximum scale to avoid large crops touching edges causing model noise
         scale = Math.min(scale, 2.7f);
 
         Log.d(TAG, "getScaledBox: Calculated scale: " + scale + " (limited to max 2.7)");
@@ -518,7 +871,7 @@ public class FaceSpoofDetector {
         Log.d(TAG, "getScaledBox: Initial scaled box - topLeft: (" + topLeftX + ", " + topLeftY +
                 "), bottomRight: (" + bottomRightX + ", " + bottomRightY + ")");
 
-        // Đảm bảo box nằm trong giới hạn ảnh
+        // Ensure box is within image bounds
         if (topLeftX < 0) {
             bottomRightX -= topLeftX;
             topLeftX = 0;

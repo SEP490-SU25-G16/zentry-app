@@ -6,26 +6,22 @@ import android.util.Log;
 
 import vn.edu.fpt.zentryapp.student.data.service.FaceSpoofDetector;
 
-/**
- * Wrapper cho Spoof Detection với improved logic và consistent thresholds
- * Fix các vấn đề về confidence inconsistency
- */
 public class SpoofDetectionManager {
     private static final String TAG = "SpoofDetectionManager";
 
-    // 🔧 BALANCED ANTI-SPOOFING THRESHOLDS
-    private static final float HIGH_CONFIDENCE_THRESHOLD = 0.75f;    // High but achievable threshold
-    private static final float MEDIUM_CONFIDENCE_THRESHOLD = 0.55f;  // More reasonable medium threshold
-    private static final float LOW_CONFIDENCE_THRESHOLD = 0.35f;     // Lower threshold for poor lighting
+    // 🔧 ENHANCED ANTI-SPOOFING THRESHOLDS
+    private static final float HIGH_CONFIDENCE_THRESHOLD = 0.85f;    // Increased from 0.75f
+    private static final float MEDIUM_CONFIDENCE_THRESHOLD = 0.70f;  // Increased from 0.55f
+    private static final float LOW_CONFIDENCE_THRESHOLD = 0.50f;     // Increased from 0.35f
 
-    private static final float REAL_SPOOF_RATIO_STRICT = 1.7f;  // Real must be 70% higher than Spoof
-    private static final float REAL_SPOOF_RATIO_LENIENT = 1.3f; // Real must be 30% higher than Spoof
+    private static final float REAL_SPOOF_RATIO_STRICT = 2.0f;  // Increased from 1.7f
+    private static final float REAL_SPOOF_RATIO_LENIENT = 1.5f; // Increased from 1.3f
 
-    // Streak counting with reasonable requirements
-    private static final int SPOOF_CONFIRMATION_LIMIT = 2;     // Need 2 frames to confirm spoof
-    private static final int REAL_CONFIRMATION_LIMIT = 2;      // Only need 2 frames to confirm real
-    private static final int MAX_SPOOF_WARNINGS = 3;           // Allow proceeding after 3 warnings
-    private static final int CONSECUTIVE_FRAME_REQUIREMENT = 2; // Only need 2 consistent frames
+    // Streak counting with stricter requirements
+    private static final int SPOOF_CONFIRMATION_LIMIT = 2;      // No change - 2 frames to confirm spoof
+    private static final int REAL_CONFIRMATION_LIMIT = 5;      // Increased from 2 to 5 frames
+    private static final int MAX_SPOOF_WARNINGS = 3;           // No change - 3 warnings max
+    private static final int CONSECUTIVE_FRAME_REQUIREMENT = 4; // Increased from 2 to 4 consistent frames
 
     private final FaceSpoofDetector detector;
 
@@ -35,8 +31,15 @@ public class SpoofDetectionManager {
     private int spoofWarningCount = 0;
     private int lowConfidenceCount = 0;
 
+    // Frame history for temporal analysis
+    private static final int FRAME_HISTORY_SIZE = 8;
+    private final java.util.Queue<FrameData> frameHistory = new java.util.LinkedList<>();
+
     // Last result for comparison
     private SpoofDetectionResult lastResult;
+    
+    // Oval boundaries for validation
+    private android.graphics.RectF ovalBoundary;
 
     public static class SpoofDetectionResult {
         public final boolean isSpoof;
@@ -55,12 +58,27 @@ public class SpoofDetectionManager {
             this.shouldProceed = shouldProceed;
         }
     }
+    
+    /**
+     * Frame data for temporal analysis
+     */
+    private static class FrameData {
+        final float confidence;
+        final boolean isSpoof;
+        final long timestamp;
+        
+        FrameData(float confidence, boolean isSpoof) {
+            this.confidence = confidence;
+            this.isSpoof = isSpoof;
+            this.timestamp = System.currentTimeMillis();
+        }
+    }
 
     public enum ConfidenceLevel {
-        HIGH,    // > 75%
-        MEDIUM,  // 55% - 75%
-        LOW,     // 35% - 55%
-        VERY_LOW // < 35%
+        HIGH,    // > 85%
+        MEDIUM,  // 70% - 85%
+        LOW,     // 50% - 70%
+        VERY_LOW // < 50%
     }
 
     public interface SpoofDetectionCallback {
@@ -70,36 +88,57 @@ public class SpoofDetectionManager {
     public SpoofDetectionManager(FaceSpoofDetector detector) {
         this.detector = detector;
     }
+    
+    /**
+     * Set oval boundary for face validation
+     */
+    public void setOvalBoundary(android.graphics.RectF ovalRect) {
+        this.ovalBoundary = ovalRect;
+        Log.d(TAG, "Oval boundary set: " + ovalRect);
+    }
 
     /**
-     * Analyze spoof detection result với improved logic
+     * Analyze spoof detection result with enhanced security logic
      */
     public void analyzeFrame(Bitmap bitmap, Rect faceRect, SpoofDetectionCallback callback) {
-        detector.detectSpoofAsync(bitmap, faceRect, rawResult -> {
+        // Use oval boundary for validation if available
+        detector.detectSpoofAsync(bitmap, faceRect, ovalBoundary, rawResult -> {
             SpoofDetectionResult enhancedResult = enhanceDetectionResult(rawResult);
 
-            Log.d(TAG, String.format("🔍 Detection: %s (conf: %.2f, level: %s) - %s",
+            Log.d(TAG, String.format("🔍 Detection: %s (conf: %.2f, level: %s) - %s, proceed=%b",
                     enhancedResult.isSpoof ? "SPOOF" : "REAL",
                     enhancedResult.confidence,
                     enhancedResult.confidenceLevel,
-                    enhancedResult.explanation));
+                    enhancedResult.explanation,
+                    enhancedResult.shouldProceed));
 
             callback.onResult(enhancedResult);
         });
     }
 
     /**
-     * Enhance raw detection result với streak tracking và logical improvements
+     * Legacy method for backward compatibility
+     */
+    public void analyzeFrame(Bitmap bitmap, Rect faceRect, android.graphics.RectF ovalRect, SpoofDetectionCallback callback) {
+        setOvalBoundary(ovalRect);
+        analyzeFrame(bitmap, faceRect, callback);
+    }
+
+    /**
+     * Enhance raw detection result with streak tracking and security improvements
      */
     private SpoofDetectionResult enhanceDetectionResult(FaceSpoofDetector.SpoofResult rawResult) {
         boolean isSpoof = rawResult.isSpoof();
         float confidence = rawResult.getScore();
 
+        // Store frame data for temporal analysis
+        updateFrameHistory(confidence, isSpoof);
+
         // Determine confidence level
         ConfidenceLevel level = getConfidenceLevel(confidence);
 
-        // 🔧 IMPROVED LOGIC: Multi-criteria decision
-        SpoofDetectionResult result = makeSmartDecision(isSpoof, confidence, level);
+        // 🔧 ENHANCED MULTI-LAYER SECURITY LOGIC
+        SpoofDetectionResult result = makeSecureDecision(isSpoof, confidence, level);
 
         // Update streaks
         updateStreaks(result);
@@ -111,116 +150,314 @@ public class SpoofDetectionManager {
     }
 
     /**
-     * Make smart decision based on multiple criteria
+     * Make secure decision based on multiple criteria with enhanced security
      */
-    private SpoofDetectionResult makeSmartDecision(boolean rawIsSpoof, float rawConfidence, ConfidenceLevel level) {
+    private SpoofDetectionResult makeSecureDecision(boolean rawIsSpoof, float rawConfidence, ConfidenceLevel level) {
         String explanation;
         boolean finalIsSpoof;
         boolean shouldProceed = false;
 
-        // Check for possible replay attack patterns
-        boolean possibleReplayAttack = false;
-        if (lastResult != null) {
-            // Check for rapid classification flips (indicative of 2D replay)
-            // This is now less sensitive and requires more evidence
-            boolean classificationFlipping =
-                    (lastResult.isSpoof != rawIsSpoof) &&
-                            (spoofStreak <= 1 && realStreak <= 1) &&
-                            lowConfidenceCount > 5 &&                  // Require more low confidence frames
-                            Math.abs(lastResult.confidence - rawConfidence) < 0.1f; // And with similar confidence
+        // Check for replay attack patterns
+        boolean possibleReplayAttack = checkForReplayAttack(rawIsSpoof, rawConfidence);
 
-            // Look for suspiciously stable confidence (static images)
-            // Real faces show more variation than printed images - this is now much less aggressive
-            float confidenceDelta = Math.abs(lastResult.confidence - rawConfidence);
-            boolean suspiciouslyStableConfidence =
-                    confidenceDelta < 0.005f &&   // Make this much stricter - almost no change
-                            realStreak > 8 &&            // Require many more frames of stability
-                            level != ConfidenceLevel.HIGH; // Don't flag high confidence real faces
-
-            // Disable medium confidence plateauing entirely
-            boolean mediumConfidenceStuck = false;
-
-            // Make replay attack detection much less aggressive
-            possibleReplayAttack = (classificationFlipping && spoofStreak > 0) ||
-                    (suspiciouslyStableConfidence && spoofStreak > 2);
-
-            if (possibleReplayAttack) {
-                Log.d(TAG, "⚠️ REPLAY ATTACK WARNING: flip=" + classificationFlipping +
-                        ", stableConf=" + suspiciouslyStableConfidence +
-                        ", mediumStuck=" + mediumConfidenceStuck);
-            }
-        }
-
-        // 🟢 HIGH CONFIDENCE CASES
+        // Check for abnormal confidence patterns
+        boolean suspiciousConfidencePattern = checkForAbnormalConfidencePattern();
+        
+        // Debug logging
+        Log.d(TAG, String.format("🔍 Decision: rawIsSpoof=%b, confidence=%.4f, level=%s, realStreak=%d, replayAttack=%b, suspiciousPattern=%b",
+                rawIsSpoof, rawConfidence, level, realStreak, possibleReplayAttack, suspiciousConfidencePattern));
+        
+        // 🟢 HIGH CONFIDENCE CASES - Much more lenient for real faces
         if (level == ConfidenceLevel.HIGH) {
-            if (!rawIsSpoof && !possibleReplayAttack) {
-                // High confidence real face, no replay attack indicators
+            if (!rawIsSpoof) {
+                // High confidence real face - trust the model more
                 finalIsSpoof = false;
-                // Need several consecutive confirmations
-                shouldProceed = realStreak >= REAL_CONFIRMATION_LIMIT;
-                explanation = "High confidence real face detected";
+                // Much more lenient - only need 2 consecutive confirmations for high confidence
+                shouldProceed = realStreak >= 2;
+                explanation = "High confidence real face detected" + 
+                    (shouldProceed ? "" : " - need " + (2 - realStreak) + " more frames");
             } else {
-                // High confidence spoof or replay attack indicators
+                // High confidence spoof
                 finalIsSpoof = true;
                 shouldProceed = false;
-                explanation = possibleReplayAttack ?
-                        "Possible replay attack detected - please use real face" :
-                        "High confidence spoof detected";
+                explanation = "High confidence spoof detected";
             }
         }
-        // 🟡 MEDIUM CONFIDENCE CASES - MORE LENIENT FOR REAL FACES
+        // 🟡 MEDIUM CONFIDENCE CASES - More lenient
         else if (level == ConfidenceLevel.MEDIUM) {
-            // For medium confidence, default to real face unless clear spoof indicators
-            if (!rawIsSpoof || (rawConfidence > MEDIUM_CONFIDENCE_THRESHOLD * 0.9 && !possibleReplayAttack)) {
-                // Medium confidence real with no replay indicators or borderline cases
+            if (!rawIsSpoof && !possibleReplayAttack && !suspiciousConfidencePattern) {
+                // Medium confidence real with no suspicious indicators
                 finalIsSpoof = false;
-
-                // Less strict streak requirement for medium confidence real faces
-                shouldProceed = realStreak >= REAL_CONFIRMATION_LIMIT;
-                explanation = "Medium confidence real face - hold steady";
-            } else if (rawIsSpoof && rawConfidence > MEDIUM_CONFIDENCE_THRESHOLD * 1.1 && possibleReplayAttack) {
-                // Only flag as spoof if both the detector says spoof AND we have replay attack indicators
-                // AND the confidence is well above the threshold
+                // More lenient - only need 3 consecutive confirmations
+                shouldProceed = realStreak >= 3;
+                explanation = "Medium confidence real face - hold steady" +
+                    (shouldProceed ? "" : " - need " + (3 - realStreak) + " more frames");
+            } else if (rawIsSpoof && !possibleReplayAttack && !suspiciousConfidencePattern) {
+                // Medium confidence spoof but no suspicious patterns
                 finalIsSpoof = true;
                 shouldProceed = false;
-                explanation = "Medium confidence spoof detected with replay patterns";
+                explanation = "Medium confidence spoof detected";
             } else {
-                // For borderline cases, favor real face but with warning
-                finalIsSpoof = false;
-                shouldProceed = realStreak >= REAL_CONFIRMATION_LIMIT + 1; // Still require more confirmation
-                explanation = "Borderline detection - try to improve lighting and stay still";
+                // Any suspicious indicators with medium confidence leads to spoof
+                finalIsSpoof = true;
+                shouldProceed = false;
+                if (possibleReplayAttack) {
+                    explanation = "Possible replay attack detected with medium confidence";
+                } else if (suspiciousConfidencePattern) {
+                    explanation = "Suspicious pattern detected - please try again";
+                } else {
+                    explanation = "Medium confidence spoof detected";
+                }
             }
         }
-        // 🔴 LOW CONFIDENCE CASES - MORE LENIENT
+        // 🔴 LOW AND VERY LOW CONFIDENCE CASES - More lenient
         else {
-            // Low confidence - try to be more permissive while maintaining security
             lowConfidenceCount++;
 
-            if (lowConfidenceCount > 10 && !rawIsSpoof) {
-                // Allow proceeding sooner if not flagged as spoof even in poor conditions
-                // This greatly helps users in poor lighting conditions
+            if (lowConfidenceCount > 15 && !rawIsSpoof && !possibleReplayAttack && !suspiciousConfidencePattern) {
+                // More lenient - only need 4 consecutive confirmations for low confidence
                 finalIsSpoof = false;
-                shouldProceed = realStreak >= 1;
-                explanation = "Low confidence but likely real face - proceeding with caution";
-            } else if (lowConfidenceCount > 15) {
-                // After many attempts, default to allowing with warning
-                finalIsSpoof = false;
-                shouldProceed = true;
-                explanation = "Low confidence - proceeding due to persistent poor conditions";
-            } else if (!rawIsSpoof && lowConfidenceCount > 5) {
-                // If not flagged as spoof and we've seen several frames
-                finalIsSpoof = false;
-                shouldProceed = false; // Still don't proceed yet
-                explanation = "Low confidence but likely real - please improve lighting or position";
+                shouldProceed = realStreak >= 4;
+                explanation = "Low confidence detection - please improve lighting or camera position";
             } else {
-                // Only for initial low confidence frames with spoof indication
+                // Default to spoof for low confidence
                 finalIsSpoof = true;
                 shouldProceed = false;
-                explanation = "Low confidence detection, please improve lighting or camera position";
+                if (possibleReplayAttack || suspiciousConfidencePattern) {
+                    explanation = "Suspicious pattern detected with low confidence";
+                } else {
+                    explanation = "Low confidence detection, please improve lighting or camera position";
+                }
             }
         }
 
+        Log.d(TAG, String.format("🎯 Final decision: isSpoof=%b, shouldProceed=%b, explanation=%s",
+                finalIsSpoof, shouldProceed, explanation));
+
         return new SpoofDetectionResult(finalIsSpoof, rawConfidence, level, explanation, shouldProceed);
+    }
+    
+    /**
+     * Check for replay attack patterns using temporal analysis
+     */
+    private boolean checkForReplayAttack(boolean currentIsSpoof, float currentConfidence) {
+        if (frameHistory.size() < 4) {
+            return false; // Not enough data
+        }
+        
+        // Check for rapid classification flips (indicative of 2D replay)
+        int classificationFlips = 0;
+        boolean lastWasSpoof = false;
+        boolean firstItem = true;
+        
+        for (FrameData frame : frameHistory) {
+            if (firstItem) {
+                lastWasSpoof = frame.isSpoof;
+                firstItem = false;
+                continue;
+            }
+            
+            if (frame.isSpoof != lastWasSpoof) {
+                classificationFlips++;
+            }
+            lastWasSpoof = frame.isSpoof;
+        }
+        
+        // More lenient - only detect if there are many rapid flips
+        boolean suspiciousFlips = classificationFlips >= 4; // Increased from 3
+        
+        // Check for suspiciously stable confidence (indicative of replay)
+        float confidenceVariance = calculateConfidenceVariance();
+        boolean suspiciouslyStableConfidence = confidenceVariance < 0.005f; // More lenient - was 0.003f
+        
+        // Check for unrealistic confidence patterns
+        boolean unrealisticConfidence = false;
+        if (frameHistory.size() >= 6) {
+            int highConfidenceCount = 0;
+            int lowConfidenceCount = 0;
+            
+            for (FrameData frame : frameHistory) {
+                if (frame.confidence > 0.95f) {
+                    highConfidenceCount++;
+                } else if (frame.confidence < 0.05f) {
+                    lowConfidenceCount++;
+                }
+            }
+            
+            // More lenient - only detect if there are extreme patterns
+            unrealisticConfidence = (highConfidenceCount >= 5 && lowConfidenceCount == 0) ||
+                                  (lowConfidenceCount >= 5 && highConfidenceCount == 0);
+        }
+        
+        boolean isReplayAttack = suspiciousFlips || (suspiciouslyStableConfidence && unrealisticConfidence);
+        
+        Log.d(TAG, String.format("📊 REPLAY CHECK: flips=%d, confVar=%.6f, stable=%b, unrealistic=%b, result=%b",
+                classificationFlips, confidenceVariance, suspiciouslyStableConfidence, unrealisticConfidence, isReplayAttack));
+        
+        return isReplayAttack;
+    }
+    
+    /**
+     * Check for abnormal confidence patterns that indicate spoofing attempts
+     */
+    private boolean checkForAbnormalConfidencePattern() {
+        if (frameHistory.size() < 6) {
+            return false; // Not enough data
+        }
+        
+        // Check for "staircase" pattern (gradually increasing/decreasing confidence)
+        // This can indicate algorithmic manipulation attempts
+        boolean isStaircase = true;
+        boolean increasing = true;
+        float lastConfidence = -1;
+        boolean firstItem = true;
+        
+        for (FrameData frame : frameHistory) {
+            if (firstItem) {
+                lastConfidence = frame.confidence;
+                firstItem = false;
+                continue;
+            }
+            
+            if (lastConfidence != -1) {
+                if (frame.confidence > lastConfidence) {
+                    if (firstItem) {
+                        increasing = true;
+                        firstItem = false;
+                    } else if (!increasing) {
+                        isStaircase = false;
+                        break;
+                    }
+                } else if (frame.confidence < lastConfidence) {
+                    if (firstItem) {
+                        increasing = false;
+                        firstItem = false;
+                    } else if (increasing) {
+                        isStaircase = false;
+                        break;
+                    }
+                }
+            }
+            lastConfidence = frame.confidence;
+        }
+        
+        // Check for "plateau" pattern (very stable confidence)
+        float confidenceVariance = calculateConfidenceVariance();
+        boolean isPlateau = confidenceVariance < 0.002f; // More lenient - was 0.001f
+        
+        // Check for "oscillation" pattern (alternating high/low confidence)
+        boolean isOscillating = false;
+        if (frameHistory.size() >= 8) {
+            int oscillationCount = 0;
+            boolean lastWasHigh = false;
+
+            
+            for (FrameData frame : frameHistory) {
+                boolean currentIsHigh = frame.confidence > 0.7f;
+                
+                if (!firstItem && currentIsHigh != lastWasHigh) {
+                    oscillationCount++;
+                }
+                
+                lastWasHigh = currentIsHigh;
+                firstItem = false;
+            }
+            
+            // More lenient - only detect if there are many oscillations
+            isOscillating = oscillationCount >= 6; // Increased from 4
+        }
+        
+        // Check for "spike" pattern (sudden extreme confidence changes)
+        boolean hasSpikes = false;
+        if (frameHistory.size() >= 4) {
+            float maxChange = 0;
+            
+            for (FrameData frame : frameHistory) {
+                if (lastConfidence != -1) {
+                    float change = Math.abs(frame.confidence - lastConfidence);
+                    maxChange = Math.max(maxChange, change);
+                }
+                lastConfidence = frame.confidence;
+            }
+            
+            // More lenient - only detect if there are extreme spikes
+            hasSpikes = maxChange > 0.8f; // Increased from 0.6f
+        }
+        
+        boolean abnormalPattern = isStaircase || isPlateau || isOscillating || hasSpikes;
+        
+        Log.d(TAG, String.format("📊 PATTERN ANALYSIS: flips=%d, confVariance=%.6f, abnormal=%b",
+                frameHistory.size(), confidenceVariance, abnormalPattern));
+        
+        return abnormalPattern;
+    }
+    
+    /**
+     * Detect cyclic patterns in confidence values
+     */
+    private boolean detectCyclicPattern() {
+        if (frameHistory.size() < 8) {
+            return false;
+        }
+        
+        // Convert queue to array for easier indexing
+        FrameData[] frames = frameHistory.toArray(new FrameData[0]);
+        
+        // Check for simple repetition pattern of length 2
+        boolean twoFrameCycle = true;
+        for (int i = 0; i < frames.length - 2; i += 2) {
+            if (Math.abs(frames[i].confidence - frames[i+2].confidence) > 0.02f) {
+                twoFrameCycle = false;
+                break;
+            }
+        }
+        
+        // Check for simple repetition pattern of length 3
+        boolean threeFrameCycle = true;
+        if (frames.length >= 6) {
+            for (int i = 0; i < frames.length - 3; i += 3) {
+                if (Math.abs(frames[i].confidence - frames[i+3].confidence) > 0.02f) {
+                    threeFrameCycle = false;
+                    break;
+                }
+            }
+        }
+        
+        return twoFrameCycle || threeFrameCycle;
+    }
+    
+    /**
+     * Calculate variance in confidence values
+     */
+    private float calculateConfidenceVariance() {
+        if (frameHistory.size() < 2) {
+            return 0.01f; // Default value if not enough data
+        }
+        
+        float sum = 0;
+        float sumSq = 0;
+        int count = 0;
+        
+        for (FrameData frame : frameHistory) {
+            sum += frame.confidence;
+            sumSq += frame.confidence * frame.confidence;
+            count++;
+        }
+        
+        float mean = sum / count;
+        float variance = (sumSq / count) - (mean * mean);
+        
+        return variance;
+    }
+    
+    /**
+     * Update frame history for temporal analysis
+     */
+    private void updateFrameHistory(float confidence, boolean isSpoof) {
+        frameHistory.add(new FrameData(confidence, isSpoof));
+        if (frameHistory.size() > FRAME_HISTORY_SIZE) {
+            frameHistory.poll();
+        }
     }
 
     /**
@@ -241,7 +478,9 @@ public class SpoofDetectionManager {
             // Reset warning count on good real face detection
             if (result.confidenceLevel == ConfidenceLevel.HIGH) {
                 spoofWarningCount = Math.max(0, spoofWarningCount - 1);
-                lowConfidenceCount = 0;
+                lowConfidenceCount = Math.max(0, lowConfidenceCount - 2); // Faster recovery
+            } else if (result.confidenceLevel == ConfidenceLevel.MEDIUM) {
+                lowConfidenceCount = Math.max(0, lowConfidenceCount - 1); // Slower recovery
             }
         }
 
@@ -265,13 +504,14 @@ public class SpoofDetectionManager {
     }
 
     /**
-     * Reset all counters
+     * Reset all counters and security state
      */
     public void reset() {
         spoofStreak = 0;
         realStreak = 0;
         spoofWarningCount = 0;
         lowConfidenceCount = 0;
+        frameHistory.clear();
         lastResult = null;
         Log.d(TAG, "Detection manager reset");
     }

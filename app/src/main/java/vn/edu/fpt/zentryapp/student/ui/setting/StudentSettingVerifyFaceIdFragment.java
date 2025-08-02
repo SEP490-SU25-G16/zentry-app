@@ -24,8 +24,10 @@ import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentSettingVerifyFaceIdBinding;
 import vn.edu.fpt.zentryapp.student.data.service.FaceIdService;
+import vn.edu.fpt.zentryapp.student.data.service.FaceIdServiceManager;
 import vn.edu.fpt.zentryapp.student.ui.components.CameraView;
-import vn.edu.fpt.zentryapp.student.ui.components.FaceOverlayView;
+import vn.edu.fpt.zentryapp.student.ui.components.OvalFaceOverlayView;
+import vn.edu.fpt.zentryapp.student.ui.setting.detection.SpoofDetectionManager;
 
 public class StudentSettingVerifyFaceIdFragment extends Fragment {
 
@@ -34,11 +36,16 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment {
     
     private FragmentStudentSettingVerifyFaceIdBinding binding;
     private FaceIdService faceIdService;
+    private SpoofDetectionManager spoofDetectionManager;
     private CameraView cameraView;
-    private FaceOverlayView faceOverlayView;
+    private OvalFaceOverlayView faceOverlayView;
     private boolean isCameraStarted = false;
     private boolean isProcessing = false;
     private NavController navController;
+    
+    // Current frame data
+    private Bitmap currentFrameBitmap;
+    private Rect currentFaceRect;
     
     @Nullable
     @Override
@@ -48,211 +55,353 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment {
         binding = FragmentStudentSettingVerifyFaceIdBinding.inflate(inflater, container, false);
         return binding.getRoot();
     }
-    
+
     @Override
-    public void onViewCreated(@NonNull View view,
-                              @Nullable Bundle savedInstanceState) {
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         
-        // Initialize FaceIdService
-        faceIdService = new FaceIdService(requireContext());
-        
-        // Get NavController
         navController = NavHostFragment.findNavController(this);
         
-        // Set up back button
+        setupViews();
+        setupClickListeners();
+        
+        // Initialize FaceIdService
+        initializeFaceIdService();
+    }
+    
+    private void setupViews() {
+        // Setup camera view
+        cameraView = new CameraView(requireContext());
+        binding.flCameraContainer.addView(cameraView);
+        
+        // Setup overlay view with enhanced oval UI
+        faceOverlayView = new OvalFaceOverlayView(requireContext());
+        binding.flCameraContainer.addView(faceOverlayView);
+    }
+    
+    private void setupClickListeners() {
         binding.ivBack.setOnClickListener(v -> requireActivity().onBackPressed());
+        binding.btnCancel.setOnClickListener(v -> requireActivity().onBackPressed());
         
-        // Set up camera view
-        setupCameraView();
-        
-        // Set up face overlay view
-        setupFaceOverlayView();
-        
-        // Set up verify button
-        binding.btnVerifyFaceId.setOnClickListener(v -> {
-            if (isCameraStarted && !isProcessing) {
-                captureAndVerifyFace();
-            } else {
-                Toast.makeText(requireContext(), "Camera not ready", Toast.LENGTH_SHORT).show();
+        binding.btnVerify.setOnClickListener(v -> {
+            if (!isProcessing) {
+                verifyFaceId();
             }
         });
+    }
+    
+    private void initializeFaceIdService() {
+        binding.progressBar.setVisibility(View.VISIBLE);
+        binding.tvStatus.setText("Initializing...");
         
-        // Request camera permission if needed
-        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA) 
+        FaceIdServiceManager.getInstance().initialize(requireContext(), new FaceIdServiceManager.InitCallback() {
+            @Override
+            public void onInitialized(FaceIdService service) {
+                if (!isAdded()) return;
+                
+                faceIdService = service;
+                
+                // Initialize SpoofDetectionManager with enhanced security
+                if (faceIdService.getFaceSpoofDetector() != null) {
+                    spoofDetectionManager = new SpoofDetectionManager(faceIdService.getFaceSpoofDetector());
+                    // Set the oval boundary for enhanced security validation
+                    if (faceOverlayView != null) {
+                        spoofDetectionManager.setOvalBoundary(faceOverlayView.getOvalRect());
+                    }
+                }
+                
+                binding.progressBar.setVisibility(View.GONE);
+                binding.tvStatus.setText("Look at the camera");
+                
+                checkCameraPermissionAndStart();
+            }
+            
+            @Override
+            public void onError(String message) {
+                if (!isAdded()) return;
+                
+                binding.progressBar.setVisibility(View.GONE);
+                binding.tvStatus.setText("Initialization failed");
+                
+                showErrorDialog("Failed to initialize face detection", message);
+            }
+        });
+    }
+    
+    private void checkCameraPermissionAndStart() {
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(requireActivity(), 
-                    new String[]{Manifest.permission.CAMERA}, 
+            ActivityCompat.requestPermissions(requireActivity(),
+                    new String[]{Manifest.permission.CAMERA},
                     CAMERA_PERMISSION_REQUEST_CODE);
         } else {
             startCamera();
         }
     }
     
-    private void setupCameraView() {
-        // Create camera view
-        cameraView = new CameraView(requireContext());
-        
-        // Add camera view to container
-        binding.flCameraContainer.addView(cameraView);
-    }
-    
-    private void setupFaceOverlayView() {
-        // Create face overlay view
-        faceOverlayView = new FaceOverlayView(requireContext());
-        
-        // Add face overlay view to container
-        binding.flCameraContainer.addView(faceOverlayView);
-    }
-    
     private void startCamera() {
-        if (cameraView != null) {
-            cameraView.startCamera(getViewLifecycleOwner());
+        if (isCameraStarted) {
+            return;
+        }
+        
+        try {
+            cameraView.startCamera(getViewLifecycleOwner(), this::processFrame);
             isCameraStarted = true;
+            binding.tvStatus.setText("Position your face in the oval");
+        } catch (Exception e) {
+            showErrorDialog("Camera Error", "Failed to start camera: " + e.getMessage());
         }
     }
     
-    private void captureAndVerifyFace() {
-        isProcessing = true;
-        binding.progressBarVerifyFaceId.setVisibility(View.VISIBLE);
-        binding.btnVerifyFaceId.setEnabled(false);
-        binding.tvVerificationStatus.setText("Verifying...");
+    private void processFrame(Bitmap bitmap) {
+        if (faceIdService == null || isProcessing) {
+            return;
+        }
         
-        // Capture photo
-        cameraView.capturePhoto(new CameraView.CaptureCallback() {
+        currentFrameBitmap = bitmap;
+        
+        // Process frame with oval boundary validation for enhanced security
+        faceIdService.processContinuousFrame(bitmap, faceOverlayView.getOvalRect(), 
+                new FaceIdService.ContinuousProcessingCallback() {
             @Override
-            public void onCaptured(Bitmap bitmap) {
-                // Process face image
-                processFaceImage(bitmap);
-            }
-            
-            @Override
-            public void onError(String message) {
-                showError("Failed to capture image: " + message);
-                resetProcessingState();
-            }
-        });
-    }
-    
-    private void processFaceImage(Bitmap bitmap) {
-        // Process face image
-        faceIdService.processFaceImage(bitmap, new FaceIdService.FaceDetectionCallback() {
-            @Override
-            public void onFaceDetected(Bitmap faceBitmap, Rect boundingBox) {
-                // Show face detection result
-                faceOverlayView.setFaceDetectionResult(boundingBox, false, "Face detected");
+            public void onFaceDetected(Rect boundingBox, boolean isSpoof, float spoofScore) {
+                currentFaceRect = boundingBox;
                 
-                // Verify face ID
-                verifyFaceId(faceBitmap);
+                // Update face position in overlay for user guidance
+                if (faceOverlayView != null) {
+                    boolean isGoodPosition = faceOverlayView.updateFacePosition(boundingBox);
+                    
+                    // If position is bad, don't proceed with further processing
+                    if (!isGoodPosition) {
+                        binding.tvStatus.setText("Position your face properly in the oval");
+                        binding.btnVerify.setEnabled(false);
+                        return;
+                    }
+                }
+                
+                // Use enhanced spoof detection with increased security
+                if (spoofDetectionManager != null) {
+                    spoofDetectionManager.analyzeFrame(bitmap, boundingBox, result -> {
+                        handleSpoofResult(result, boundingBox);
+                    });
+                } else {
+                    // Fallback to basic spoof detection with stricter thresholds
+                    if (isSpoof || spoofScore > 0.65f) {  // Lowered from 0.7f for more sensitivity
+                        binding.tvStatus.setText("Spoof detected! Please use your real face.");
+                        binding.btnVerify.setEnabled(false);
+                    } else if (!isSpoof && spoofScore < 0.15f) {  // Decreased from 0.3f for more security
+                        binding.tvStatus.setText("Face detected. Ready to verify!");
+                        binding.btnVerify.setEnabled(true);
+                    } else {
+                        binding.tvStatus.setText("Uncertain detection. Please improve lighting and position.");
+                        binding.btnVerify.setEnabled(false);
+                    }
+                }
             }
             
             @Override
             public void onNoFaceDetected() {
-                showError("No face detected. Please try again.");
-                resetProcessingState();
+                currentFaceRect = null;
+                binding.tvStatus.setText("No face detected. Look at the camera.");
+                binding.btnVerify.setEnabled(false);
+                
+                if (faceOverlayView != null) {
+                    faceOverlayView.clear();
+                }
             }
             
             @Override
             public void onMultipleFacesDetected() {
-                showError("Multiple faces detected. Please ensure only one face is in the frame.");
-                resetProcessingState();
+                currentFaceRect = null;
+                binding.tvStatus.setText("Multiple faces detected. Only one face should be visible.");
+                binding.btnVerify.setEnabled(false);
+                
+                if (faceOverlayView != null) {
+                    faceOverlayView.clear();
+                }
             }
             
             @Override
             public void onError(String errorMessage) {
-                showError(errorMessage);
-                resetProcessingState();
+                binding.tvStatus.setText("Detection error: " + errorMessage);
+                binding.btnVerify.setEnabled(false);
             }
         });
     }
     
-    private void verifyFaceId(Bitmap faceBitmap) {
-        // Get user ID from auth manager
-        String userId = AuthManager.getInstance(requireContext()).getCurrentUserId();
+    /**
+     * Handle enhanced spoof detection result with improved security
+     */
+    private void handleSpoofResult(SpoofDetectionManager.SpoofDetectionResult result, Rect boundingBox) {
+        if (!isAdded()) {
+            return;
+        }
         
-        // Verify face ID
-        faceIdService.verifyFaceId(faceBitmap, userId, new FaceIdService.FaceIdCallback() {
-            @Override
-            public void onSuccess(String message) {
-                // Show success message
-                showVerificationResult(true, message);
+        // Handle spoof detection with higher security threshold
+        if (result.isSpoof) {
+            binding.tvStatus.setText(result.explanation);
+            binding.btnVerify.setEnabled(false);
+            return;
+        }
+
+        // For real face detections
+        if (!result.isSpoof) {
+            // Check face position using oval view
+            boolean isInGoodPosition = faceOverlayView != null && 
+                                      faceOverlayView.validateFaceWithinOval(boundingBox);
+            
+            if (!isInGoodPosition) {
+                binding.tvStatus.setText("Position your face properly in the oval");
+                binding.btnVerify.setEnabled(false);
+                return;
             }
             
-            @Override
-            public void onFailure(String errorMessage) {
-                // Show failure message
-                showVerificationResult(false, errorMessage);
-            }
-        });
-    }
-    
-    private void showVerificationResult(boolean isSuccess, String message) {
-        requireActivity().runOnUiThread(() -> {
-            // Hide progress bar
-            binding.progressBarVerifyFaceId.setVisibility(View.GONE);
-            binding.btnVerifyFaceId.setEnabled(true);
-            
-            // Update verification status
-            if (isSuccess) {
-                binding.tvVerificationStatus.setText("Verification successful");
-                binding.tvVerificationStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.green_success));
-                
-                // Show success dialog
-                new AlertDialog.Builder(requireContext())
-                        .setTitle("Success")
-                        .setMessage(message)
-                        .setPositiveButton("Continue", (dialog, which) -> {
-                            // Navigate to the next screen or perform action
-                            // This depends on the flow where verification is used
-                            navController.navigateUp();
-                        })
-                        .setCancelable(false)
-                        .show();
+            // Enable verify button for real faces with good position
+            if (result.shouldProceed) {
+                binding.tvStatus.setText("Real face detected. Ready to verify!");
+                binding.btnVerify.setEnabled(true);
             } else {
-                binding.tvVerificationStatus.setText("Verification failed");
-                binding.tvVerificationStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.red_error));
-                
-                // Show error dialog
-                new AlertDialog.Builder(requireContext())
-                        .setTitle("Verification Failed")
-                        .setMessage(message)
-                        .setPositiveButton("Try Again", (dialog, which) -> {
-                            resetProcessingState();
-                        })
-                        .setNegativeButton("Cancel", (dialog, which) -> {
-                            requireActivity().onBackPressed();
-                        })
-                        .setCancelable(false)
-                        .show();
+                binding.tvStatus.setText("Keep your face steady");
+                binding.btnVerify.setEnabled(false);
             }
-            
+        }
+    }
+    
+    private void verifyFaceId() {
+        if (currentFrameBitmap == null || currentFaceRect == null) {
+            showErrorDialog("Verification Failed", "No face detected");
+            return;
+        }
+        
+        // Final validation of face position
+        if (faceOverlayView != null) {
+            boolean isInGoodPosition = faceOverlayView.validateFaceWithinOval(currentFaceRect);
+            if (!isInGoodPosition) {
+                binding.tvStatus.setText("Please position your face properly in the oval");
+                return;
+            }
+        }
+        
+        isProcessing = true;
+        binding.progressBar.setVisibility(View.VISIBLE);
+        binding.tvStatus.setText("Verifying your Face ID...");
+        binding.btnVerify.setEnabled(false);
+        
+        String userId = AuthManager.getInstance(requireContext()).getCurrentUserId();
+        if (userId == null || userId.isEmpty()) {
             isProcessing = false;
-        });
+            binding.progressBar.setVisibility(View.GONE);
+            showErrorDialog("Verification Failed", "User not logged in");
+            return;
+        }
+        
+        // Verify face ID with enhanced security validation using oval boundary
+        faceIdService.verifyFace(
+                currentFrameBitmap, 
+                currentFaceRect, 
+                faceOverlayView != null ? faceOverlayView.getOvalRect() : null,
+                userId, 
+                new FaceIdService.FaceVerificationCallback() {
+                    @Override
+                    public void onVerified(float confidence) {
+                        if (!isAdded()) return;
+                        
+                        isProcessing = false;
+                        binding.progressBar.setVisibility(View.GONE);
+                        
+                        // Show success message
+                        showSuccessDialog("Verification Successful", 
+                                "Your Face ID has been verified with " + 
+                                Math.round(confidence * 100) + "% confidence");
+                    }
+                    
+                    @Override
+                    public void onVerificationFailed(String reason) {
+                        if (!isAdded()) return;
+                        
+                        isProcessing = false;
+                        binding.progressBar.setVisibility(View.GONE);
+                        
+                        // Show appropriate error message
+                        if (reason.contains("spoof") || reason.contains("Spoof")) {
+                            showErrorDialog("Security Alert", 
+                                    "Spoof detection triggered. Please ensure you're using a real face.");
+                        } else if (reason.contains("confidence") || reason.contains("match")) {
+                            showErrorDialog("Verification Failed", 
+                                    "Your face doesn't match our records. Please try again.");
+                        } else {
+                            showErrorDialog("Verification Error", reason);
+                        }
+                        
+                        // Restart camera
+                        startCamera();
+                    }
+                    
+                    @Override
+                    public void onError(String errorMessage) {
+                        if (!isAdded()) return;
+                        
+                        isProcessing = false;
+                        binding.progressBar.setVisibility(View.GONE);
+                        
+                        if (errorMessage.contains("Network")) {
+                            showErrorDialog("Network Error", 
+                                    "Could not connect to the server. Please check your connection.");
+                        } else {
+                            showErrorDialog("Verification Error", errorMessage);
+                        }
+                        
+                        // Restart camera
+                        startCamera();
+                    }
+                });
     }
     
-    private void showError(String message) {
-        requireActivity().runOnUiThread(() -> {
-            Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show();
-            resetProcessingState();
-        });
+    private void showSuccessDialog(String title, String message) {
+        new AlertDialog.Builder(requireContext())
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton("Continue", (dialog, which) -> {
+                    if (isAdded()) {
+                        // Navigate back to settings after successful verification
+                        navController.navigate(R.id.action_verifyFaceId_to_settings);
+                    }
+                })
+                .setCancelable(false)
+                .show();
     }
     
-    private void resetProcessingState() {
-        isProcessing = false;
-        binding.progressBarVerifyFaceId.setVisibility(View.GONE);
-        binding.btnVerifyFaceId.setEnabled(true);
-        binding.tvVerificationStatus.setText("Ready to verify");
-        binding.tvVerificationStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.black));
-        faceOverlayView.clear();
+    private void showErrorDialog(String title, String message) {
+        new AlertDialog.Builder(requireContext())
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .show();
+    }
+    
+    private void stopCamera() {
+        try {
+            if (cameraView != null) {
+                cameraView.stopCamera();
+            }
+        } catch (Exception e) {
+            // Ignore
+        } finally {
+            isCameraStarted = false;
+        }
     }
     
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
         if (requestCode == CAMERA_PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startCamera();
             } else {
-                Toast.makeText(requireContext(), "Camera permission is required", Toast.LENGTH_LONG).show();
+                showErrorDialog("Permission Required", 
+                        "Camera permission is required to verify Face ID");
+                
+                // Go back if permission denied
                 requireActivity().onBackPressed();
             }
         }
@@ -261,9 +410,9 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        if (cameraView != null) {
-            cameraView.stopCamera();
-        }
+        
+        // Clean up
+        stopCamera();
         binding = null;
     }
 } 
