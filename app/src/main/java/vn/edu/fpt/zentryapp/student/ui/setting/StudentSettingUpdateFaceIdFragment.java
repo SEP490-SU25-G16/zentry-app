@@ -24,6 +24,7 @@ import java.util.Locale;
 
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentSettingUpdateFaceIdBinding;
+import vn.edu.fpt.zentryapp.student.data.service.FaceIdConfig;
 import vn.edu.fpt.zentryapp.student.data.service.FaceIdService;
 import vn.edu.fpt.zentryapp.student.data.service.FaceIdServiceManager;
 import vn.edu.fpt.zentryapp.student.ui.components.CameraView;
@@ -99,9 +100,12 @@ public class StudentSettingUpdateFaceIdFragment extends Fragment {
                 
                 faceIdService = service;
                 
+                // 🔧 NEW: Set update scenario for balanced validation
+                faceIdService.setScenario(FaceIdConfig.Scenario.UPDATE);
+                
                 // Initialize SpoofDetectionManager with enhanced security
                 if (faceIdService.getFaceSpoofDetector() != null) {
-                    spoofDetectionManager = new SpoofDetectionManager(faceIdService.getFaceSpoofDetector());
+                    spoofDetectionManager = new SpoofDetectionManager(faceIdService.getFaceSpoofDetector(), requireContext());
                     // Set the oval boundary for enhanced security validation
                     if (faceOverlayView != null) {
                         spoofDetectionManager.setOvalBoundary(faceOverlayView.getOvalRect());

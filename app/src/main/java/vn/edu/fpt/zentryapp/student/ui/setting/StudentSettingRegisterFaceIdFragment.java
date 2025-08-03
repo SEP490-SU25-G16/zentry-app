@@ -29,6 +29,7 @@ import java.io.IOException;
 
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentSettingRegisterFaceIdBinding;
+import vn.edu.fpt.zentryapp.student.data.service.FaceIdConfig;
 import vn.edu.fpt.zentryapp.student.data.service.FaceIdService;
 import vn.edu.fpt.zentryapp.student.data.service.FaceIdServiceManager;
 import vn.edu.fpt.zentryapp.student.data.service.FaceTracker;
@@ -213,11 +214,14 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
 
                 faceIdService = service;
 
+                // 🔧 NEW: Set registration scenario for more lenient validation
+                faceIdService.setScenario(FaceIdConfig.Scenario.REGISTRATION);
+
                 // Initialize SpoofDetectionManager with FaceSpoofDetector
                 initializeSpoofDetection();
 
                 checkCameraPermissionAndStart();
-                Log.d(TAG, "✅ FaceIdService initialized");
+                Log.d(TAG, "✅ FaceIdService initialized with REGISTRATION scenario");
             }
 
             @Override
@@ -236,7 +240,7 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
      */
     private void initializeSpoofDetection() {
         if (faceIdService != null && faceIdService.getFaceSpoofDetector() != null) {
-            spoofDetectionManager = new SpoofDetectionManager(faceIdService.getFaceSpoofDetector());
+            spoofDetectionManager = new SpoofDetectionManager(faceIdService.getFaceSpoofDetector(), requireContext());
             // Set the oval boundary for enhanced security validation
             if (faceOverlayView != null) {
                 spoofDetectionManager.setOvalBoundary(faceOverlayView.getOvalRect());
@@ -551,7 +555,7 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
             return;
         }
 
-        stateManager.transitionTo(FaceRegistrationState.PROCESSING, "Registering your face...");
+        stateManager.transitionTo(FaceRegistrationState.PROCESSING, "Processing face data...");
 
         // Check again if fragment is still attached
         if (!isAdded()) {
@@ -580,6 +584,9 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
         final Rect capturedFaceRect = currentFaceRect;
         final String finalUserId = userId;
 
+        // 🔧 NEW: Show progress updates
+        stateManager.transitionTo(FaceRegistrationState.PROCESSING, "Generating face embedding...");
+        
         // 🎯 Register face with enhanced security validation
         faceIdService.captureAndRegisterFace(
                 capturedBitmap, 
@@ -606,8 +613,18 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
                         }
 
                         Log.e(TAG, "❌ Registration failed: " + errorMessage);
-                        if (errorMessage.contains("Network error")) {
+                        
+                        // 🔧 NEW: Enhanced error categorization
+                        if (errorMessage.contains("timeout") || errorMessage.contains("Timeout")) {
+                            handleNetworkError("Request timeout. Please try again.");
+                        } else if (errorMessage.contains("Network error") || errorMessage.contains("Cannot connect")) {
                             handleNetworkError(errorMessage);
+                        } else if (errorMessage.contains("Authentication failed")) {
+                            stateManager.transitionTo(FaceRegistrationState.FAILED_OTHER,
+                                    "Authentication failed. Please login again.");
+                        } else if (errorMessage.contains("Server error")) {
+                            stateManager.transitionTo(FaceRegistrationState.FAILED_OTHER,
+                                    "Server error. Please try again later.");
                         } else if (errorMessage.contains("spoof") || errorMessage.contains("Spoof")) {
                             stateManager.transitionTo(FaceRegistrationState.FAILED_SPOOF,
                                     "Registration failed: " + errorMessage);

@@ -1,32 +1,18 @@
 package vn.edu.fpt.zentryapp.student.ui.setting.detection;
 
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Rect;
 import android.util.Log;
 
 import vn.edu.fpt.zentryapp.student.data.service.FaceSpoofDetector;
+import vn.edu.fpt.zentryapp.student.data.service.FaceIdConfig;
 
 public class SpoofDetectionManager {
     private static final String TAG = "SpoofDetectionManager";
 
-    // 🔧 IMPROVED ANTI-SPOOFING THRESHOLDS - More lenient for real faces
-    private static final float HIGH_CONFIDENCE_THRESHOLD = 0.85f;    // Keep high for security
-    private static final float MEDIUM_CONFIDENCE_THRESHOLD = 0.60f;  // Reduced from 0.70f for better real face detection
-    private static final float LOW_CONFIDENCE_THRESHOLD = 0.40f;     // Reduced from 0.50f for better real face detection
-
-    private static final float REAL_SPOOF_RATIO_STRICT = 2.0f;  // Keep strict for security
-    private static final float REAL_SPOOF_RATIO_LENIENT = 1.5f; // Keep lenient for real faces
-
-    // 🎯 IMPROVED STREAK REQUIREMENTS - More lenient for real faces
-    private static final int SPOOF_CONFIRMATION_LIMIT = 2;      // Keep strict for spoof detection
-    private static final int REAL_CONFIRMATION_LIMIT = 3;      // Reduced from 5 to 3 frames for real face
-    private static final int MAX_SPOOF_WARNINGS = 3;           // Keep same
-    private static final int CONSECUTIVE_FRAME_REQUIREMENT = 3; // Reduced from 4 to 3 frames
-
-    // 🆕 NEW REAL FACE INDICATORS
-    private static final int REAL_FACE_RECOVERY_THRESHOLD = 2;  // Frames needed for recovery
-    private static final float NATURAL_MOVEMENT_THRESHOLD = 0.15f; // Variance threshold for natural movement
-    private static final int MIN_REAL_FACE_FRAMES = 2;         // Minimum frames for real face confirmation
+    // 🔧 NEW: Configuration-based thresholds
+    private final FaceIdConfig.AntiSpoofConfig config;
 
     private final FaceSpoofDetector detector;
 
@@ -95,8 +81,14 @@ public class SpoofDetectionManager {
         void onResult(SpoofDetectionResult result);
     }
 
-    public SpoofDetectionManager(FaceSpoofDetector detector) {
+    public SpoofDetectionManager(FaceSpoofDetector detector, Context context) {
         this.detector = detector;
+        this.config = new FaceIdConfig(context).getConfig().antiSpoofConfig;
+    }
+    
+    public SpoofDetectionManager(FaceSpoofDetector detector, FaceIdConfig.AntiSpoofConfig config) {
+        this.detector = detector;
+        this.config = config;
     }
     
     /**
@@ -184,15 +176,16 @@ public class SpoofDetectionManager {
         Log.d(TAG, String.format("🔍 Decision: rawIsSpoof=%b, confidence=%.4f, level=%s, realStreak=%d, replayAttack=%b, suspiciousPattern=%b, naturalMovement=%b, ovalCompliant=%b",
                 rawIsSpoof, rawConfidence, level, realStreak, possibleReplayAttack, suspiciousConfidencePattern, hasNaturalMovement, isOvalCompliant));
         
+        // 🔧 NEW: Use configurable thresholds
         // 🟢 HIGH CONFIDENCE CASES - More lenient for real faces
         if (level == ConfidenceLevel.HIGH) {
             if (!rawIsSpoof) {
                 // High confidence real face - trust the model more
                 finalIsSpoof = false;
                 // More lenient - only need 2 consecutive confirmations for high confidence
-                shouldProceed = realStreak >= 2;
+                shouldProceed = realStreak >= config.minRealFaceFrames;
                 explanation = "High confidence real face detected" + 
-                    (shouldProceed ? "" : " - need " + (2 - realStreak) + " more frames");
+                    (shouldProceed ? "" : " - need " + (config.minRealFaceFrames - realStreak) + " more frames");
             } else {
                 // High confidence spoof
                 finalIsSpoof = true;
@@ -210,9 +203,9 @@ public class SpoofDetectionManager {
                     shouldProceed = realStreak >= 1; // Only need 1 frame if natural movement detected
                     explanation = "Medium confidence real face with natural movement - proceed";
                 } else {
-                    shouldProceed = realStreak >= 2; // Need 2 frames otherwise
+                    shouldProceed = realStreak >= config.minRealFaceFrames; // Need configurable frames otherwise
                     explanation = "Medium confidence real face - hold steady" +
-                        (shouldProceed ? "" : " - need " + (2 - realStreak) + " more frames");
+                        (shouldProceed ? "" : " - need " + (config.minRealFaceFrames - realStreak) + " more frames");
                 }
             } else if (rawIsSpoof && !possibleReplayAttack && !suspiciousConfidencePattern) {
                 // Medium confidence spoof but no suspicious patterns
@@ -238,14 +231,14 @@ public class SpoofDetectionManager {
 
             // 🆕 IMPROVED: Better recovery logic for real faces
             if (lowConfidenceCount > 10 && !rawIsSpoof && !possibleReplayAttack && !suspiciousConfidencePattern) {
-                // More lenient - only need 3 consecutive confirmations for low confidence
+                // More lenient - only need configurable consecutive confirmations for low confidence
                 finalIsSpoof = false;
-                shouldProceed = realStreak >= 3;
+                shouldProceed = realStreak >= config.minRealFaceFrames;
                 explanation = "Low confidence detection - please improve lighting or camera position";
             } else if (hasNaturalMovement && isOvalCompliant && !rawIsSpoof) {
                 // 🆕 NEW: Allow real face with natural movement even at low confidence
                 finalIsSpoof = false;
-                shouldProceed = realStreak >= 2;
+                shouldProceed = realStreak >= config.minRealFaceFrames;
                 explanation = "Real face detected with natural movement";
             } else {
                 // Default to spoof for low confidence
@@ -499,8 +492,8 @@ public class SpoofDetectionManager {
         // Calculate confidence variance
         float variance = calculateConfidenceVariance();
         
-        // Natural movement typically has moderate variance (not too stable, not too erratic)
-        boolean hasNaturalVariance = variance > 0.01f && variance < NATURAL_MOVEMENT_THRESHOLD;
+        // 🔧 NEW: Use configurable threshold for natural movement
+        boolean hasNaturalVariance = variance > 0.01f && variance < config.naturalMovementThreshold;
         
         // Check for gradual confidence changes (natural) vs sudden changes (replay)
         boolean hasGradualChanges = true;
@@ -559,11 +552,11 @@ public class SpoofDetectionManager {
      * Get confidence level from score
      */
     private ConfidenceLevel getConfidenceLevel(float confidence) {
-        if (confidence >= HIGH_CONFIDENCE_THRESHOLD) {
+        if (confidence >= config.highConfidenceThreshold) {
             return ConfidenceLevel.HIGH;
-        } else if (confidence >= MEDIUM_CONFIDENCE_THRESHOLD) {
+        } else if (confidence >= config.mediumConfidenceThreshold) {
             return ConfidenceLevel.MEDIUM;
-        } else if (confidence >= LOW_CONFIDENCE_THRESHOLD) {
+        } else if (confidence >= config.lowConfidenceThreshold) {
             return ConfidenceLevel.LOW;
         } else {
             return ConfidenceLevel.VERY_LOW;
