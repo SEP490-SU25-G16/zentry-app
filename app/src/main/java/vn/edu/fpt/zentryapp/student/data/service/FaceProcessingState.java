@@ -5,6 +5,7 @@ package vn.edu.fpt.zentryapp.student.data.service;
  */
 public enum FaceProcessingState {
     INITIALIZING,    // Models and camera are initializing
+    LIVENESS_CHALLENGE, // Liveness detection challenge
     READY,           // Ready to detect faces
     NO_FACE,         // No face detected in frame
     MULTIPLE_FACES,  // Multiple faces detected in frame

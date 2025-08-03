@@ -23,14 +23,19 @@ public enum FaceRegistrationState {
     // Stabilization states
     FACE_STABILIZING("Hold still..."),
     FACE_STABLE("Perfect! Processing..."),
+
+    // Liveness detection
+    LIVENESS_CHALLENGE("Blink your eyes"),
     
     // Spoof detection
     FACE_SPOOFED("Spoof detected! Use real face"),
+    FACE_SUSPICIOUS("Suspicious activity detected. Please hold steady."),
     SPOOF_SUSPECTED("Please ensure you're using a real face"),
     
     // Processing states
     CAPTURING("Capturing face..."),
     PROCESSING("Registering your face..."),
+    ANALYZING("Analyzing... Please hold steady."),
     
     // Final states
     SUCCESS("Face ID registered successfully!"),
@@ -93,6 +98,8 @@ public enum FaceRegistrationState {
     public boolean isProcessingState() {
         return this == CAPTURING ||
                this == PROCESSING ||
-               this == FACE_STABILIZING;
+               this == FACE_STABILIZING ||
+               this == ANALYZING ||
+               this == INITIALIZING;    // Thêm INITIALIZING vào trạng thái xử lý
     }
 }

@@ -1,5 +1,7 @@
 package vn.edu.fpt.zentryapp.student.ui.setting.ui;
 
+import android.text.method.ScrollingMovementMethod;
+import android.util.Log;
 import android.view.View;
 
 import androidx.core.content.ContextCompat;
@@ -16,25 +18,25 @@ import vn.edu.fpt.zentryapp.student.ui.setting.state.FaceRegistrationState;
  */
 public class FaceRegistrationUIController {
     private static final String TAG = "FaceRegUIController";
-    
+
     private final FragmentStudentSettingRegisterFaceIdBinding binding;
     private final OvalFaceOverlayView faceOverlayView;
-    
+
     // UI States
     public enum UIScreenState {
         SETUP,    // Màn hình giới thiệu
         CAMERA,   // Màn hình camera
         LOADING   // Màn hình loading khi processing
     }
-    
+
     private UIScreenState currentScreenState = UIScreenState.SETUP;
-    
-    public FaceRegistrationUIController(FragmentStudentSettingRegisterFaceIdBinding binding, 
-                                      OvalFaceOverlayView faceOverlayView) {
+
+    public FaceRegistrationUIController(FragmentStudentSettingRegisterFaceIdBinding binding,
+                                         OvalFaceOverlayView faceOverlayView) {
         this.binding = binding;
         this.faceOverlayView = faceOverlayView;
     }
-    
+
     /**
      * Show appropriate screen
      */
@@ -42,13 +44,13 @@ public class FaceRegistrationUIController {
         if (currentScreenState == screenState) {
             return; // Already showing this screen
         }
-        
+
         currentScreenState = screenState;
-        
+
         // Hide all screens first
         binding.llSetupScreen.setVisibility(View.GONE);
         binding.flCameraScreen.setVisibility(View.GONE);
-        
+
         // Show appropriate screen
         switch (screenState) {
             case SETUP:
@@ -63,119 +65,162 @@ public class FaceRegistrationUIController {
                 break;
         }
     }
-    
+
     /**
      * Update UI based on Face Registration State
      */
     public void updateForState(FaceRegistrationState state, String message) {
         // Update status message
         updateStatusMessage(state, message);
-        
+
         // Update oval overlay
         updateOvalOverlay(state);
-        
-        // Update progress visibility
-        updateProgressVisibility(state);
-        
+
+        // Cập nhật progress visibility based on state
+        boolean showProgress = state.isProcessingState() ||
+                state == FaceRegistrationState.PROCESSING ||
+                state == FaceRegistrationState.CAPTURING;
+                
+        showLoadingIndicator(showProgress);
+
         // Update screen if needed
         updateScreenForState(state);
+        
+        // Log cập nhật UI để debug
+        System.out.println("UI đã cập nhật cho trạng thái: " + state + " với thông báo: " + message);
     }
-    
+
     /**
      * Update status message with color coding
      */
     private void updateStatusMessage(FaceRegistrationState state, String message) {
         if (binding.tvStatusMessage == null) return;
-        
+
         binding.tvStatusMessage.setText(message);
-        
+
         // Color code messages based on state type
         int textColor;
         if (state.isErrorState()) {
             textColor = ContextCompat.getColor(binding.getRoot().getContext(), R.color.error_red);
+            // Set error message with larger text and bold for error states
+            binding.tvStatusMessage.setTextSize(16); // Increase text size for errors
+            binding.tvStatusMessage.setPadding(16, 16, 16, 16); // Add padding for emphasis
         } else if (state == FaceRegistrationState.SUCCESS) {
             textColor = ContextCompat.getColor(binding.getRoot().getContext(), R.color.success_green);
+            // Reset text size and padding for success
+            binding.tvStatusMessage.setTextSize(14);
+            binding.tvStatusMessage.setPadding(8, 8, 8, 8);
         } else if (state.isProcessingState()) {
             textColor = ContextCompat.getColor(binding.getRoot().getContext(), R.color.processing_blue);
+            // Reset text size and padding for processing
+            binding.tvStatusMessage.setTextSize(14);
+            binding.tvStatusMessage.setPadding(8, 8, 8, 8);
         } else {
             textColor = ContextCompat.getColor(binding.getRoot().getContext(), R.color.text_primary);
+            // Reset text size and padding for normal states
+            binding.tvStatusMessage.setTextSize(14);
+            binding.tvStatusMessage.setPadding(8, 8, 8, 8);
+        }
+
+        binding.tvStatusMessage.setTextColor(textColor);
+        
+        // Make error messages scrollable if they're long
+        if (state.isErrorState() && message.length() > 100) {
+            binding.tvStatusMessage.setMovementMethod(new ScrollingMovementMethod());
+            binding.tvStatusMessage.setMaxHeight(300); // Limit height but allow scrolling
+        } else {
+            binding.tvStatusMessage.setMovementMethod(null);
+            binding.tvStatusMessage.setMaxHeight(Integer.MAX_VALUE);
         }
         
-        binding.tvStatusMessage.setTextColor(textColor);
+        // Log status messages for debugging
+        if (state.isErrorState()) {
+            Log.e("FaceRegUIController", "Error state: " + state + " - " + message);
+        } else {
+            Log.d("FaceRegUIController", "State: " + state + " - " + message);
+        }
     }
-    
+
     /**
      * Update oval overlay appearance
      */
     private void updateOvalOverlay(FaceRegistrationState state) {
         if (faceOverlayView == null) return;
-        
+
         switch (state) {
             case FACE_REAL:
                 faceOverlayView.setOvalColor(ContextCompat.getColor(
-                    faceOverlayView.getContext(), R.color.success_green));
+                        faceOverlayView.getContext(), R.color.success_green));
                 faceOverlayView.updateState(FaceProcessingState.FACE_REAL, state.getDefaultMessage());
+                break;
+
+            case LIVENESS_CHALLENGE:
+                faceOverlayView.setOvalColor(ContextCompat.getColor(
+                        faceOverlayView.getContext(), R.color.liveness_challenge_blue));
+                faceOverlayView.updateState(FaceProcessingState.LIVENESS_CHALLENGE, state.getDefaultMessage());
                 break;
 
             case FACE_STABLE:
                 faceOverlayView.setOvalColor(ContextCompat.getColor(
-                    faceOverlayView.getContext(), R.color.success_green));
+                        faceOverlayView.getContext(), R.color.success_green));
                 faceOverlayView.updateState(FaceProcessingState.FACE_STABLE, state.getDefaultMessage());
                 break;
-                
+
             case FACE_SPOOFED:
             case FAILED_SPOOF:
                 faceOverlayView.setOvalColor(ContextCompat.getColor(
-                    faceOverlayView.getContext(), R.color.error_red));
+                        faceOverlayView.getContext(), R.color.error_red));
                 faceOverlayView.updateState(FaceProcessingState.FACE_SPOOFED, state.getDefaultMessage());
                 break;
-                
+
             case FACE_STABILIZING:
                 faceOverlayView.setOvalColor(ContextCompat.getColor(
-                    faceOverlayView.getContext(), R.color.processing_blue));
+                        faceOverlayView.getContext(), R.color.processing_blue));
                 faceOverlayView.updateState(FaceProcessingState.FACE_STABILIZING, state.getDefaultMessage());
                 faceOverlayView.startProgressAnimation(700); // 0.7 seconds
+                break;
+                
+            case ANALYZING:
+                faceOverlayView.setOvalColor(ContextCompat.getColor(
+                        faceOverlayView.getContext(), R.color.processing_blue));
+                faceOverlayView.updateState(FaceProcessingState.FACE_STABLE, state.getDefaultMessage());
                 break;
 
             case FACE_DETECTED:
                 faceOverlayView.setOvalColor(ContextCompat.getColor(
-                    faceOverlayView.getContext(), R.color.warning_yellow));
+                        faceOverlayView.getContext(), R.color.warning_yellow));
                 faceOverlayView.updateState(FaceProcessingState.FACE_DETECTED, state.getDefaultMessage());
                 break;
 
             case NO_FACE:
                 faceOverlayView.setOvalColor(ContextCompat.getColor(
-                    faceOverlayView.getContext(), R.color.white));
+                        faceOverlayView.getContext(), R.color.white));
                 faceOverlayView.updateState(FaceProcessingState.NO_FACE, state.getDefaultMessage());
                 break;
 
             case FACE_OUT_OF_BOUNDS:
                 faceOverlayView.setOvalColor(ContextCompat.getColor(
-                    faceOverlayView.getContext(), R.color.warning_yellow));
+                        faceOverlayView.getContext(), R.color.warning_yellow));
                 faceOverlayView.updateState(FaceProcessingState.FACE_DETECTED, state.getDefaultMessage());
                 break;
 
             default:
                 faceOverlayView.setOvalColor(ContextCompat.getColor(
-                    faceOverlayView.getContext(), R.color.white));
+                        faceOverlayView.getContext(), R.color.white));
                 faceOverlayView.updateState(FaceProcessingState.READY, state.getDefaultMessage());
                 break;
         }
     }
-    
+
     /**
-     * Update progress bar visibility
+     * Hiển thị loading indicator
      */
-    private void updateProgressVisibility(FaceRegistrationState state) {
-        if (binding.progressBarRegisterFaceId == null) return;
-        
-        boolean showProgress = state.isProcessingState() || 
-                              state == FaceRegistrationState.PROCESSING ||
-                              state == FaceRegistrationState.CAPTURING;
-        
-        binding.progressBarRegisterFaceId.setVisibility(showProgress ? View.VISIBLE : View.GONE);
+    public void showLoadingIndicator(boolean show) {
+        if (binding.progressBarRegisterFaceId != null) {
+            binding.progressBarRegisterFaceId.setVisibility(show ? View.VISIBLE : View.GONE);
+        }
     }
-    
+
     /**
      * Update screen based on state
      */
@@ -186,36 +231,37 @@ public class FaceRegistrationUIController {
                 // Make sure loading overlay is visible during initialization
                 showLoadingOverlay(true);
                 break;
-                
+
             case READY:
                 // When ready, ensure we show the camera and hide loading overlay
                 showScreen(UIScreenState.CAMERA);
                 showLoadingOverlay(false);
                 break;
-                
+
             case NO_FACE:
             case FACE_DETECTED:
             case FACE_REAL:
             case FACE_STABILIZING:
             case FACE_SPOOFED:
+            case ANALYZING:
                 if (currentScreenState != UIScreenState.CAMERA) {
                     showScreen(UIScreenState.CAMERA);
                 }
                 // Ensure loading overlay is hidden during these states
                 showLoadingOverlay(false);
                 break;
-                
+
             case PROCESSING:
             case CAPTURING:
                 showScreen(UIScreenState.LOADING);
                 break;
-                
+
             case SUCCESS:
                 // Success sẽ được handle bởi navigation sang Activity khác
                 break;
         }
     }
-    
+
     /**
      * Show/hide loading overlay
      */
@@ -228,7 +274,7 @@ public class FaceRegistrationUIController {
             binding.flStudentSettingRegisterFaceIdCameraContainer.setVisibility(View.VISIBLE);
         }
     }
-    
+
     /**
      * Show error with retry option
      */
@@ -237,13 +283,13 @@ public class FaceRegistrationUIController {
         if (binding.tvStatusMessage != null) {
             binding.tvStatusMessage.setText(errorMessage);
             binding.tvStatusMessage.setTextColor(
-                ContextCompat.getColor(binding.getRoot().getContext(), R.color.error_red));
+                    ContextCompat.getColor(binding.getRoot().getContext(), R.color.error_red));
         }
-        
+
         // Show retry button (nếu có trong layout)
         // Có thể extend layout để có retry button
     }
-    
+
     /**
      * Enable/disable camera controls
      */
@@ -252,14 +298,14 @@ public class FaceRegistrationUIController {
         binding.ivCameraBack.setEnabled(enabled);
         binding.ivCameraBack.setAlpha(enabled ? 1.0f : 0.5f);
     }
-    
+
     /**
      * Get current screen state
      */
     public UIScreenState getCurrentScreenState() {
         return currentScreenState;
     }
-    
+
     /**
      * Cleanup UI controller
      */

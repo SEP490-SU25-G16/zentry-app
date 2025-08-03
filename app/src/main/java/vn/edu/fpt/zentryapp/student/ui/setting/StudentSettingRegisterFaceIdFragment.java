@@ -1,6 +1,10 @@
 package vn.edu.fpt.zentryapp.student.ui.setting;
 
 import android.Manifest;
+import android.animation.ValueAnimator;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -8,12 +12,14 @@ import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-
-
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.LinearInterpolator;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -26,7 +32,9 @@ import androidx.fragment.app.Fragment;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Locale;
 
+import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentSettingRegisterFaceIdBinding;
 import vn.edu.fpt.zentryapp.student.data.service.FaceIdConfig;
@@ -53,6 +61,10 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
     private FaceRegistrationUIController uiController;
     private FaceTracker faceTracker;
     private FaceIdService faceIdService;
+    
+    // 🔍 ERROR TRACKING
+    private String lastDetailedErrorMessage = ""; // Store detailed error information
+    private boolean hasDetailedError = false;
 
     // 📷 CAMERA COMPONENTS
     private CameraView cameraView;
@@ -62,6 +74,12 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
     // 💾 CURRENT DATA
     private Bitmap currentFrameBitmap;
     private Rect currentFaceRect;
+
+    // 5-Second Analysis
+    private final java.util.List<Float> frameScores = new java.util.ArrayList<>();
+    private boolean isAnalyzing = false;
+    private static final int ANALYSIS_DURATION_MS = 5000;
+    private static final float MIN_AVERAGE_SCORE_FOR_REGISTRATION = 0.75f;
 
     // 🔄 HANDLERS
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -82,6 +100,9 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
         initializeComponents();
         setupClickListeners();
 
+        // Đảm bảo biến analysisOverlay ban đầu là null để thiết lập UI phân tích khi cần
+        analysisOverlay = null;
+        
         Log.d(TAG, "✅ Fragment initialized with clean architecture");
     }
 
@@ -146,12 +167,89 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
 
         // Handle state-specific actions
         handleStateActions(state);
+        
+        // Cập nhật UI overlay theo màu sắc dựa vào trạng thái
+        updateOverlayColor(state);
+    }
+    
+    /**
+     * Cập nhật màu sắc overlay dựa vào trạng thái
+     */
+    private void updateOverlayColor(FaceRegistrationState state) {
+        if (faceOverlayView == null || !isAdded()) return;
+        
+        int color;
+        switch (state) {
+            case FACE_REAL:
+            case FACE_STABLE:
+                color = ContextCompat.getColor(requireContext(), R.color.success_green);
+                break;
+                
+            case FACE_DETECTED:
+            case FACE_STABILIZING:
+            case FACE_WARNING:
+                color = ContextCompat.getColor(requireContext(), R.color.warning_yellow);
+                break;
+                
+            case FACE_SPOOFED:
+            case FACE_OUT_OF_BOUNDS:
+            case FAILED_SPOOF:
+            case MULTIPLE_FACES:
+                color = ContextCompat.getColor(requireContext(), R.color.error_red);
+                break;
+                
+            case NO_FACE:
+            case READY:
+                color = ContextCompat.getColor(requireContext(), R.color.white);
+                break;
+                
+            case LIVENESS_CHALLENGE:
+                color = ContextCompat.getColor(requireContext(), R.color.primary);
+                break;
+                
+            case ANALYZING:
+            case PROCESSING:
+                color = ContextCompat.getColor(requireContext(), R.color.processing_blue);
+                break;
+                
+            default:
+                color = ContextCompat.getColor(requireContext(), R.color.white);
+                break;
+        }
+        
+        faceOverlayView.setOvalColor(color);
     }
 
     /**
      * Handle actions for specific states
      */
     private void handleStateActions(FaceRegistrationState state) {
+        // Kiểm tra xem fragment có còn hoạt động không
+        if (!isAdded() || getActivity() == null) {
+            Log.w(TAG, "⚠️ Fragment not valid for state action: " + state);
+            return;
+        }
+
+        // Ghi log cho trạng thái
+        Log.d(TAG, "Xử lý trạng thái: " + state);
+        
+        // Cập nhật tvStatusMessage (Thêm vào để luôn cập nhật thông báo trạng thái)
+        if (binding != null && binding.tvStatusMessage != null) {
+            String message = state.getDefaultMessage();
+            binding.tvStatusMessage.setText(message);
+        }
+        
+        // Cập nhật UI loading nếu đang trong trạng thái xử lý
+        if (state.isProcessingState()) {
+            if (uiController != null) {
+                uiController.showLoadingIndicator(true);
+            }
+        } else {
+            if (uiController != null) {
+                uiController.showLoadingIndicator(false);
+            }
+        }
+
         switch (state) {
             case SUCCESS:
                 handleSuccessState();
@@ -166,12 +264,99 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
                 break;
 
             case FACE_STABLE:
-                // 🎯 Capture after a short delay
-                mainHandler.postDelayed(() -> {
-                    if (stateManager.getCurrentState() == FaceRegistrationState.FACE_STABLE) {
-                        captureAndRegisterFace();
+                if (!isAnalyzing) {
+                    // Hiển thị UI thông báo
+                    Log.d(TAG, "Khuôn mặt đã ổn định, bắt đầu phân tích...");
+                    stateManager.transitionTo(FaceRegistrationState.ANALYZING, 
+                        "Đang phân tích khuôn mặt...");
+                    
+                    // Cập nhật UI để người dùng biết đang phân tích
+                    if (binding != null && binding.tvStatusMessage != null) {
+                        binding.tvStatusMessage.setText("Đang phân tích khuôn mặt...");
                     }
-                }, 500);
+                    
+                    // Bắt đầu phân tích
+                    startAnalysis();
+                }
+                break;
+
+            case FACE_DETECTED:
+                // Cập nhật UI khi phát hiện khuôn mặt
+                if (faceOverlayView != null) {
+                    faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.warning_yellow));
+                }
+                break;
+
+            case NO_FACE:
+                // Cập nhật UI khi không phát hiện khuôn mặt
+                if (faceOverlayView != null) {
+                    faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.white));
+                }
+                break;
+
+            case ANALYZING:
+                // Đảm bảo UI phân tích được hiển thị
+                if (analysisOverlay != null && analysisOverlay.getVisibility() != View.VISIBLE) {
+                    analysisOverlay.setVisibility(View.VISIBLE);
+                }
+                break;
+
+            case LIVENESS_CHALLENGE:
+                // Hiển thị UI cho liveness challenge
+                Log.d(TAG, "🔄 Kích hoạt Liveness Challenge");
+                if (binding != null && binding.tvStatusMessage != null) {
+                    binding.tvStatusMessage.setText("Hãy nhìn vào camera và nhấp mắt");
+                }
+                if (faceOverlayView != null) {
+                    faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.primary));
+                }
+                break;
+                
+            case FACE_OUT_OF_BOUNDS:
+                // Cập nhật UI khi khuôn mặt nằm ngoài khung hình
+                if (faceOverlayView != null) {
+                    faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.error_red));
+                }
+                break;
+                
+            case READY:
+                // Đảm bảo UI được đặt lại ở trạng thái sẵn sàng
+                if (faceOverlayView != null) {
+                    faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.white));
+                }
+                break;
+                
+            case INITIALIZING:
+                // Hiển thị UI loading khi đang khởi tạo
+                if (uiController != null) {
+                    uiController.showLoadingOverlay(true);
+                }
+                break;
+                
+            case FACE_REAL:
+            case FACE_STABILIZING:
+                // Cập nhật UI cho trạng thái ổn định khuôn mặt
+                if (faceOverlayView != null) {
+                    faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.warning_yellow));
+                }
+                break;
+                
+            case FACE_SPOOFED:
+                // Cập nhật UI khi phát hiện giả mạo
+                if (faceOverlayView != null) {
+                    faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.error_red));
+                }
+                break;
+                
+            case PROCESSING:
+                // Hiển thị UI đang xử lý
+                if (uiController != null) {
+                    uiController.showLoadingIndicator(true);
+                }
+                // Đảm bảo ẩn overlay phân tích
+                if (analysisOverlay != null) {
+                    analysisOverlay.setVisibility(View.GONE);
+                }
                 break;
         }
     }
@@ -202,7 +387,15 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
         // Check if already initialized to prevent duplicate initializations
         if (FaceIdServiceManager.getInstance().isInitialized() && faceIdService != null) {
             Log.d(TAG, "✅ FaceIdService already initialized, proceeding to camera");
+            
+            // Đánh dấu đã khởi tạo thành công
+            faceIdServiceInitialized = true;
+            
             initializeSpoofDetection();
+            
+            // Đảm bảo chuyển sang trạng thái READY trước khi khởi động camera
+            stateManager.transitionTo(FaceRegistrationState.READY, "Position your face in the oval");
+            
             checkCameraPermissionAndStart();
             return;
         }
@@ -213,12 +406,16 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
                 if (!isAdded()) return;
 
                 faceIdService = service;
+                faceIdServiceInitialized = true;
 
                 // 🔧 NEW: Set registration scenario for more lenient validation
                 faceIdService.setScenario(FaceIdConfig.Scenario.REGISTRATION);
 
                 // Initialize SpoofDetectionManager with FaceSpoofDetector
                 initializeSpoofDetection();
+                
+                // Đảm bảo chuyển sang trạng thái READY trước khi khởi động camera
+                stateManager.transitionTo(FaceRegistrationState.READY, "Position your face in the oval");
 
                 checkCameraPermissionAndStart();
                 Log.d(TAG, "✅ FaceIdService initialized with REGISTRATION scenario");
@@ -323,6 +520,33 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
     private void processFrame(Bitmap bitmap) {
         currentFrameBitmap = bitmap;
 
+        // Kiểm tra xem FaceIdService đã khởi tạo chưa
+        if (faceIdService == null || !faceIdServiceInitialized) {
+            Log.w(TAG, "FaceIdService not initialized yet, skipping frame processing");
+            return;
+        }
+
+        if (isAnalyzing) {
+            faceIdService.processContinuousFrame(bitmap, faceOverlayView.getOvalRect(), new FaceIdService.ContinuousProcessingCallback() {
+                @Override
+                public void onFaceDetected(Rect boundingBox, boolean isSpoof, float spoofScore) {
+                    if (!isSpoof) {
+                        frameScores.add(spoofScore);
+                    }
+                }
+
+                @Override
+                public void onNoFaceDetected() {}
+
+                @Override
+                public void onMultipleFacesDetected() {}
+
+                @Override
+                public void onError(String errorMessage) {}
+            });
+            return;
+        }
+
         // Skip if not ready
         if (faceIdService == null) {
             return;
@@ -334,21 +558,32 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
         }
 
         // Process frame with oval boundary validation
-        faceIdService.processContinuousFrame(bitmap, faceOverlayView.getOvalRect(), 
+        faceIdService.processContinuousFrame(bitmap, faceOverlayView.getOvalRect(),
                 new FaceIdService.ContinuousProcessingCallback() {
             @Override
             public void onFaceDetected(Rect boundingBox, boolean isSpoof, float spoofScore) {
                 currentFaceRect = boundingBox;
-                
+
                 // Update face position in overlay for user guidance
                 if (faceOverlayView != null) {
                     boolean isGoodPosition = faceOverlayView.updateFacePosition(boundingBox);
-                    
+
                     // If position is bad, don't proceed with further processing
                     if (!isGoodPosition && stateManager.getCurrentState() != FaceRegistrationState.FACE_OUT_OF_BOUNDS) {
-                        stateManager.transitionTo(FaceRegistrationState.FACE_OUT_OF_BOUNDS, 
+                        stateManager.transitionTo(FaceRegistrationState.FACE_OUT_OF_BOUNDS,
                                 "Position your face properly in the oval");
+                        // Cập nhật UI ngay lập tức
+                        if (faceOverlayView != null) {
+                            faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.error_red));
+                        }
                         return;
+                    } else if (isGoodPosition && stateManager.getCurrentState() == FaceRegistrationState.FACE_OUT_OF_BOUNDS) {
+                        // Khi vị trí đã tốt nhưng trạng thái vẫn là out of bounds, cập nhật trạng thái
+                        stateManager.transitionTo(FaceRegistrationState.FACE_DETECTED, "Face detected");
+                        // Cập nhật UI ngay lập tức
+                        if (faceOverlayView != null) {
+                            faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.warning_yellow));
+                        }
                     }
                 }
 
@@ -367,6 +602,17 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
             public void onNoFaceDetected() {
                 currentFaceRect = null;
                 stateManager.transitionTo(FaceRegistrationState.NO_FACE, "Look at the camera");
+                
+                // Cập nhật UI ngay lập tức
+                if (faceOverlayView != null) {
+                    faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.white));
+                }
+                
+                // Cập nhật thông báo trạng thái
+                if (binding != null && binding.tvStatusMessage != null) {
+                    binding.tvStatusMessage.setText("Look at the camera");
+                }
+                
                 resetFaceTracker();
             }
 
@@ -375,6 +621,17 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
                 currentFaceRect = null;
                 stateManager.transitionTo(FaceRegistrationState.MULTIPLE_FACES,
                         "Only one face should be visible");
+                
+                // Cập nhật UI ngay lập tức
+                if (faceOverlayView != null) {
+                    faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.error_red));
+                }
+                
+                // Cập nhật thông báo trạng thái
+                if (binding != null && binding.tvStatusMessage != null) {
+                    binding.tvStatusMessage.setText("Only one face should be visible");
+                }
+                
                 resetFaceTracker();
             }
 
@@ -395,75 +652,27 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
             return;
         }
 
-        Log.d(TAG, "🔍 Enhanced spoof result: isSpoof=" + result.isSpoof + 
-              ", confidence=" + result.confidence + 
-              ", level=" + result.confidenceLevel + 
-              ", shouldProceed=" + result.shouldProceed + 
-              ", explanation=" + result.explanation);
+        if (result.triggerLivenessChallenge) {
+            stateManager.transitionTo(FaceRegistrationState.LIVENESS_CHALLENGE, result.explanation);
+            return;
+        }
 
-        // Handle spoof detection with improved thresholds
         if (result.isSpoof) {
-            // For high or medium confidence spoof detections, immediately transition to spoofed state
-            if (result.confidenceLevel == SpoofDetectionManager.ConfidenceLevel.HIGH || 
-                result.confidenceLevel == SpoofDetectionManager.ConfidenceLevel.MEDIUM) {
-                stateManager.transitionTo(FaceRegistrationState.FACE_SPOOFED, result.explanation);
-                resetFaceTracker();
-                return;
-            }
-            
-            // For lower confidence spoof, show warning but don't fail immediately
-            if (stateManager.getCurrentState() != FaceRegistrationState.FACE_WARNING) {
-                stateManager.transitionTo(FaceRegistrationState.FACE_WARNING, result.explanation);
-            }
+            stateManager.transitionTo(FaceRegistrationState.FACE_SPOOFED, result.explanation);
             resetFaceTracker();
             return;
         }
 
-        // 🆕 IMPROVED: Better handling for real face detections
-        if (!result.isSpoof) {
-            // Update state based on confidence level
-            if (result.confidenceLevel == SpoofDetectionManager.ConfidenceLevel.HIGH) {
-                if (stateManager.getCurrentState() != FaceRegistrationState.FACE_REAL &&
-                    stateManager.getCurrentState() != FaceRegistrationState.FACE_STABILIZING) {
-                    stateManager.transitionTo(FaceRegistrationState.FACE_REAL, "High confidence real face detected");
-                }
-            } else if (result.confidenceLevel == SpoofDetectionManager.ConfidenceLevel.MEDIUM) {
-                if (stateManager.getCurrentState() != FaceRegistrationState.FACE_REAL &&
-                    stateManager.getCurrentState() != FaceRegistrationState.FACE_STABILIZING) {
-                    stateManager.transitionTo(FaceRegistrationState.FACE_REAL, "Real face detected");
-                }
+        if (result.shouldProceed) {
+            stateManager.transitionTo(FaceRegistrationState.FACE_STABLE, result.explanation);
+        } else {
+            // Use a FACE_SUSPICIOUS state to provide feedback without failing
+            if (result.explanation.contains("Suspicious")) {
+                stateManager.transitionTo(FaceRegistrationState.FACE_SUSPICIOUS, result.explanation);
             } else {
-                // Low confidence real face - show guidance
-                if (stateManager.getCurrentState() != FaceRegistrationState.FACE_WARNING) {
-                    stateManager.transitionTo(FaceRegistrationState.FACE_WARNING, 
-                        "Low confidence detection - please improve lighting and position");
-                }
-                resetFaceTracker();
-                return;
+                stateManager.transitionTo(FaceRegistrationState.FACE_STABILIZING, result.explanation);
             }
-
-            // 🆕 IMPROVED: Process based on should proceed flag with better feedback
-            if (result.shouldProceed) {
-                stateManager.transitionTo(FaceRegistrationState.FACE_STABLE, "Ready to capture!");
-            } else {
-                // Provide better guidance based on explanation
-                String guidance = result.explanation;
-                if (guidance.contains("need")) {
-                    // Extract frame count needed
-                    if (guidance.contains("1 more frame")) {
-                        guidance = "Almost there! Hold steady for 1 more frame";
-                    } else if (guidance.contains("2 more frames")) {
-                        guidance = "Keep holding! Need 2 more frames";
-                    } else {
-                        guidance = "Hold steady! " + guidance;
-                    }
-                }
-                
-                if (stateManager.getCurrentState() != FaceRegistrationState.FACE_STABILIZING) {
-                    stateManager.transitionTo(FaceRegistrationState.FACE_STABILIZING, guidance);
-                }
-                trackFaceStability(boundingBox);
-            }
+            trackFaceStability(boundingBox);
         }
     }
 
@@ -510,7 +719,14 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
                     
                     // Update progress animation in overlay
                     if (faceOverlayView != null && percentage > 0) {
+                        // Cập nhật màu sắc oval để phản hồi trực quan
+                        faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.warning_yellow));
                         faceOverlayView.startProgressAnimation(3000); // 3 second animation
+                    }
+                    
+                    // Cập nhật thông báo trạng thái
+                    if (binding != null && binding.tvStatusMessage != null) {
+                        binding.tvStatusMessage.setText("Hold still... " + percentage + "%");
                     }
                 }
 
@@ -520,6 +736,16 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
 
                     currentFaceRect = stableFaceRect;
                     stateManager.transitionTo(FaceRegistrationState.FACE_STABLE, "Perfect!");
+                    
+                    // Cập nhật màu oval khi khuôn mặt ổn định
+                    if (faceOverlayView != null) {
+                        faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.success_green));
+                    }
+                    
+                    // Cập nhật thông báo trạng thái
+                    if (binding != null && binding.tvStatusMessage != null) {
+                        binding.tvStatusMessage.setText("Perfect! Processing...");
+                    }
                 }
 
                 @Override
@@ -531,7 +757,14 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
                     
                     // Stop progress animation
                     if (faceOverlayView != null) {
+                        // Đặt lại màu oval
+                        faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.warning_yellow));
                         faceOverlayView.stopProgressAnimation();
+                    }
+                    
+                    // Cập nhật thông báo trạng thái
+                    if (binding != null && binding.tvStatusMessage != null) {
+                        binding.tvStatusMessage.setText("Keep your face steady");
                     }
                 }
             });
@@ -587,6 +820,11 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
         // 🔧 NEW: Show progress updates
         stateManager.transitionTo(FaceRegistrationState.PROCESSING, "Generating face embedding...");
         
+        // Kiểm tra và ẩn overlay phân tích nếu đang hiển thị
+        if (analysisOverlay != null && analysisOverlay.getVisibility() == View.VISIBLE) {
+            analysisOverlay.setVisibility(View.GONE);
+        }
+        
         // 🎯 Register face with enhanced security validation
         faceIdService.captureAndRegisterFace(
                 capturedBitmap, 
@@ -614,21 +852,31 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
 
                         Log.e(TAG, "❌ Registration failed: " + errorMessage);
                         
+                        // Store detailed error information for UI display
+                        lastDetailedErrorMessage = "Registration failure details:\n" + errorMessage;
+                        hasDetailedError = true;
+                        
                         // 🔧 NEW: Enhanced error categorization
                         if (errorMessage.contains("timeout") || errorMessage.contains("Timeout")) {
+                            lastDetailedErrorMessage += "\n\nError type: Network Timeout";
                             handleNetworkError("Request timeout. Please try again.");
                         } else if (errorMessage.contains("Network error") || errorMessage.contains("Cannot connect")) {
+                            lastDetailedErrorMessage += "\n\nError type: Network Connectivity";
                             handleNetworkError(errorMessage);
                         } else if (errorMessage.contains("Authentication failed")) {
+                            lastDetailedErrorMessage += "\n\nError type: Authentication";
                             stateManager.transitionTo(FaceRegistrationState.FAILED_OTHER,
                                     "Authentication failed. Please login again.");
                         } else if (errorMessage.contains("Server error")) {
+                            lastDetailedErrorMessage += "\n\nError type: Server";
                             stateManager.transitionTo(FaceRegistrationState.FAILED_OTHER,
                                     "Server error. Please try again later.");
                         } else if (errorMessage.contains("spoof") || errorMessage.contains("Spoof")) {
+                            lastDetailedErrorMessage += "\n\nError type: Spoof Detection";
                             stateManager.transitionTo(FaceRegistrationState.FAILED_SPOOF,
                                     "Registration failed: " + errorMessage);
                         } else {
+                            lastDetailedErrorMessage += "\n\nError type: Other/Unknown";
                             stateManager.transitionTo(FaceRegistrationState.FAILED_OTHER,
                                     "Registration failed: " + errorMessage);
                         }
@@ -763,17 +1011,29 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
         } else {
             message = message + "\n\nWould you like to try again?";
         }
+        
+        // Add detailed error information if available
+        final String detailedMessage = hasDetailedError ? 
+                message + "\n\n--- DETAILED ERROR INFORMATION ---\n" + lastDetailedErrorMessage : message;
+        
+        // Log the detailed error for debugging
+        Log.e(TAG, "Detailed error information: " + detailedMessage);
 
-        // For other errors, show regular retry dialog
-        new AlertDialog.Builder(requireContext())
+        // For other errors, show regular retry dialog with detailed information
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext())
                 .setTitle("Registration Failed")
-                .setMessage(message)
+                .setMessage(detailedMessage)
                 .setPositiveButton("Retry", (dialog, which) -> {
                     // Check if fragment is still attached before proceeding
                     if (!isAdded()) {
                         Log.w(TAG, "Fragment not attached, cannot retry");
                         return;
                     }
+
+                    // Reset error tracking
+                    hasDetailedError = false;
+                    lastDetailedErrorMessage = "";
+                    
 
                     // Make sure everything is fully reset before retry
                     resetComponents();
@@ -787,16 +1047,39 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
                         startFaceRegistration();
                     }, 500);
                 })
+                .setNeutralButton("Copy Error Info", (dialog, which) -> {
+                    // Copy error details to clipboard
+                    ClipboardManager clipboard = (ClipboardManager) requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
+                    ClipData clip = ClipData.newPlainText("Face Registration Error", detailedMessage);
+                    clipboard.setPrimaryClip(clip);
+                    Toast.makeText(requireContext(), "Error details copied to clipboard", Toast.LENGTH_SHORT).show();
+                    
+                    // Show dialog again
+                    handleErrorState(state);
+                })
                 .setNegativeButton("Cancel", (dialog, which) -> {
                     // Check if fragment is still attached before proceeding
                     if (!isAdded()) {
                         Log.w(TAG, "Fragment not attached, cannot handle cancel");
                         return;
                     }
+
+                    // Reset error tracking
+                    hasDetailedError = false;
+                    lastDetailedErrorMessage = "";
                     requireActivity().onBackPressed();
                 })
-                .setCancelable(false)
-                .show();
+                .setCancelable(false);
+        
+        // Create and show the dialog        
+        AlertDialog dialog = builder.create();
+        dialog.show();
+        
+        // Make the message scrollable for long detailed errors
+        TextView messageView = dialog.findViewById(android.R.id.message);
+        if (messageView != null) {
+            messageView.setMovementMethod(new ScrollingMovementMethod());
+        }
     }
 
     /**
@@ -882,11 +1165,22 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
         
         if (faceOverlayView != null) {
             faceOverlayView.clear();
+            // Đặt lại màu của oval để biểu thị trạng thái mới
+            faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.white));
         }
 
         // Clear data
         currentFrameBitmap = null;
         currentFaceRect = null;
+        
+        // Đặt lại biến phân tích
+        isAnalyzing = false;
+        frameScores.clear();
+        
+        // Ẩn overlay phân tích nếu đang hiển thị
+        if (analysisOverlay != null) {
+            analysisOverlay.setVisibility(View.GONE);
+        }
 
         // Clear any pending handlers/callbacks
         if (mainHandler != null) {
@@ -943,4 +1237,249 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
 
         Log.d(TAG, "🧹 Fragment cleaned up");
     }
-}
+    // Thêm các biến UI cần thiết
+    private ProgressBar analysisProgressBar;
+    private TextView analysisCountdownText;
+    private View analysisOverlay;
+    
+    // Thêm biến theo dõi xem faceIdService đã khởi tạo thành công chưa
+    private boolean faceIdServiceInitialized = false;
+    
+    /**
+     * Start a 5-second analysis of face quality before proceeding with registration
+     * Collects frame scores to ensure consistent high-quality face detection
+     */
+    private void startAnalysis() {
+        // Kiểm tra nếu đã đang phân tích
+        if (isAnalyzing) {
+            Log.d(TAG, "Đã đang phân tích, bỏ qua yêu cầu mới");
+            return;
+        }
+        
+        isAnalyzing = true;
+        frameScores.clear();
+        
+        // Kiểm tra fragment tồn tại
+        if (!isAdded() || binding == null) return;
+        
+        // Khởi tạo và hiển thị UI phân tích nếu chưa tồn tại
+        setupAnalysisUI();
+        
+        // Hiện overlay phân tích
+        if (analysisOverlay != null) {
+            analysisOverlay.setVisibility(View.VISIBLE);
+        }
+        
+        // Start with initial analyzing state message
+        stateManager.transitionTo(FaceRegistrationState.ANALYZING, "Đang phân tích... Giữ nguyên");
+        
+        // Hiển thị và cập nhật progressBar
+        if (analysisProgressBar != null) {
+            analysisProgressBar.setVisibility(View.VISIBLE);
+            analysisProgressBar.setMax(ANALYSIS_DURATION_MS);
+            analysisProgressBar.setProgress(0);
+            
+            // Animator để cập nhật progress một cách mượt mà
+            final ValueAnimator progressAnimator = ValueAnimator.ofInt(0, ANALYSIS_DURATION_MS);
+            progressAnimator.setDuration(ANALYSIS_DURATION_MS);
+            progressAnimator.setInterpolator(new LinearInterpolator());
+            progressAnimator.addUpdateListener(animation -> {
+                if (analysisProgressBar != null && isAdded()) {
+                    analysisProgressBar.setProgress((Integer) animation.getAnimatedValue());
+                }
+            });
+            progressAnimator.start();
+        }
+        
+        // Start countdown feedback
+        final int[] secondsLeft = {ANALYSIS_DURATION_MS / 1000};
+        final int countdownInterval = 1000; // 1 second
+        
+        // Countdown handler to update UI every second
+        final Handler countdownHandler = new Handler(Looper.getMainLooper());
+        final Runnable countdownRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!isAdded() || !isAnalyzing) return;
+                
+                secondsLeft[0]--;
+                if (secondsLeft[0] > 0) {
+                    // Update countdown message and UI
+                    String message = "Đang phân tích... " + secondsLeft[0] + "s";
+                    stateManager.transitionTo(FaceRegistrationState.ANALYZING, message);
+                    
+                    // Cập nhật text đếm ngược
+                    if (analysisCountdownText != null) {
+                        analysisCountdownText.setText(message);
+                    }
+                    
+                    countdownHandler.postDelayed(this, countdownInterval);
+                }
+            }
+        };
+        
+        // Start countdown updates
+        countdownHandler.postDelayed(countdownRunnable, countdownInterval);
+        
+        // Schedule analysis completion
+        mainHandler.postDelayed(() -> {
+            // Stop analyzing
+            isAnalyzing = false;
+            countdownHandler.removeCallbacks(countdownRunnable);
+            
+            // Ẩn overlay phân tích
+            if (analysisOverlay != null && isAdded()) {
+                analysisOverlay.setVisibility(View.GONE);
+            }
+            
+            // Check if fragment is still valid
+            if (!isAdded()) {
+                Log.w(TAG, "Fragment not attached during analysis completion");
+                return;
+            }
+            
+            // Check if we collected enough data
+            if (frameScores.isEmpty()) {
+                stateManager.transitionTo(FaceRegistrationState.FAILED_OTHER, 
+                        "Không thể lấy được dữ liệu ổn định. Vui lòng thử lại.");
+                return;
+            }
+            
+            if (frameScores.size() < 10) {
+                stateManager.transitionTo(FaceRegistrationState.FAILED_OTHER, 
+                        "Không đủ dữ liệu chất lượng. Cần cải thiện ánh sáng và giữ vị trí ổn định.");
+                return;
+            }
+            
+            // Calculate statistics
+            float sum = 0;
+            float min = Float.MAX_VALUE;
+            float max = Float.MIN_VALUE;
+            
+            for (float score : frameScores) {
+                sum += score;
+                min = Math.min(min, score);
+                max = Math.max(max, score);
+            }
+            
+            float averageScore = sum / frameScores.size();
+            float variance = calculateVariance(frameScores, averageScore);
+            
+            Log.d(TAG, "Analysis complete: " + frameScores.size() + " frames analyzed");
+            Log.d(TAG, "Scores - Avg: " + averageScore + ", Min: " + min + ", Max: " + max + ", Variance: " + variance);
+            
+            // Quality assessment
+            boolean isConsistent = variance < 0.03; // Low variance indicates consistent detection
+            boolean isHighQuality = averageScore >= MIN_AVERAGE_SCORE_FOR_REGISTRATION;
+            boolean isAcceptableQuality = averageScore >= (MIN_AVERAGE_SCORE_FOR_REGISTRATION - 0.1f);
+            
+            // Log detailed quality information
+            String qualityLog = String.format(Locale.US, 
+                "Face Analysis Results - Frames: %d, Average Score: %.3f, Min: %.3f, Max: %.3f, Variance: %.5f, " +
+                "isConsistent: %b, isHighQuality: %b, isAcceptableQuality: %b",
+                frameScores.size(), averageScore, min, max, variance,
+                isConsistent, isHighQuality, isAcceptableQuality);
+            Log.d(TAG, qualityLog);
+            
+            // Different paths based on quality assessment
+            if (isHighQuality && isConsistent) {
+                // High quality and consistent - proceed with registration
+                stateManager.transitionTo(FaceRegistrationState.PROCESSING, 
+                        "Kiểm tra chất lượng đạt. Đang đăng ký...");
+                captureAndRegisterFace();
+            } else if (isAcceptableQuality) {
+                // Acceptable but not ideal - warn user but proceed
+                stateManager.transitionTo(FaceRegistrationState.PROCESSING, 
+                        "Chất lượng chấp nhận được. Đang tiến hành đăng ký...");
+                captureAndRegisterFace();
+            } else {
+                // Low quality - provide specific feedback based on issues
+                String feedbackMessage = generateQualityFeedback(averageScore, variance);
+                lastDetailedErrorMessage = qualityLog + "\n\nDetailed Analysis: " + feedbackMessage;
+                hasDetailedError = true;
+                Log.e(TAG, "❌ Analysis failed: " + lastDetailedErrorMessage);
+                stateManager.transitionTo(FaceRegistrationState.FAILED_OTHER, feedbackMessage);
+            }
+        }, ANALYSIS_DURATION_MS);
+    }
+    
+    /**
+     * Thiết lập UI cho phân tích
+     */
+    private void setupAnalysisUI() {
+        if (binding == null || !isAdded()) return;
+        
+        // Kiểm tra nếu đã tạo UI trước đó
+        if (analysisOverlay != null) {
+            // Đảm bảo hiển thị UI chính xác
+            analysisOverlay.setVisibility(View.VISIBLE);
+            return;
+        }
+        
+        // Tạo overlay cho phân tích
+        analysisOverlay = LayoutInflater.from(requireContext())
+                .inflate(R.layout.overlay_face_analysis, binding.flStudentSettingRegisterFaceIdCameraContainer, false);
+        
+        // Thêm vào container
+        binding.flStudentSettingRegisterFaceIdCameraContainer.addView(analysisOverlay);
+        
+        // Lấy reference đến các thành phần UI
+        analysisProgressBar = analysisOverlay.findViewById(R.id.progressBarAnalysis);
+        analysisCountdownText = analysisOverlay.findViewById(R.id.tvAnalysisCountdown);
+        
+        // Đảm bảo progressBar ở trạng thái mặc định ban đầu
+        if (analysisProgressBar != null) {
+            analysisProgressBar.setProgress(0);
+        }
+        
+        // Đặt text ban đầu cho countdown
+        if (analysisCountdownText != null) {
+            analysisCountdownText.setText("Analyzing...");
+        }
+        
+        // Hiển thị UI
+        analysisOverlay.setVisibility(View.VISIBLE);
+        
+        Log.d(TAG, "Analysis UI initialized and shown");
+    }
+
+    /**
+     * Calculate variance of collected scores to assess consistency
+     */
+    private float calculateVariance(java.util.List<Float> scores, float mean) {
+        float sumSquaredDiff = 0;
+        for (float score : scores) {
+            float diff = score - mean;
+            sumSquaredDiff += diff * diff;
+        }
+        return sumSquaredDiff / scores.size();
+    }
+
+    /**
+     * Generate specific feedback based on detected quality issues
+     */
+    private String generateQualityFeedback(float averageScore, float variance) {
+        StringBuilder feedback = new StringBuilder();
+        
+        if (variance > 0.05) {
+            feedback.append("Phát hiện khuôn mặt không ổn định. Vui lòng giữ khuôn mặt ổn định hơn và thử lại.");
+            feedback.append("\n\nLỗi chi tiết: Chỉ số biến thiên (variance) = ").append(String.format(Locale.US, "%.5f", variance));
+            feedback.append(" (vượt quá ngưỡng 0.05)");
+        } else if (averageScore < 0.4f) {
+            feedback.append("Chất lượng phát hiện rất thấp. Vui lòng thử lại trong điều kiện ánh sáng tốt hơn.");
+            feedback.append("\n\nLỗi chi tiết: Điểm trung bình = ").append(String.format(Locale.US, "%.3f", averageScore));
+            feedback.append(" (thấp hơn ngưỡng tối thiểu 0.4)");
+        } else if (averageScore < 0.6f) {
+            feedback.append("Chất lượng phát hiện thấp. Cải thiện ánh sáng và giảm chuyển động khuôn mặt.");
+            feedback.append("\n\nLỗi chi tiết: Điểm trung bình = ").append(String.format(Locale.US, "%.3f", averageScore));
+            feedback.append(" (thấp hơn ngưỡng khuyến nghị 0.6)");
+        } else {
+            feedback.append("Không thể có được hình ảnh đủ rõ ràng. Vui lòng thử lại với ánh sáng và vị trí tốt hơn.");
+            feedback.append("\n\nLỗi chi tiết: Kết hợp giữa điểm phát hiện và độ ổn định không đáp ứng yêu cầu");
+        }
+        
+        return feedback.toString();
+    }
+    }
+    
+

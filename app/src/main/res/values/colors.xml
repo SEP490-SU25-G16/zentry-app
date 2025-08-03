@@ -35,4 +35,7 @@
     <!-- Button Colors -->
     <color name="button_primary">#1976D2</color>
     <color name="button_secondary">#E3F2FD</color>
+    <color name="liveness_challenge_blue">#0000FF</color>
 </resources>
+
+
