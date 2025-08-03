@@ -5,6 +5,7 @@ import android.os.Bundle;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
 import androidx.navigation.fragment.NavHostFragment;
@@ -14,6 +15,7 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import vn.edu.fpt.zentryapp.R;
+import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentSettingBinding;
 
 public class StudentSettingFragment extends Fragment {
@@ -22,6 +24,7 @@ public class StudentSettingFragment extends Fragment {
     private NavController navController;
     private boolean hasDevice;
     private boolean hasFaceId;
+    private StudentSettingViewModel viewModel;
 
     @Nullable
     @Override
@@ -37,6 +40,11 @@ public class StudentSettingFragment extends Fragment {
     public void onViewCreated(@NonNull View view,
                               @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+
+        viewModel = new ViewModelProvider(this).get(StudentSettingViewModel.class);
+        AuthManager authManager = AuthManager.getInstance(requireContext());
+        viewModel.init(requireContext(), authManager);
+
         navController = NavHostFragment.findNavController(this);
 
         // Khởi tạo trạng thái đăng ký thiết bị và Face ID từ lưu trữ hoặc API
@@ -73,12 +81,7 @@ public class StudentSettingFragment extends Fragment {
 
         // TODO: Xử lý Logout nếu có
         binding.llStudentSettingRowLogout.setOnClickListener(v -> {
-            // TODO: gọi API logout hoặc xử lý đăng xuất
-            // Sau khi đăng xuất thành công, điều hướng về màn hình đăng nhập
-            // 1) Xoá token / session ở đây
-            // Ví dụ: SessionManager.clear()
-
-            // 2) Điều hướng về LoginFragment, xóa hết back stack
+            viewModel.logout();
             NavController nav = Navigation.findNavController(requireActivity(), R.id.nav_host_fragment);
             nav.navigate(R.id.action_global_logout);
         });

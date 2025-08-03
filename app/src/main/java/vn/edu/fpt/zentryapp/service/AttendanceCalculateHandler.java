@@ -25,7 +25,7 @@ public class AttendanceCalculateHandler {
         Log.d(TAG, "=== INITIALIZING ATTENDANCE CALCULATE HANDLER ===");
 
         this.context = context;
-        this.timeFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault());
+        this.timeFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
 
         if (context == null) {
             Log.e(TAG, "❌ FATAL: Context is NULL");
@@ -33,15 +33,7 @@ public class AttendanceCalculateHandler {
         }
 
         Log.d(TAG, "Context: " + context.getClass().getSimpleName());
-
-        try {
-            this.apiService = ApiClient.getClient(context).create(AttendanceApiService.class);
-            Log.d(TAG, "✅ ApiService created successfully");
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Failed to create ApiService", e);
-            throw new RuntimeException("Failed to initialize AttendanceCalculateHandler", e);
-        }
-
+        this.apiService = ApiClient.getClient(context).create(AttendanceApiService.class);
         Log.d(TAG, "AttendanceCalculateHandler initialized successfully");
         Log.d(TAG, "===============================================");
     }

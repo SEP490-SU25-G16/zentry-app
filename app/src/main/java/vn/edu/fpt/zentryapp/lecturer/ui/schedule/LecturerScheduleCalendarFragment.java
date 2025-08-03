@@ -16,14 +16,14 @@ import android.view.ViewGroup;
 
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentLecturerScheduleCalendarBinding;
-import vn.edu.fpt.zentryapp.lecturer.adapter.CalendarSessionAdapter;
+import vn.edu.fpt.zentryapp.lecturer.adapter.LecturerCalendarClassSectionAdapter;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.CalendarSession;
 
-public class LecturerScheduleCalendarFragment extends Fragment implements CalendarSessionAdapter.OnSessionClickListener {
+public class LecturerScheduleCalendarFragment extends Fragment implements LecturerCalendarClassSectionAdapter.OnLecturerCalendarClassSectionListener {
 
     private FragmentLecturerScheduleCalendarBinding binding;
     private LecturerScheduleCalendarViewModel viewModel;
-    private CalendarSessionAdapter sessionAdapter;
+    private LecturerCalendarClassSectionAdapter sessionAdapter;
     private NavController navController;
 
     @Nullable
@@ -53,7 +53,7 @@ public class LecturerScheduleCalendarFragment extends Fragment implements Calend
     }
 
     private void setupRecyclerView() {
-        sessionAdapter = new CalendarSessionAdapter();
+        sessionAdapter = new LecturerCalendarClassSectionAdapter();
         sessionAdapter.setOnSessionClickListener(this);
 
         binding.rvSessions.setLayoutManager(new LinearLayoutManager(requireContext()));

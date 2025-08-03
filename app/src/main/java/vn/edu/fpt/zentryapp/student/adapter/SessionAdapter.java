@@ -21,9 +21,6 @@ public class SessionAdapter extends RecyclerView.Adapter<SessionAdapter.ViewHold
         void onSessionClick(Session session);
     }
 
-    public void setOnSessionClickListener(OnSessionClickListener listener) {
-        this.onSessionClickListener = listener;
-    }
 
     public void setSessions(List<Session> sessions) {
         this.sessions = sessions != null ? sessions : new ArrayList<>();

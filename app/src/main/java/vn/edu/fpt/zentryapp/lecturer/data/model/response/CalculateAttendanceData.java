@@ -2,7 +2,14 @@ package vn.edu.fpt.zentryapp.lecturer.data.model.response;
 
 import com.google.gson.annotations.SerializedName;
 
-// CalculateAttendanceData.java
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+
+@AllArgsConstructor
+@NoArgsConstructor
+@Getter
 public class CalculateAttendanceData {
     @SerializedName("Success")
     private boolean success;
@@ -13,8 +20,4 @@ public class CalculateAttendanceData {
     @SerializedName("AttendedCount")
     private int attendedCount;
 
-    // Getters
-    public boolean isSuccess() { return success; }
-    public String getMessage() { return message; }
-    public int getAttendedCount() { return attendedCount; }
 }

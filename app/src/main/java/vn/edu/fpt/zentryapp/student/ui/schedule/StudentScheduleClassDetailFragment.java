@@ -1,34 +1,35 @@
 package vn.edu.fpt.zentryapp.student.ui.schedule;
 
+import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
-import androidx.viewpager2.adapter.FragmentStateAdapter;
-import androidx.viewpager2.widget.ViewPager2;
+import androidx.navigation.NavController;
+import androidx.navigation.fragment.NavHostFragment;
 
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
-import com.google.android.material.tabs.TabLayoutMediator;
-
-import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentScheduleClassDetailBinding;
-import vn.edu.fpt.zentryapp.student.ui.schedule.tabs.ClassHistoryFragment;
-import vn.edu.fpt.zentryapp.student.ui.schedule.tabs.FinalAttendanceFragment;
+import vn.edu.fpt.zentryapp.student.data.model.response.ScheduleDetailDto;
+import vn.edu.fpt.zentryapp.student.data.model.response.StudentScheduleClassSection;
+import vn.edu.fpt.zentryapp.student.data.model.response.StudentFinalAttendanceDto;
 
 public class StudentScheduleClassDetailFragment extends Fragment {
 
+    private static final String TAG = "StudentClassDetail";
+
     private FragmentStudentScheduleClassDetailBinding binding;
     private StudentScheduleClassDetailViewModel viewModel;
-    private String sessionId;
+    private NavController navController;
+    private StudentScheduleClassSection session;
 
     @Nullable
     @Override
@@ -44,192 +45,187 @@ public class StudentScheduleClassDetailFragment extends Fragment {
                               @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // 🔧 LẤY data từ arguments
-        Bundle args = getArguments();
-        if (args != null) {
-            sessionId = args.getString("sessionId", "");
+        navController = NavHostFragment.findNavController(this);
 
-            // 🔧 HIỂN THỊ thông tin cơ bản ngay lập tức từ arguments
-            displayBasicInfo(args);
-        } else {
-            Log.w("ClassDetail", "No arguments provided, using default sessionId");
-            sessionId = "default_session";
+        // Get session object from arguments
+        if (getArguments() != null) {
+            session = (StudentScheduleClassSection) getArguments().getSerializable("session");
         }
 
-        // Initialize ViewModel - chỉ cần sessionId để load attendance data
+        // Initialize ViewModel
         viewModel = new ViewModelProvider(this).get(StudentScheduleClassDetailViewModel.class);
         AuthManager authManager = AuthManager.getInstance(requireContext());
-        viewModel.init(requireContext(), authManager, sessionId);
+        viewModel.init(requireContext(), authManager, session);
 
-        setupToolbar();
-        setupViewPager();
+        setupUI();
         setupClickListeners();
         observeViewModel();
     }
 
-    /**
-     * 🔧 SETUP toolbar với back navigation
-     */
-    private void setupToolbar() {
-        binding.ivStudentScheduleClassDetailBack.setOnClickListener(v ->
-                requireActivity().onBackPressed());
-    }
+    private void setupUI() {
+        // Set basic info from session object if available
+        if (session != null) {
+            // Course info
+            String courseDisplay = session.getCourseName() + " - " + session.getSectionCode();
+            binding.tvStudentScheduleClassDetailSubject.setText(courseDisplay);
 
-    /**
-     * 🔧 HIỂN THỊ thông tin cơ bản từ arguments (không cần API)
-     */
-    private void displayBasicInfo(Bundle args) {
-        String courseName = args.getString("courseName", "Unknown Course");
-        String sectionCode = args.getString("sectionCode", "Unknown Section");
-        String room = args.getString("room", "Unknown Room");
-        String lecturer = args.getString("lecturer", "Unknown Lecturer");
-        String startTime = args.getString("startTime", "");
-        String endTime = args.getString("endTime", "");
-        String dayOfWeek = args.getString("dayOfWeek", "");
+            // Class info - format time display
+            String timeDisplay = formatTimeDisplay(session);
+            binding.tvStudentScheduleClassDetailDuration.setText(timeDisplay);
 
-        // Set UI elements immediately
-        binding.tvStudentScheduleClassDetailSubject.setText(courseName);
-        binding.tvStudentScheduleClassDetailGrade.setText(sectionCode);
+            // Room info
+            String roomDisplay = session.getBuildingRoomDisplay();
+            binding.tvStudentScheduleClassDetailRoom.setText(roomDisplay);
 
-        // Format duration string
-        String durationText = formatDurationText(dayOfWeek, startTime, endTime, room, lecturer);
-        binding.tvStudentScheduleClassDetailDurationLabel.setText(durationText);
-
-        Log.d("ClassDetail", "Basic info displayed: " + courseName + " - " + sectionCode);
-    }
-
-    /**
-     * 🔧 FORMAT duration text với thông tin đầy đủ
-     */
-    private String formatDurationText(String dayOfWeek, String startTime, String endTime, String room, String lecturer) {
-        StringBuilder sb = new StringBuilder();
-
-        // Time info
-        if (!dayOfWeek.isEmpty() && !startTime.isEmpty() && !endTime.isEmpty()) {
-            sb.append(dayOfWeek).append(" ").append(startTime).append(" - ").append(endTime);
+            // Will be updated from API
+            binding.tvStudentScheduleClassDetailStudentCount.setText("Loading...");
         }
-
-        // Room info
-        if (!room.isEmpty()) {
-            if (sb.length() > 0) sb.append(" at ");
-            sb.append(room);
-        }
-
-        // Lecturer info
-        if (!lecturer.isEmpty()) {
-            if (sb.length() > 0) sb.append("\n");
-            sb.append("Lecturer: ").append(lecturer);
-        }
-
-        return sb.toString();
     }
 
-    /**
-     * 🔧 SETUP ViewPager với tabs
-     */
-    private void setupViewPager() {
-        String[] tabTitles = new String[]{"History", "Final Attendance"};
-
-        FragmentStateAdapter adapter = new FragmentStateAdapter(this) {
-            @NonNull
-            @Override
-            public Fragment createFragment(int position) {
-                switch (position) {
-                    case 0:
-                        // 🔧 PASS sessionId thay vì classId
-                        return ClassHistoryFragment.newInstance(sessionId);
-                    case 1:
-                        return FinalAttendanceFragment.newInstance(sessionId);
-                    default:
-                        return new Fragment();
-                }
-            }
-
-            @Override
-            public int getItemCount() {
-                return tabTitles.length;
-            }
-        };
-
-        binding.viewPagerStudentScheduleClassDetail.setAdapter(adapter);
-
-        // Connect TabLayout with ViewPager2
-        new TabLayoutMediator(binding.tabLayoutStudentScheduleClassDetail,
-                binding.viewPagerStudentScheduleClassDetail,
-                (tab, pos) -> tab.setText(tabTitles[pos])
-        ).attach();
-
-        // 🔧 THÊM listener để cập nhật chiều cao khi chuyển tab
-        binding.viewPagerStudentScheduleClassDetail.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
-            @Override
-            public void onPageSelected(int position) {
-                super.onPageSelected(position);
-                // Request layout lại để tính toán chiều cao mới
-                binding.viewPagerStudentScheduleClassDetail.requestLayout();
-                Log.d("ClassDetail", "Switched to tab: " + tabTitles[position]);
-            }
-        });
+    private String formatTimeDisplay(StudentScheduleClassSection session) {
+        try {
+            String dayTime = session.getDayOfWeek() + " " +
+                    session.getStartTime().substring(0, 5) + " - " +
+                    session.getEndTime().substring(0, 5);
+            return dayTime;
+        } catch (Exception e) {
+            return "Schedule not available";
+        }
     }
 
-    /**
-     * 🔧 SETUP click listeners
-     */
     private void setupClickListeners() {
-        // Notification button click
+        // Back button
+        binding.ivStudentScheduleClassDetailBack.setOnClickListener(v ->
+                navController.navigateUp());
+
+        // Notification button
         binding.btnStudentScheduleClassDetailNotification.setOnClickListener(v -> {
             Toast.makeText(requireContext(), "Notifications", Toast.LENGTH_SHORT).show();
-            viewModel.onNotificationClicked();
+        });
+
+        // Claim Request button
+        binding.btnStudentScheduleClassDetailClaimRequest.setOnClickListener(v -> {
+            // TODO: Implement claim request functionality
+            Toast.makeText(requireContext(), "Claim Request clicked", Toast.LENGTH_SHORT).show();
         });
     }
 
-    /**
-     * 🔧 OBSERVE ViewModel LiveData
-     */
     private void observeViewModel() {
-        // 🔧 CHỈ observe loading state cho attendance data
+        // Loading state
         viewModel.isLoading().observe(getViewLifecycleOwner(), isLoading -> {
-            // Optional: show loading indicator for attendance data
-            Log.d("ClassDetail", "Loading attendance data: " + isLoading);
+
+            Log.d(TAG, "Loading: " + isLoading);
         });
 
-        // 🔧 BỎ observe classDetail vì đã có data từ arguments
+        viewModel.classSectionDetail().observe(getViewLifecycleOwner(), scheduleDetail -> {
+            if (scheduleDetail != null) {
+                updateScheduleDetailUI(scheduleDetail);
+            }
+        });
+
+        // Student final attendance
+        viewModel.studentFinalAttendance().observe(getViewLifecycleOwner(), attendanceData -> {
+            if (attendanceData != null) {
+                updateStudentAttendanceUI(attendanceData);
+            }
+        });
+
+        // Error handling
+        viewModel.errorMessage().observe(getViewLifecycleOwner(), error -> {
+            if (error != null) {
+                Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+
+    // ✅ NEW: Method để update UI với schedule detail data
+    private void updateScheduleDetailUI(ScheduleDetailDto scheduleDetail) {
+        // Update course name với data từ API
+        String courseDisplay = scheduleDetail.getFormattedCourseDisplay();
+        binding.tvStudentScheduleClassDetailSubject.setText(courseDisplay);
+
+        // Update student count từ API
+        String studentCountDisplay = scheduleDetail.getFormattedStudentCount();
+        binding.tvStudentScheduleClassDetailStudentCount.setText(studentCountDisplay);
+
+        // Update duration từ API
+        String durationDisplay = scheduleDetail.getFormattedDuration();
+        binding.tvStudentScheduleClassDetailDuration.setText(durationDisplay);
+
+        // Update room display từ API
+        String roomDisplay = scheduleDetail.getFormattedRoomDisplay();
+        binding.tvStudentScheduleClassDetailRoom.setText(roomDisplay);
 
     }
 
-    /**
-     * 🔧 STATIC method để tạo fragment với sessionId
-     */
-    public static StudentScheduleClassDetailFragment newInstance(String sessionId) {
-        StudentScheduleClassDetailFragment fragment = new StudentScheduleClassDetailFragment();
-        Bundle args = new Bundle();
-        args.putString("sessionId", sessionId);
-        fragment.setArguments(args);
-        return fragment;
+    private void updateStudentAttendanceUI(StudentFinalAttendanceDto attendanceData) {
+        // Update student info
+        binding.tvStudentName.setText(attendanceData.getFullName());
+        binding.tvStudentId.setText("ID: " + attendanceData.getStudentId());
+
+        // Update attendance status based on session status
+        updateAttendanceStatus(attendanceData);
+
+        // Update rounds info in student count field
+        String roundsInfo = attendanceData.getAttendedRoundsCount() + "/" +
+                attendanceData.getTotalRounds() + " Rounds";
+        binding.tvStudentScheduleClassDetailStudentCount.setText(roundsInfo);
+
+        Log.d(TAG, "Updated UI - Student: " + attendanceData.getFullName() +
+                ", Status: " + attendanceData.getSessionStatus() +
+                ", Percentage: " + attendanceData.getFinalAttendancePercentage() + "%");
     }
 
-    /**
-     * 🔧 THÊM method để tạo fragment với full arguments
-     */
-    public static StudentScheduleClassDetailFragment newInstanceWithData(
-            String sessionId, String courseName, String sectionCode,
-            String room, String lecturer, String startTime, String endTime, String dayOfWeek) {
+    private void updateAttendanceStatus(StudentFinalAttendanceDto attendanceData) {
+        String status;
+        String textColor;
 
-        StudentScheduleClassDetailFragment fragment = new StudentScheduleClassDetailFragment();
-        Bundle args = new Bundle();
+        // ✅ SIMPLIFIED: Chỉ 3 cases - Active, Completed, Missed
+        switch (attendanceData.getSessionStatus().toLowerCase()) {
+            case "active":
+                // Session đang diễn ra - chưa có kết quả final
+                status = "On going";
+                textColor = "#F59E0B"; // Orange - đang diễn ra
+                break;
 
-        // Core session info
-        args.putString("sessionId", sessionId);
-        args.putString("courseName", courseName);
-        args.putString("sectionCode", sectionCode);
-        args.putString("room", room);
-        args.putString("lecturer", lecturer);
+            case "completed":
+                // Session đã kết thúc - check attendance percentage
+                if (attendanceData.getFinalAttendancePercentage() >= 80.0) {
+                    status = "Attended";
+                    textColor = "#10B981"; // Green - có mặt
+                } else {
+                    status = "Absent";
+                    textColor = "#EF4444"; // Red - vắng mặt
+                }
+                break;
 
-        // Timing info
-        args.putString("startTime", startTime);
-        args.putString("endTime", endTime);
-        args.putString("dayOfWeek", dayOfWeek);
+            case "missed":
+                // Session bị miss - không tham gia
+                status = "Missed";
+                textColor = "#EF4444"; // Red - bỏ lỡ
+                break;
 
-        fragment.setArguments(args);
-        return fragment;
+            default:
+                // Fallback case (shouldn't happen)
+                status = "Unknown";
+                textColor = "#64748B"; // Gray
+                break;
+        }
+
+        // ✅ CHỈ set text và color - không set background
+        binding.tvStudentAttendanceStatus.setText(status);
+        binding.tvStudentAttendanceStatus.setTextColor(Color.parseColor(textColor));
+
+        Log.d(TAG, "Status updated: " + status +
+                " (Session: " + attendanceData.getSessionStatus() +
+                ", Percentage: " + attendanceData.getFinalAttendancePercentage() + "%)");
+    }
+
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        binding = null;
     }
 }

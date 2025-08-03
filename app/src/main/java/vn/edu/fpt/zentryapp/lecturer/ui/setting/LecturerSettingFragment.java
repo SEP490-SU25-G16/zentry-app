@@ -2,6 +2,7 @@ package vn.edu.fpt.zentryapp.lecturer.ui.setting;
 
 import android.app.AlertDialog;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -25,6 +26,8 @@ public class LecturerSettingFragment extends Fragment {
     private FragmentLecturerSettingBinding binding;
     private LecturerSettingViewModel viewModel;
     private NavController navController;
+    private boolean hasDevice;
+    private AuthManager authManager;
 
     @Nullable
     @Override
@@ -40,14 +43,19 @@ public class LecturerSettingFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         navController = NavHostFragment.findNavController(this);
-
+        authManager = AuthManager.getInstance(requireContext());
         // Initialize ViewModel
         viewModel = new ViewModelProvider(this).get(LecturerSettingViewModel.class);
         AuthManager authManager = AuthManager.getInstance(requireContext());
         viewModel.init(authManager);
-
+        hasDevice = checkIfDeviceRegistered();
         setupClickListeners();
         observeViewModel();
+    }
+
+    // Thêm các phương thức kiểm tra trạng thái như Student
+    private boolean checkIfDeviceRegistered() {
+        return authManager.isDeviceRegistered();
     }
 
     private void setupClickListeners() {
@@ -61,9 +69,15 @@ public class LecturerSettingFragment extends Fragment {
             navController.navigate(R.id.action_setting_to_notification);
         });
 
-        // Device row
+        // Device row - Logic điều kiện như Student
         binding.llSettingRowDevice.setOnClickListener(v -> {
-            navController.navigate(R.id.action_setting_to_deviceInfo);
+            if (hasDevice) {
+                // Nếu đã đăng ký thiết bị, chuyển đến màn hình thông tin thiết bị
+                navController.navigate(R.id.action_setting_to_deviceInfo);
+            } else {
+                // Nếu chưa đăng ký, chuyển đến màn hình đăng ký thiết bị
+                navController.navigate(R.id.action_setting_to_deviceRegister);
+            }
         });
 
         // Logout row

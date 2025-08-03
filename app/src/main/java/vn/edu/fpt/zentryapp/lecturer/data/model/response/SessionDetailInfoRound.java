@@ -22,17 +22,9 @@ public class SessionDetailInfoRound {
     private int totalStudents;
     private int totalRounds;
     private String status;
-    private long duration; // in milliseconds
+    private long duration;
 
     // Helper methods
-    public String getClassDisplay() {
-        return className;
-    }
-
-    public String getCourseDisplay() {
-        return courseName;
-    }
-
     public String getStudentCountDisplay() {
         return totalStudents + " Students";
     }
@@ -40,13 +32,7 @@ public class SessionDetailInfoRound {
     public String getDurationDisplay() {
         long hours = duration / (60 * 60 * 1000);
         long minutes = (duration % (60 * 60 * 1000)) / (60 * 1000);
-        long seconds = (duration % (60 * 1000)) / 1000;
 
-        return String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds);
-    }
-
-    public String getSessionDateDisplay() {
-        SimpleDateFormat format = new SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.getDefault());
-        return format.format(sessionDate);
+        return String.format(Locale.getDefault(), "%02d:%02d", hours, minutes);
     }
 }

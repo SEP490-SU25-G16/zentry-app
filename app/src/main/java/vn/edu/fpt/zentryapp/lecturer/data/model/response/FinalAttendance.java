@@ -1,38 +1,59 @@
 package vn.edu.fpt.zentryapp.lecturer.data.model.response;
 
+import com.google.gson.annotations.SerializedName;
 
 import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
 
-@Data
-@NoArgsConstructor
+@Getter
 @AllArgsConstructor
 public class FinalAttendance {
+    @SerializedName("StudentId")
     private String studentId;
-    private String studentCode;
-    private String studentName;
+
+    @SerializedName("StudentFullName")
+    private String studentFullName;
+
+    @SerializedName("Email")
     private String email;
-    private boolean finalStatus; // true = attended, false = absent
-    private int totalRounds;
-    private int attendedRounds;
-    private String avatarUrl;
 
-    // Helper methods
-    public String getAttendanceStatus() {
-        return finalStatus ? "Attended" : "Absent";
-    }
+    @SerializedName("PhoneNumber")
+    private String phoneNumber;
 
-    public int getAttendanceStatusColor() {
-        return finalStatus ? 0xFF4CAF50 : 0xFFE53935; // Green : Red
-    }
+    @SerializedName("Status")
+    private String status;
 
-    public String getAttendanceRatio() {
-        return attendedRounds + "/" + totalRounds + " rounds";
-    }
+    @SerializedName("EnrollmentId")
+    private String enrollmentId;
 
-    public int getAttendancePercentage() {
-        if (totalRounds == 0) return 0;
-        return (attendedRounds * 100) / totalRounds;
-    }
+    @SerializedName("EnrolledAt")
+    private String enrolledAt;
+
+    @SerializedName("EnrollmentStatus")
+    private String enrollmentStatus;
+
+    @SerializedName("SessionId")
+    private String sessionId;
+
+    @SerializedName("ClassSectionId")
+    private String classSectionId;
+
+    @SerializedName("ScheduleId")
+    private String scheduleId;
+
+    @SerializedName("CourseId")
+    private String courseId;
+
+    @SerializedName("ClassInfo")
+    private String classInfo;
+
+    @SerializedName("SessionStartTime")
+    private String sessionStartTime;
+
+    @SerializedName("LastAttendanceRecordId")
+    private String lastAttendanceRecordId;
+
+    @SerializedName("LastAttendanceTime")
+    private String lastAttendanceTime;
+
 }

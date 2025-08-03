@@ -2,7 +2,13 @@ package vn.edu.fpt.zentryapp.lecturer.data.model.response;
 
 import com.google.gson.annotations.SerializedName;
 
-// CalculateAttendanceResponse.java
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@AllArgsConstructor
+@NoArgsConstructor
+@Getter
 public class CalculateAttendanceResponse {
     @SerializedName("Success")
     private boolean success;
@@ -15,10 +21,4 @@ public class CalculateAttendanceResponse {
 
     @SerializedName("Message")
     private String message;
-
-    // Getters
-    public boolean isSuccess() { return success; }
-    public CalculateAttendanceData getData() { return data; }
-    public String getError() { return error; }
-    public String getMessage() { return message; }
 }

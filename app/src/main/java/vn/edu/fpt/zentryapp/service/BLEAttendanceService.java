@@ -34,7 +34,6 @@ import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -44,8 +43,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import vn.edu.fpt.zentryapp.MainActivity;
 import vn.edu.fpt.zentryapp.R;
-import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerScheduleSession;
-import vn.edu.fpt.zentryapp.student.data.model.response.StudentScheduleSession;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerScheduleClassSection;
+import vn.edu.fpt.zentryapp.student.data.model.response.StudentScheduleClassSection;
 
 /**
  * BLE Attendance Service - Quản lý attendance tracking qua Bluetooth Low Energy
@@ -84,7 +83,7 @@ public class BLEAttendanceService extends Service {
 
     // ======= SESSION DATA =======
     private String sessionId; // ID phiên học
-    private String roomId; // ID phòng học
+    private String roomName; // ID phòng học
     private String userId; // ID người dùng
     private String userRole; // STUDENT hoặc LECTURER
     private String deviceId; // Device ID formatted (XX:XX:XX:XX:XX:XX)
@@ -128,7 +127,6 @@ public class BLEAttendanceService extends Service {
             @SuppressLint("HardwareIds")
             String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
             this.idBytes = generateIdBytes(androidId);
-
             // Format thành XX:XX:XX:XX:XX:XX để dễ đọc
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < idBytes.length; i++) {
@@ -235,7 +233,7 @@ public class BLEAttendanceService extends Service {
         }
 
         // ✅ FIXED: Lấy 4 ký tự đầu của my room để compare
-        String myRoomPrefix = roomId.length() >= 4 ? roomId.substring(0, 4) : roomId;
+        String myRoomPrefix = roomName.length() >= 4 ? roomName.substring(0, 4) : roomName;
 
      //   Log.d(TAG, "  Advertised room (4 chars): '" + advertisedRoom + "'");
       //  Log.d(TAG, "  My room (4 chars): '" + myRoomPrefix + "'");
@@ -288,7 +286,7 @@ public class BLEAttendanceService extends Service {
                 (List<AttendanceModels.AttendanceRound>) intent.getSerializableExtra("rounds");
 
         Log.d(TAG, "Session ID: " + sessionId);
-        Log.d(TAG, "Room: " + roomId);
+        Log.d(TAG, "Room: " + roomName);
         Log.d(TAG, "User: " + userId + " (" + userRole + ")");
         Log.d(TAG, "Rounds: " + (rounds != null ? rounds.size() : 0));
 
@@ -306,16 +304,16 @@ public class BLEAttendanceService extends Service {
         userRole = intent.getStringExtra("userRole");
 
         if ("STUDENT".equals(userRole)) {
-            StudentScheduleSession session = (StudentScheduleSession) intent.getSerializableExtra("session");
+            StudentScheduleClassSection session = (StudentScheduleClassSection) intent.getSerializableExtra("session");
             if (session != null) {
                 sessionId = session.getSessionId();
-                roomId = session.getRoom();
+                roomName = session.getRoom();
             }
         } else {
-            LecturerScheduleSession session = (LecturerScheduleSession) intent.getSerializableExtra("session");
+            LecturerScheduleClassSection session = (LecturerScheduleClassSection) intent.getSerializableExtra("session");
             if (session != null) {
                 sessionId = session.getSessionId();
-                roomId = session.getRoom();
+                roomName = session.getRoomName();
             }
         }
     }
@@ -370,10 +368,10 @@ public class BLEAttendanceService extends Service {
     @RequiresPermission(Manifest.permission.BLUETOOTH_ADVERTISE)
     private void startAdvertising() {
         // Chuẩn bị room data, truncate nếu quá dài
-        byte[] roomBytes = roomId.getBytes(StandardCharsets.UTF_8);
+        byte[] roomBytes = roomName.getBytes(StandardCharsets.UTF_8);
         if (roomBytes.length > ROOM_BYTES_MAX) {
             roomBytes = Arrays.copyOf(roomBytes, ROOM_BYTES_MAX);
-            Log.w(TAG, "Room truncated from '" + roomId + "' to '" +
+            Log.w(TAG, "Room truncated from '" + roomName + "' to '" +
                     new String(roomBytes, StandardCharsets.UTF_8) + "'");
         }
 
@@ -398,7 +396,7 @@ public class BLEAttendanceService extends Service {
                     .setIncludeDeviceName(false) // Không cần device name
                     .build();
             advertiser.startAdvertising(advertiseSettings, data, advCallback);
-            Log.d(TAG, "🟢 Advertising started for room: " + roomId);
+            Log.d(TAG, "🟢 Advertising started for room: " + roomName);
         } else {
             Log.e(TAG, "❌ BLE Advertiser not available");
         }
@@ -493,7 +491,7 @@ public class BLEAttendanceService extends Service {
             Log.d(TAG, "  " + device.getMacAddress() + " RSSI: " + device.getRssi());
         }
 
-        String timestamp = createUtcTimestamp();
+        String timestamp = createTimestamp();
 
         // Tạo attendance submission object
         AttendanceModels.AttendanceSubmission submission = new AttendanceModels.AttendanceSubmission(
@@ -516,24 +514,17 @@ public class BLEAttendanceService extends Service {
     /**
      * Tạo UTC timestamp đúng format cho API
      */
-    private String createUtcTimestamp() {
-        SimpleDateFormat utcFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault());
-        utcFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
-
-        // ✅ FIXED: Lùi 7 giờ để có UTC time thật
-        Date nowVN = new Date(); // Current VN time
-        Date nowUTC = new Date(nowVN.getTime());
-
-        String utcTimestamp = utcFormat.format(nowUTC);
-
-        Log.d(TAG, "VN time: " + nowVN);
-        Log.d(TAG, "UTC time: " + nowUTC);
-        Log.d(TAG, "Created UTC timestamp: " + utcTimestamp);
-
-        return utcTimestamp;
+    private String createTimestamp() {
+        return createTimestamp(new Date());
     }
 
+    private String createTimestamp(Date date) {
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+        String timestamp = format.format(date);
 
+        Log.d(TAG, "Formatted timestamp: " + timestamp);
+        return timestamp;
+    }
 
     /**
      * Calculate attendance round - chỉ lecturer mới thực hiện
@@ -703,7 +694,7 @@ public class BLEAttendanceService extends Service {
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("BLE Attendance Active")
-                .setContentText("Room: " + roomId + " | Status: Running")
+                .setContentText("Room: " + roomName + " | Status: Running")
                 .setSmallIcon(R.drawable.ic_bluetooth)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true) // Không thể swipe away
