@@ -48,6 +48,11 @@ public class FaceIdService {
     private final ExecutorService executor;
     private final Handler mainHandler;
     
+    // 🔧 NEW: Improved components
+    private final FaceDecisionEngine decisionEngine;
+    private final ModelRetryManager retryManager;
+    private final FaceProcessingErrorHandler errorHandler;
+    
     private final CountDownLatch modelLoadLatch = new CountDownLatch(3); // Đếm ngược cho 3 model
     private volatile boolean isInitialized = false;
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
@@ -58,43 +63,54 @@ public class FaceIdService {
         this.mainHandler = new Handler(Looper.getMainLooper());
         this.faceIdApi = ApiClient.getClient(context).create(FaceIdApi.class);
         
+        // 🔧 NEW: Initialize improved components
+        this.decisionEngine = new FaceDecisionEngine(FaceDecisionEngine.FaceDecisionConfig.getDefault());
+        this.retryManager = new ModelRetryManager.Builder()
+            .maxRetries(3)
+            .initialRetryDelayMs(1000)
+            .build();
+        this.errorHandler = new FaceProcessingErrorHandler(context);
+        
         // Khởi tạo các model bất đồng bộ
         initializeModelsAsync();
     }
     
     private void initializeModelsAsync() {
-        // Khởi tạo FaceDetector
+        // 🔧 NEW: Initialize FaceDetector with retry
         executor.execute(() -> {
             try {
-                this.faceDetector = new FaceDetector(context);
+                this.faceDetector = retryManager.executeWithRetry(() -> new FaceDetector(context));
                 modelLoadLatch.countDown();
                 Log.d(TAG, "FaceDetector initialized");
-            } catch (Exception e) {
+            } catch (ModelRetryManager.ModelRetryException e) {
                 Log.e(TAG, "Error initializing FaceDetector", e);
+                errorHandler.handleModelInitializationError(e, "FaceDetector");
                 modelLoadLatch.countDown();
             }
         });
         
-        // Khởi tạo FaceEmbedding
+        // 🔧 NEW: Initialize FaceEmbedding with retry
         executor.execute(() -> {
             try {
-                this.faceEmbedding = new FaceEmbedding(context);
+                this.faceEmbedding = retryManager.executeWithRetry(() -> new FaceEmbedding(context));
                 modelLoadLatch.countDown();
                 Log.d(TAG, "FaceEmbedding initialized");
-            } catch (Exception e) {
+            } catch (ModelRetryManager.ModelRetryException e) {
                 Log.e(TAG, "Error initializing FaceEmbedding", e);
+                errorHandler.handleModelInitializationError(e, "FaceEmbedding");
                 modelLoadLatch.countDown();
             }
         });
         
-        // Khởi tạo FaceSpoofDetector
+        // 🔧 NEW: Initialize FaceSpoofDetector with retry
         executor.execute(() -> {
             try {
-                this.faceSpoofDetector = new FaceSpoofDetector(context);
+                this.faceSpoofDetector = retryManager.executeWithRetry(() -> new FaceSpoofDetector(context));
                 modelLoadLatch.countDown();
                 Log.d(TAG, "FaceSpoofDetector initialized");
-            } catch (Exception e) {
+            } catch (ModelRetryManager.ModelRetryException e) {
                 Log.e(TAG, "Error initializing FaceSpoofDetector", e);
+                errorHandler.handleModelInitializationError(e, "FaceSpoofDetector");
                 modelLoadLatch.countDown();
             }
         });
@@ -224,7 +240,7 @@ public class FaceIdService {
     }
     
     /**
-     * Helper method for processing face with oval boundary validation
+     * 🔧 NEW: Improved helper method using FaceDecisionEngine
      */
     private void processFaceWithOvalBoundary(Bitmap bitmap, Rect boundingBox, android.graphics.RectF ovalRect, 
                                            Bitmap faceBitmap, FaceDetectionCallback callback) {
@@ -232,19 +248,8 @@ public class FaceIdService {
         Log.d(TAG, "processFaceWithOvalBoundary: Face detected with bounding box: " + boundingBox.toString());
         Log.d(TAG, "processFaceWithOvalBoundary: faceBitmap size: " + faceBitmap.getWidth() + "x" + faceBitmap.getHeight());
         
-        // Check if face is within oval boundary if oval is provided
-        if (ovalRect != null) {
-            Log.d(TAG, "processFaceWithOvalBoundary: Validating face position within oval");
-            boolean isWithinOval = checkFaceWithinOval(boundingBox, ovalRect);
-            if (!isWithinOval) {
-                Log.e(TAG, "processFaceWithOvalBoundary: FAILED - Face not within oval boundary");
-                runOnMainThread(() -> callback.onError("Please position your face within the oval guide"));
-                return;
-            }
-            Log.d(TAG, "processFaceWithOvalBoundary: Face position validation PASSED");
-        } else {
-            Log.d(TAG, "processFaceWithOvalBoundary: No oval boundary provided - skipping position validation");
-        }
+        // 🔧 NEW: Use FaceDecisionEngine for oval validation
+        FaceDecisionEngine.OvalValidationResult ovalValidation = validateOvalBoundary(boundingBox, ovalRect);
         
         Log.d(TAG, "processFaceWithOvalBoundary: Starting spoof detection");
         
@@ -253,46 +258,47 @@ public class FaceIdService {
             Log.d(TAG, "processFaceWithOvalBoundary: Spoof detection result - isSpoof: " + 
                     spoofResult.isSpoof() + ", score: " + spoofResult.getScore() + ", confidence: " + spoofResult.getConfidence());
 
-            boolean isWithinOval = (ovalRect == null) || checkFaceWithinOval(boundingBox, ovalRect);
-
-            // Greatly Improved Decision Logic
-            // Case 1: High confidence real face - prioritize model result
-            if (spoofResult.getConfidence() > 0.65f && !spoofResult.isSpoof()) {
-                Log.d(TAG, "processFaceWithOvalBoundary: SUCCESS - High confidence real face, proceeding");
-                runOnMainThread(() -> callback.onFaceDetected(faceBitmap, boundingBox));
-                return;
-            }
-
-            // Case 2: Good confidence real face - we're being more lenient now
-            if (!spoofResult.isSpoof()) {
-                Log.d(TAG, "processFaceWithOvalBoundary: SUCCESS - Face verified as real with acceptable confidence");
-                runOnMainThread(() -> callback.onFaceDetected(faceBitmap, boundingBox));
-                return;
-            }
+            // 🔧 NEW: Use FaceDecisionEngine for decision making
+            FaceDecisionEngine.FaceDetectionResult detectionResult = new FaceDecisionEngine.FaceDetectionResult(
+                true, boundingBox, spoofResult.getConfidence()
+            );
             
-            // Case 3: Face within oval but model thinks it's spoof - we'll still allow it if confidence is low
-            if (isWithinOval && spoofResult.isSpoof() && spoofResult.getConfidence() < 0.70f) {
-                Log.d(TAG, "processFaceWithOvalBoundary: SUCCESS - Face within oval, allowing despite low spoof confidence");
-                runOnMainThread(() -> callback.onFaceDetected(faceBitmap, boundingBox));
-                return;
-            }
+            FaceDecisionEngine.SpoofDetectionResult spoofDetectionResult = new FaceDecisionEngine.SpoofDetectionResult(
+                spoofResult.isSpoof(), spoofResult.getConfidence(), spoofResult.getScore()
+            );
             
-            // Case 4: Strong spoof detected
-            if (spoofResult.isSpoof() && spoofResult.getConfidence() > 0.85f) {
-                Log.e(TAG, "processFaceWithOvalBoundary: FAILED - High confidence spoof detected (score: " + spoofResult.getScore() + ")");
-                runOnMainThread(() -> callback.onError("Spoof detected! Please use a real face."));
-                return;
-            }
-
-            // Case 5: Fallback - give benefit of the doubt
-            if (!isWithinOval) {
-                Log.e(TAG, "processFaceWithOvalBoundary: FAILED - Face not properly positioned");
-                runOnMainThread(() -> callback.onError("Please position your face properly within the oval."));
-            } else {
-                Log.e(TAG, "processFaceWithOvalBoundary: CAUTION - Unclear verification. Proceeding anyway.");
+            FaceDecisionEngine.FaceDecisionResult decision = decisionEngine.evaluate(
+                detectionResult, spoofDetectionResult, ovalValidation
+            );
+            
+            Log.d(TAG, "processFaceWithOvalBoundary: Decision result: " + decision);
+            
+            // 🔧 NEW: Handle decision result
+            if (decision.isAccepted()) {
+                Log.d(TAG, "processFaceWithOvalBoundary: SUCCESS - " + decision.getMessage());
                 runOnMainThread(() -> callback.onFaceDetected(faceBitmap, boundingBox));
+            } else if (decision.isRejected()) {
+                Log.e(TAG, "processFaceWithOvalBoundary: FAILED - " + decision.getMessage());
+                runOnMainThread(() -> callback.onError(decision.getMessage()));
+            } else if (decision.needsGuidance()) {
+                Log.w(TAG, "processFaceWithOvalBoundary: GUIDANCE - " + decision.getMessage());
+                runOnMainThread(() -> callback.onError(decision.getMessage()));
             }
         });
+    }
+    
+    /**
+     * 🔧 NEW: Helper method to validate oval boundary
+     */
+    private FaceDecisionEngine.OvalValidationResult validateOvalBoundary(Rect boundingBox, android.graphics.RectF ovalRect) {
+        if (ovalRect == null) {
+            return new FaceDecisionEngine.OvalValidationResult(true, "No oval boundary provided");
+        }
+        
+        boolean isWithinOval = checkFaceWithinOval(boundingBox, ovalRect);
+        String reason = isWithinOval ? "Face properly positioned within oval" : "Face not within oval boundary";
+        
+        return new FaceDecisionEngine.OvalValidationResult(isWithinOval, reason);
     }
     
     /**
@@ -369,9 +375,10 @@ public class FaceIdService {
         
         isProcessing.set(true);
         
-        executor.execute(() -> {
+        // 🔧 NEW: Use retry manager for face detection
+        retryManager.executeWithRetryAsync(() -> {
             try {
-                // Step 1: Detect face
+                // Step 1: Detect face with retry
                 List<FaceDetector.FaceDetectionResult> faces = faceDetector.detectFaces(bitmap);
                 
                 if (faces.isEmpty()) {
@@ -379,7 +386,7 @@ public class FaceIdService {
                         callback.onNoFaceDetected();
                         isProcessing.set(false);
                     });
-                    return;
+                    return null;
                 }
                 
                 if (faces.size() > 1) {
@@ -387,30 +394,45 @@ public class FaceIdService {
                         callback.onMultipleFacesDetected();
                         isProcessing.set(false);
                     });
-                    return;
+                    return null;
                 }
                 
                 // Get the single detected face
                 FaceDetector.FaceDetectionResult faceResult = faces.get(0);
                 Rect boundingBox = faceResult.getBoundingBox();
                 
-                // Check if face is within oval boundary if oval is provided
-                if (ovalRect != null) {
-                    boolean isWithinOval = checkFaceWithinOval(boundingBox, ovalRect);
-                    if (!isWithinOval) {
-                        Log.d(TAG, "processContinuousFrame: Face not within oval boundary");
-                        runOnMainThread(() -> {
-                            callback.onError("Face not positioned correctly");
-                            isProcessing.set(false);
-                        });
-                        return;
-                    }
+                // 🔧 NEW: Use FaceDecisionEngine for oval validation
+                FaceDecisionEngine.OvalValidationResult ovalValidation = validateOvalBoundary(boundingBox, ovalRect);
+                
+                if (!ovalValidation.isValid()) {
+                    Log.d(TAG, "processContinuousFrame: Face not within oval boundary");
+                    runOnMainThread(() -> {
+                        callback.onError(ovalValidation.getReason());
+                        isProcessing.set(false);
+                    });
+                    return null;
                 }
                 
                 // Step 2: Check for spoofing with oval validation
                 faceSpoofDetector.detectSpoofAsync(bitmap, boundingBox, ovalRect, spoofResult -> {
                     Log.d(TAG, "processContinuousFrame: Spoof detection completed - isSpoof: " + 
                           spoofResult.isSpoof() + ", score: " + spoofResult.getScore());
+                    
+                    // 🔧 NEW: Use FaceDecisionEngine for decision making
+                    FaceDecisionEngine.FaceDetectionResult detectionResult = new FaceDecisionEngine.FaceDetectionResult(
+                        true, boundingBox, spoofResult.getConfidence()
+                    );
+                    
+                    FaceDecisionEngine.SpoofDetectionResult spoofDetectionResult = new FaceDecisionEngine.SpoofDetectionResult(
+                        spoofResult.isSpoof(), spoofResult.getConfidence(), spoofResult.getScore()
+                    );
+                    
+                    FaceDecisionEngine.FaceDecisionResult decision = decisionEngine.evaluate(
+                        detectionResult, spoofDetectionResult, ovalValidation
+                    );
+                    
+                    Log.d(TAG, "processContinuousFrame: Decision result: " + decision);
+                    
                     runOnMainThread(() -> {
                         Log.d(TAG, "processContinuousFrame: Calling callback with isSpoof: " + 
                               spoofResult.isSpoof() + ", score: " + spoofResult.getScore());
@@ -419,10 +441,29 @@ public class FaceIdService {
                     });
                 });
                 
+                return null;
+                
             } catch (Exception e) {
                 Log.e(TAG, "Error in continuous frame processing", e);
+                errorHandler.handleFaceDetectionError(e);
                 runOnMainThread(() -> {
                     callback.onError("Error processing frame: " + e.getMessage());
+                    isProcessing.set(false);
+                });
+                return null;
+            }
+        }, new ModelRetryManager.RetryCallback<Object>() {
+            @Override
+            public void onSuccess(Object result) {
+                // Success handled in the operation
+            }
+            
+            @Override
+            public void onFailure(ModelRetryManager.ModelRetryException exception) {
+                Log.e(TAG, "Retry failed for continuous frame processing", exception);
+                errorHandler.handleGeneralError(exception, "continuous frame processing");
+                runOnMainThread(() -> {
+                    callback.onError("Processing failed after retries");
                     isProcessing.set(false);
                 });
             }
@@ -520,66 +561,82 @@ public class FaceIdService {
         
         Log.d(TAG, "registerFaceId: Models initialized - generating face embedding");
         
-        // Use async method to generate embedding
-        faceEmbedding.getFaceEmbeddingAsync(faceBitmap, embedding -> {
-            Log.d(TAG, "registerFaceId: Face embedding generated - length: " + embedding.length);
-            
-            executor.execute(() -> {
-                try {
-                    Log.d(TAG, "registerFaceId: Converting embedding to byte array");
-                    
-                    // Convert embedding to byte array for API call
-                    ByteBuffer buffer = ByteBuffer.allocate(embedding.length * 4);
-                    for (float value : embedding) {
-                        buffer.putFloat(value);
-                    }
-                    
-                    Log.d(TAG, "registerFaceId: Creating multipart request - buffer size: " + buffer.array().length);
-                    
-                    // Create multipart request
-                    RequestBody embeddingPart = RequestBody.create(
-                            MediaType.parse("application/octet-stream"), 
-                            buffer.array());
-                    
-                    MultipartBody.Part filePart = MultipartBody.Part.createFormData(
-                            "embedding", "embedding.bin", embeddingPart);
-                    
-                    RequestBody userIdPart = RequestBody.create(
-                            MediaType.parse("text/plain"), userId);
-                    
-                    Log.d(TAG, "registerFaceId: Making API call to register face ID");
-                    
-                    // Make API call
-                    Call<FaceIdResponse> call = faceIdApi.registerFaceId(filePart, userIdPart);
-                    call.enqueue(new Callback<FaceIdResponse>() {
-                        @Override
-                        public void onResponse(@NonNull Call<FaceIdResponse> call, @NonNull Response<FaceIdResponse> response) {
-                            Log.d(TAG, "registerFaceId: API response received - code: " + response.code() + 
-                                  ", successful: " + response.isSuccessful());
-                            
-                            if (response.isSuccessful() && response.body() != null) {
-                                Log.d(TAG, "registerFaceId: SUCCESS - Face ID registered successfully");
-                                runOnMainThread(() -> callback.onSuccess("Face ID registered successfully"));
-                            } else {
-                                String errorMsg = "Failed to register Face ID: " + response.message();
-                                Log.e(TAG, "registerFaceId: FAILED - " + errorMsg);
-                                runOnMainThread(() -> callback.onFailure(errorMsg));
-                            }
-                        }
+        // 🔧 NEW: Use retry manager for embedding generation
+        retryManager.executeWithRetryAsync(() -> {
+            try {
+                // Generate face embedding with retry
+                float[] embedding = retryManager.executeWithRetry(() -> faceEmbedding.getFaceEmbedding(faceBitmap));
+                Log.d(TAG, "registerFaceId: Face embedding generated - length: " + embedding.length);
+                
+                // Convert embedding to byte array for API call
+                ByteBuffer buffer = ByteBuffer.allocate(embedding.length * 4);
+                for (float value : embedding) {
+                    buffer.putFloat(value);
+                }
+                
+                Log.d(TAG, "registerFaceId: Creating multipart request - buffer size: " + buffer.array().length);
+                
+                // Create multipart request
+                RequestBody embeddingPart = RequestBody.create(
+                        MediaType.parse("application/octet-stream"), 
+                        buffer.array());
+                
+                MultipartBody.Part filePart = MultipartBody.Part.createFormData(
+                        "embedding", "embedding.bin", embeddingPart);
+                
+                RequestBody userIdPart = RequestBody.create(
+                        MediaType.parse("text/plain"), userId);
+                
+                Log.d(TAG, "registerFaceId: Making API call to register face ID");
+                
+                // Make API call with timeout
+                Call<FaceIdResponse> call = faceIdApi.registerFaceId(filePart, userIdPart);
+                call.enqueue(new Callback<FaceIdResponse>() {
+                    @Override
+                    public void onResponse(@NonNull Call<FaceIdResponse> call, @NonNull Response<FaceIdResponse> response) {
+                        Log.d(TAG, "registerFaceId: API response received - code: " + response.code() + 
+                              ", successful: " + response.isSuccessful());
                         
-                        @Override
-                        public void onFailure(@NonNull Call<FaceIdResponse> call, @NonNull Throwable t) {
-                            String errorMsg = "Network error: " + t.getMessage();
-                            Log.e(TAG, "registerFaceId: NETWORK FAILURE - " + errorMsg, t);
+                        if (response.isSuccessful() && response.body() != null) {
+                            Log.d(TAG, "registerFaceId: SUCCESS - Face ID registered successfully");
+                            runOnMainThread(() -> callback.onSuccess("Face ID registered successfully"));
+                        } else {
+                            String errorMsg = "Failed to register Face ID: " + response.message();
+                            Log.e(TAG, "registerFaceId: FAILED - " + errorMsg);
+                            errorHandler.handleNetworkError(new Exception(errorMsg), "face registration");
                             runOnMainThread(() -> callback.onFailure(errorMsg));
                         }
-                    });
+                    }
                     
-                } catch (Exception e) {
-                    Log.e(TAG, "registerFaceId: EXCEPTION during API call preparation", e);
-                    runOnMainThread(() -> callback.onFailure("Error: " + e.getMessage()));
-                }
-            });
+                    @Override
+                    public void onFailure(@NonNull Call<FaceIdResponse> call, @NonNull Throwable t) {
+                        String errorMsg = "Network error: " + t.getMessage();
+                        Log.e(TAG, "registerFaceId: NETWORK FAILURE - " + errorMsg, t);
+                        errorHandler.handleNetworkError(new Exception(errorMsg), "face registration");
+                        runOnMainThread(() -> callback.onFailure(errorMsg));
+                    }
+                });
+                
+                return null;
+                
+            } catch (Exception e) {
+                Log.e(TAG, "registerFaceId: EXCEPTION during API call preparation", e);
+                errorHandler.handleGeneralError(e, "face registration");
+                runOnMainThread(() -> callback.onFailure("Error: " + e.getMessage()));
+                return null;
+            }
+        }, new ModelRetryManager.RetryCallback<Object>() {
+            @Override
+            public void onSuccess(Object result) {
+                // Success handled in the operation
+            }
+            
+            @Override
+            public void onFailure(ModelRetryManager.ModelRetryException exception) {
+                Log.e(TAG, "Retry failed for face registration", exception);
+                errorHandler.handleGeneralError(exception, "face registration");
+                runOnMainThread(() -> callback.onFailure("Registration failed after retries"));
+            }
         });
     }
     
