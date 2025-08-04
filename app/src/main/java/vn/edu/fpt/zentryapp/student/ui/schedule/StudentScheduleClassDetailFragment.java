@@ -16,6 +16,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import java.util.Date;
+
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentScheduleClassDetailBinding;
 import vn.edu.fpt.zentryapp.student.data.model.response.ScheduleDetailDto;
@@ -113,7 +115,6 @@ public class StudentScheduleClassDetailFragment extends Fragment {
     private void observeViewModel() {
         // Loading state
         viewModel.isLoading().observe(getViewLifecycleOwner(), isLoading -> {
-
             Log.d(TAG, "Loading: " + isLoading);
         });
 
@@ -138,8 +139,7 @@ public class StudentScheduleClassDetailFragment extends Fragment {
         });
     }
 
-
-    // ✅ NEW: Method để update UI với schedule detail data
+    // Method để update UI với schedule detail data
     private void updateScheduleDetailUI(ScheduleDetailDto scheduleDetail) {
         // Update course name với data từ API
         String courseDisplay = scheduleDetail.getFormattedCourseDisplay();
@@ -156,72 +156,125 @@ public class StudentScheduleClassDetailFragment extends Fragment {
         // Update room display từ API
         String roomDisplay = scheduleDetail.getFormattedRoomDisplay();
         binding.tvStudentScheduleClassDetailRoom.setText(roomDisplay);
-
     }
 
     private void updateStudentAttendanceUI(StudentFinalAttendanceDto attendanceData) {
-        // Update student info
+        // ✅ Update student info section
         binding.tvStudentName.setText(attendanceData.getFullName());
-        binding.tvStudentId.setText("ID: " + attendanceData.getStudentId());
+        binding.tvStudentId.setText("ID: " + attendanceData.getStudentId().substring(0, 8).toUpperCase());
 
-        // Update attendance status based on session status
-        updateAttendanceStatus(attendanceData);
+        // ✅ Update attendance statistics
+        updateAttendanceStatistics(attendanceData);
 
-        // Update rounds info in student count field
-        String roundsInfo = attendanceData.getAttendedRoundsCount() + "/" +
-                attendanceData.getTotalRounds() + " Rounds";
-        binding.tvStudentScheduleClassDetailStudentCount.setText(roundsInfo);
+        // ✅ Update final status button
+        updateFinalStatusButton(attendanceData);
 
         Log.d(TAG, "Updated UI - Student: " + attendanceData.getFullName() +
                 ", Status: " + attendanceData.getSessionStatus() +
                 ", Percentage: " + attendanceData.getFinalAttendancePercentage() + "%");
     }
 
-    private void updateAttendanceStatus(StudentFinalAttendanceDto attendanceData) {
-        String status;
-        String textColor;
+    private void updateAttendanceStatistics(StudentFinalAttendanceDto attendanceData) {
+        // ✅ Update attended rounds
+        binding.tvAttendedRounds.setText(String.valueOf(attendanceData.getAttendedRoundsCount()));
 
-        // ✅ SIMPLIFIED: Chỉ 3 cases - Active, Completed, Missed
-        switch (attendanceData.getSessionStatus().toLowerCase()) {
+        // ✅ Update missed rounds
+        int missedRounds = attendanceData.getTotalRounds() - attendanceData.getAttendedRoundsCount();
+        binding.tvMissedRounds.setText(String.valueOf(missedRounds));
+
+        // ✅ Update attendance percentage (circular progress)
+        int percentage = (int) Math.round(attendanceData.getFinalAttendancePercentage());
+        binding.tvAttendancePercentage.setText(percentage + "%");
+
+        // ✅ Update total rounds display
+        String totalDisplay = String.format("Total: %d/%d",
+                attendanceData.getAttendedRoundsCount(),
+                attendanceData.getTotalRounds());
+        binding.tvTotalRounds.setText(totalDisplay);
+
+        // ✅ Update percentage circle color based on attendance
+        if (percentage >= 80) {
+            // Green for good attendance (80%+)
+            binding.tvAttendancePercentage.getParent(); // MaterialCardView parent will keep green background
+        } else if (percentage >= 50) {
+            // Could add orange/yellow for medium attendance if needed
+        } else {
+            // Could add red background for low attendance if needed
+        }
+    }
+
+    private void updateFinalStatusButton(StudentFinalAttendanceDto attendanceData) {
+        String status;
+        String backgroundColor;
+
+        String sessionStatus = attendanceData.getSessionStatus().toLowerCase();
+
+        // ✅ Check if Active session has ended
+        boolean isActiveSessionEnded = false;
+        if ("active".equals(sessionStatus) && session != null) {
+            Date currentTime = new Date();
+            Date endTime = session.getEndTimeAsDate();
+
+            if (endTime != null) {
+                isActiveSessionEnded = currentTime.after(endTime);
+                Log.d(TAG, String.format("Active session check: CurrentTime=%s, EndTime=%s, HasEnded=%s",
+                        currentTime, endTime, isActiveSessionEnded));
+            }
+        }
+
+        // ✅ Determine status and color
+        switch (sessionStatus) {
             case "active":
-                // Session đang diễn ra - chưa có kết quả final
-                status = "On going";
-                textColor = "#F59E0B"; // Orange - đang diễn ra
+                if (isActiveSessionEnded) {
+                    // Active session has ended - check attendance
+                    if (attendanceData.getFinalAttendancePercentage() >= 80.0) {
+                        status = "Attended";
+                        backgroundColor = "#10B981"; // Green
+                    } else {
+                        status = "Absent";
+                        backgroundColor = "#EF4444"; // Red
+                    }
+                } else {
+                    // Active and still ongoing
+                    status = "Ongoing";
+                    backgroundColor = "#F59E0B"; // Orange
+                }
                 break;
 
             case "completed":
-                // Session đã kết thúc - check attendance percentage
+                // Session completed - check attendance percentage
                 if (attendanceData.getFinalAttendancePercentage() >= 80.0) {
                     status = "Attended";
-                    textColor = "#10B981"; // Green - có mặt
+                    backgroundColor = "#10B981"; // Green
                 } else {
                     status = "Absent";
-                    textColor = "#EF4444"; // Red - vắng mặt
+                    backgroundColor = "#EF4444"; // Red
                 }
                 break;
 
             case "missed":
-                // Session bị miss - không tham gia
+                // Session was missed
                 status = "Missed";
-                textColor = "#EF4444"; // Red - bỏ lỡ
+                backgroundColor = "#EF4444"; // Red
                 break;
 
             default:
-                // Fallback case (shouldn't happen)
+                // Fallback
                 status = "Unknown";
-                textColor = "#64748B"; // Gray
+                backgroundColor = "#64748B"; // Gray
                 break;
         }
 
-        // ✅ CHỈ set text và color - không set background
-        binding.tvStudentAttendanceStatus.setText(status);
-        binding.tvStudentAttendanceStatus.setTextColor(Color.parseColor(textColor));
+        // ✅ Update final status button
+        binding.btnFinalAttendanceStatus.setText(status);
+        binding.btnFinalAttendanceStatus.setBackgroundTintList(
+                android.content.res.ColorStateList.valueOf(Color.parseColor(backgroundColor))
+        );
 
-        Log.d(TAG, "Status updated: " + status +
-                " (Session: " + attendanceData.getSessionStatus() +
-                ", Percentage: " + attendanceData.getFinalAttendancePercentage() + "%)");
+        Log.d(TAG, String.format("Final status updated: %s (Session: %s, IsActiveEnded: %s, Percentage: %.1f%%)",
+                status, attendanceData.getSessionStatus(), isActiveSessionEnded,
+                attendanceData.getFinalAttendancePercentage()));
     }
-
 
     @Override
     public void onDestroyView() {

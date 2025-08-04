@@ -154,7 +154,7 @@ public class LecturerScheduleClassSectionAdapter extends RecyclerView.Adapter<Le
                     break;
 
                 case ACTION_UPCOMING:
-                    setupButton("Upcoming", "#64748B", false); // Gray
+                    setupButton("Upcoming", "#A3BFED", false); // Gray
                     break;
 
                 case ACTION_MISSED:
@@ -173,6 +173,9 @@ public class LecturerScheduleClassSectionAdapter extends RecyclerView.Adapter<Le
             boolean isCurrentlyHappening = startTime != null && endTime != null &&
                     isCurrentTimeInSession(currentTime, startTime, endTime);
 
+            // ✅ HARDCODE: Check if session has ended (past end time)
+            boolean hasEnded = endTime != null && currentTime.getTime() > endTime.getTime();
+
             // Check if there's any active session
             boolean hasActiveSession = hasActiveSessionInList();
 
@@ -189,6 +192,11 @@ public class LecturerScheduleClassSectionAdapter extends RecyclerView.Adapter<Le
                     }
 
                 case STATUS_ACTIVE:
+                    // ✅ HARDCODE: Nếu Active nhưng đã quá giờ kết thúc → VIEW
+                    if (hasEnded) {
+                        return ACTION_VIEW;
+                    }
+                    // Nếu vẫn đang trong thời gian hoặc chưa tới giờ → ONGOING
                     return ACTION_ONGOING;
 
                 case STATUS_COMPLETED:
@@ -234,20 +242,23 @@ public class LecturerScheduleClassSectionAdapter extends RecyclerView.Adapter<Le
             boolean isCurrentlyHappening = startTime != null && endTime != null &&
                     isCurrentTimeInSession(currentTime, startTime, endTime);
 
+            // ✅ HARDCODE: Check if session has ended
+            boolean hasEnded = endTime != null && currentTime.getTime() > endTime.getTime();
+
             int backgroundColor;
 
             switch (status) {
                 case STATUS_PENDING:
-                    // Pending luôn là màu trắng, dù có đang diễn ra hay không
                     backgroundColor = Color.WHITE;
                     break;
 
                 case STATUS_ACTIVE:
-                    if (isCurrentlyHappening) {
-                        // Active + đang diễn ra = màu xanh nhạt
+                    // ✅ HARDCODE: Active nhưng đã kết thúc → màu như Completed
+                    if (hasEnded) {
+                        backgroundColor = Color.parseColor("#F8FAFC"); // Very light gray (như Completed)
+                    } else if (isCurrentlyHappening) {
                         backgroundColor = Color.parseColor("#DCFCE7"); // Light green
                     } else {
-                        // Active + không đang diễn ra = màu trắng
                         backgroundColor = Color.WHITE;
                     }
                     break;

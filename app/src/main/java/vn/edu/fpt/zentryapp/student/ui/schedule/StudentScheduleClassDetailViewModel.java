@@ -19,6 +19,7 @@ import vn.edu.fpt.zentryapp.student.data.model.response.StudentScheduleClassSect
 import vn.edu.fpt.zentryapp.student.data.model.response.StudentFinalAttendanceDto;
 import vn.edu.fpt.zentryapp.student.data.model.response.StudentFinalAttendanceResponse;
 import vn.edu.fpt.zentryapp.student.data.model.response.ClassSectionDetailDto;
+import vn.edu.fpt.zentryapp.student.data.model.response.ClassSectionDetailResponse;
 
 public class StudentScheduleClassDetailViewModel extends ViewModel {
     private static final String TAG = "StudentClassDetailVM";
@@ -58,7 +59,6 @@ public class StudentScheduleClassDetailViewModel extends ViewModel {
             return;
         }
 
-        // ✅ FIXED: Get schedule ID thay vì class section ID
         String scheduleId = getScheduleId();
         if (scheduleId == null) {
             _errorMessage.setValue("Schedule ID not available");
@@ -105,11 +105,7 @@ public class StudentScheduleClassDetailViewModel extends ViewModel {
     private String getScheduleId() {
         if (session == null) return null;
 
-        // TODO: Bạn cần thêm scheduleId field vào StudentScheduleClassSection model
-        // return session.getScheduleId();
-
-        // Temporary: sử dụng sessionId hoặc classSectionId làm scheduleId
-        return session.getClassSectionId(); // hoặc session.getSessionId()
+        return session.getScheduleId();
     }
 
     /**
@@ -163,5 +159,4 @@ public class StudentScheduleClassDetailViewModel extends ViewModel {
                     }
                 });
     }
-
 }

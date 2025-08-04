@@ -5,6 +5,7 @@ import android.app.Dialog;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
@@ -26,8 +27,10 @@ import java.io.Serializable;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -49,6 +52,9 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
 
     private static final String TAG = "StudentScheduleAdapter";
 
+    private static final String PREF_NAME = "StudentJoinedSessions";
+    private static final String KEY_JOINED_SESSIONS = "joined_sessions";
+
     // Session Status Constants (matching API response)
     private static final String STATUS_PENDING = "Pending";
     private static final String STATUS_ACTIVE = "Active";
@@ -62,9 +68,13 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
     private static final String ACTION_UPCOMING = "UPCOMING";
     private static final String ACTION_MISSED = "MISSED";
 
+
     private List<StudentScheduleClassSection> sessions = new ArrayList<>();
     private OnSessionActionListener listener;
     private AuthManager authManager;
+    private Context context;
+
+    private Set<String> joinedSessions = new HashSet<>();
 
     public interface OnSessionActionListener {
         void onSessionClick(StudentScheduleClassSection session);
@@ -104,6 +114,64 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
         return sessions.size();
     }
 
+    // Method để mark session đã join
+    public void markSessionAsJoined(String sessionId) {
+        joinedSessions.add(sessionId);
+        notifyDataSetChanged();
+    }
+
+    // Method để check session đã join chưa
+    public boolean isSessionJoined(String sessionId) {
+        return joinedSessions.contains(sessionId);
+    }
+
+    // ✅ Load joined sessions từ SharedPreferences
+    private void loadJoinedSessionsFromPrefs() {
+        if (context == null) return;
+
+        SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        Set<String> savedSessions = prefs.getStringSet(KEY_JOINED_SESSIONS, new HashSet<>());
+
+        Log.d(TAG, "Loaded " + savedSessions.size() + " joined sessions from SharedPreferences");
+        // Có thể log để debug
+        for (String sessionId : savedSessions) {
+            Log.d(TAG, "Previously joined session: " + sessionId);
+        }
+    }
+
+    // ✅ Save joined sessions vào SharedPreferences
+    private void saveJoinedSessionToPrefs(String sessionId) {
+        if (context == null) return;
+
+        SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        Set<String> savedSessions = new HashSet<>(prefs.getStringSet(KEY_JOINED_SESSIONS, new HashSet<>()));
+
+        savedSessions.add(sessionId);
+        prefs.edit().putStringSet(KEY_JOINED_SESSIONS, savedSessions).apply();
+
+        Log.d(TAG, "Saved joined session to SharedPreferences: " + sessionId);
+    }
+
+    // ✅ Check session đã join chưa từ SharedPreferences
+    private boolean isSessionJoinedFromPrefs(String sessionId) {
+        if (context == null) return false;
+
+        SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        Set<String> savedSessions = prefs.getStringSet(KEY_JOINED_SESSIONS, new HashSet<>());
+
+        return savedSessions.contains(sessionId);
+    }
+
+    // ✅ Clear old sessions (optional - gọi khi cần cleanup)
+    private void clearOldJoinedSessions() {
+        if (context == null) return;
+
+        SharedPreferences prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        prefs.edit().clear().apply();
+
+        Log.d(TAG, "Cleared all joined sessions from SharedPreferences");
+    }
+
     class ViewHolder extends RecyclerView.ViewHolder {
         private final ItemStudentScheduleClassSectionBinding binding;
 
@@ -114,6 +182,11 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
 
         @RequiresApi(api = Build.VERSION_CODES.O)
         public void bind(StudentScheduleClassSection session) {
+            if (context == null) {
+                context = itemView.getContext();
+                loadJoinedSessionsFromPrefs(); // Load khi lần đầu set context
+            }
+
             // Set basic session info
             setBasicInfo(session);
 
@@ -129,17 +202,13 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
 
         private void setBasicInfo(StudentScheduleClassSection session) {
             // Dòng 1: Course Name + Section Code
-            String courseDisplay = session.getCourseName() + " - " + session.getSectionCode();
-            binding.tvStudentSessionCourseName.setText(courseDisplay);
+            binding.tvStudentSessionCourseName.setText(session.getCourseDisplay());
 
-            // Dòng 2: Day + Time Range (server đã format sẵn)
-            String timeDisplay = session.getDayOfWeek() + " " +
-                    session.getStartTime() + " - " + session.getEndTime();
-            binding.tvStudentSessionDateTime.setText(timeDisplay);
+            // Dòng 2: Day + Time Range (chỉ giờ phút, không có giây)
+            binding.tvStudentSessionDateTime.setText(session.getDayTimeDisplay());
 
             // Dòng 3: Building - Room
-            String roomDisplay = session.getBuilding() + " - " + session.getRoom();
-            binding.tvStudentSessionClassRoom.setText(roomDisplay);
+            binding.tvStudentSessionClassRoom.setText(session.getBuildingRoomDisplay());
         }
 
         private void configureButton(StudentScheduleClassSection session) {
@@ -180,23 +249,27 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
             boolean isCurrentlyHappening = startTime != null && endTime != null &&
                     isCurrentTimeInSession(currentTime, startTime, endTime);
 
-            // Check if there's any active session
-            boolean hasActiveSession = hasActiveSessionInList();
+            // ✅ Check từ SharedPreferences
+            boolean hasJoined = isSessionJoinedFromPrefs(session.getSessionId());
 
             switch (status) {
                 case STATUS_PENDING:
-                    if (hasActiveSession) {
-                        return ACTION_UPCOMING;
-                    }
-                    // Nếu đang trong thời gian diễn ra -> có thể join
-                    if (isCurrentlyHappening) {
-                        return ACTION_JOIN;
-                    } else {
-                        return ACTION_UPCOMING;
-                    }
+                    // Pending luôn luôn là UPCOMING, dù có đang trong thời gian
+                    return ACTION_UPCOMING;
 
                 case STATUS_ACTIVE:
-                    return ACTION_ONGOING;
+                    if (isCurrentlyHappening) {
+                        if (hasJoined) {
+                            // Active + trong thời gian + đã join = ONGOING
+                            return ACTION_ONGOING;
+                        } else {
+                            // Active + trong thời gian + chưa join = JOIN
+                            return ACTION_JOIN;
+                        }
+                    } else {
+                        // Active + không trong thời gian = VIEW
+                        return ACTION_VIEW;
+                    }
 
                 case STATUS_COMPLETED:
                     return ACTION_VIEW;
@@ -303,20 +376,39 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
 
             switch (action) {
                 case ACTION_JOIN:
+                    // Active + trong thời gian + chưa join → hiển thị confirm
                     showJoinConfirmation(session);
                     break;
 
                 case ACTION_ONGOING:
+                    // Active + trong thời gian + đã join → view
+                    if (listener != null) {
+                        listener.onSessionClick(session);
+                    }
+                    break;
+
                 case ACTION_VIEW:
+                    // Completed hoặc Active không trong thời gian → view
                     if (listener != null) {
                         listener.onSessionClick(session);
                     }
                     break;
 
                 case ACTION_UPCOMING:
-                    Toast.makeText(itemView.getContext(),
-                            "Class hasn't started yet. Please wait until " + session.getStartTime(),
-                            Toast.LENGTH_SHORT).show();
+                    // Pending hoặc chưa tới giờ
+                    String message;
+                    Date currentTime = new Date();
+                    Date startTime = parseSessionTime(session.getStartTime());
+                    Date endTime = parseSessionTime(session.getEndTime());
+                    boolean isCurrentlyHappening = startTime != null && endTime != null &&
+                            isCurrentTimeInSession(currentTime, startTime, endTime);
+
+                    if (isCurrentlyHappening && STATUS_PENDING.equals(session.getStatus())) {
+                        message = "Lecturer hasn't started the class yet. Please wait for activation.";
+                    } else {
+                        message = "Class hasn't started yet. Please wait until " + session.getStartTime();
+                    }
+                    Toast.makeText(itemView.getContext(), message, Toast.LENGTH_SHORT).show();
                     break;
 
                 case ACTION_MISSED:
@@ -326,6 +418,7 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
                     break;
             }
         }
+
 
         @RequiresApi(api = Build.VERSION_CODES.O)
         private void showJoinConfirmation(StudentScheduleClassSection session) {
@@ -366,12 +459,16 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
                 listener.onJoinSession(session);
             }
 
-            // Update session status and refresh UI
-            session.setStatus(STATUS_ACTIVE);
+            // ✅ Save joined session vào SharedPreferences
+            saveJoinedSessionToPrefs(session.getSessionId());
+
+            // Refresh UI để hiển thị trạng thái mới
             notifyDataSetChanged();
 
             Log.d(TAG, "Student joined session: " + session.getSessionId());
         }
+
+
 
         @RequiresApi(api = Build.VERSION_CODES.O)
         private void loadSessionRounds(StudentScheduleClassSection session) {

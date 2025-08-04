@@ -18,194 +18,352 @@
         app:cardCornerRadius="20dp"
         app:cardElevation="8dp">
 
-        <androidx.constraintlayout.widget.ConstraintLayout
+        <ScrollView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:padding="24dp">
+            android:fillViewport="true">
 
-            <!-- Header Info -->
-            <TextView
-                android:id="@+id/tvStudentScheduleClassDetailSubject"
-                android:layout_width="0dp"
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:fontFamily="@font/jostsemibold"
-                android:text="Mathematics - G701"
-                android:textColor="#1E293B"
-                android:textSize="22sp"
-                android:textStyle="bold"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
+                android:padding="24dp">
 
-            <!-- Class Info Section - Equal Distribution -->
-            <LinearLayout
-                android:id="@+id/layoutStudentClassInfo"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:weightSum="3"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/tvStudentScheduleClassDetailSubject">
-
-                <!-- Students Count -->
+                <!-- Header Info -->
                 <TextView
-                    android:id="@+id/tvStudentScheduleClassDetailStudentCount"
+                    android:id="@+id/tvStudentScheduleClassDetailSubject"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:fontFamily="@font/mulishextrabold"
-                    android:text="21 Students"
-                    android:textAlignment="center"
-                    android:textColor="#64748B"
-                    android:textSize="14sp"
-                    android:drawablePadding="4dp" />
+                    android:fontFamily="@font/jostsemibold"
+                    android:text="Mathematics - G701"
+                    android:textColor="#1E293B"
+                    android:textSize="22sp"
+                    android:textStyle="bold"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent" />
 
-                <!-- Duration -->
-                <TextView
-                    android:id="@+id/tvStudentScheduleClassDetailDuration"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:fontFamily="@font/mulishextrabold"
-                    android:text="2 hours 30mins"
-                    android:textAlignment="center"
-                    android:textColor="#64748B"
-                    android:textSize="14sp"
-                    android:drawablePadding="4dp" />
-
-                <!-- Room -->
-                <TextView
-                    android:id="@+id/tvStudentScheduleClassDetailRoom"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:fontFamily="@font/mulishextrabold"
-                    android:text="BE-201"
-                    android:textAlignment="center"
-                    android:textColor="#64748B"
-                    android:textSize="14sp"
-                    android:drawablePadding="4dp" />
-
-            </LinearLayout>
-
-            <!-- Claim Request Button -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnStudentScheduleClassDetailClaimRequest"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:fontFamily="@font/mulishextrabold"
-                android:paddingVertical="12dp"
-                android:text="Claim Request"
-                android:textAllCaps="false"
-                android:textColor="#FFFFFF"
-                android:textSize="16sp"
-                app:backgroundTint="#A3BFED"
-                app:cornerRadius="25dp"
-                app:icon="@drawable/ic_claim_request"
-                app:iconGravity="textStart"
-                app:iconPadding="8dp"
-                app:iconSize="20dp"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/layoutStudentClassInfo" />
-
-            <!-- Final Attendance Title -->
-            <TextView
-                android:id="@+id/tvStudentFinalAttendanceTitle"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="32dp"
-                android:gravity="center"
-                android:fontFamily="@font/mulishextrabold"
-                android:text="Final Attendance"
-                android:textColor="#1E293B"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/btnStudentScheduleClassDetailClaimRequest" />
-
-            <!-- Student Attendance Item -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardStudentAttendanceItem"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                app:cardBackgroundColor="#F8FAFC"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="2dp"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/tvStudentFinalAttendanceTitle">
-
+                <!-- Class Info Section -->
                 <LinearLayout
+                    android:id="@+id/layoutStudentClassInfo"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:weightSum="3"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@+id/tvStudentScheduleClassDetailSubject">
+
+                    <TextView
+                        android:id="@+id/tvStudentScheduleClassDetailStudentCount"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fontFamily="@font/mulishextrabold"
+                        android:text="21 Students"
+                        android:textAlignment="center"
+                        android:textColor="#64748B"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/tvStudentScheduleClassDetailDuration"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fontFamily="@font/mulishextrabold"
+                        android:text="2 hours 30mins"
+                        android:textAlignment="center"
+                        android:textColor="#64748B"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/tvStudentScheduleClassDetailRoom"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fontFamily="@font/mulishextrabold"
+                        android:text="BE-201"
+                        android:textAlignment="center"
+                        android:textColor="#64748B"
+                        android:textSize="14sp" />
+
+                </LinearLayout>
+
+                <!-- Claim Request Button -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnStudentScheduleClassDetailClaimRequest"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:fontFamily="@font/mulishextrabold"
+                    android:paddingVertical="12dp"
+                    android:text="Claim Request"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    app:backgroundTint="#A3BFED"
+                    app:cornerRadius="25dp"
+                    app:icon="@drawable/ic_claim_request"
+                    app:iconGravity="textStart"
+                    app:iconPadding="8dp"
+                    app:iconSize="20dp"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@+id/layoutStudentClassInfo" />
+
+                <!-- Final Attendance Title -->
+                <TextView
+                    android:id="@+id/tvStudentFinalAttendanceTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="32dp"
+                    android:gravity="center"
+                    android:fontFamily="@font/mulishextrabold"
+                    android:text="Final Attendance"
+                    android:textColor="#1E293B"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@+id/btnStudentScheduleClassDetailClaimRequest" />
+
+                <!-- Student Info Section -->
+                <LinearLayout
+                    android:id="@+id/layoutStudentInfo"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@+id/tvStudentFinalAttendanceTitle">
+
+                    <TextView
+                        android:id="@+id/tvStudentName"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/jostsemibold"
+                        android:text="Daniel Smith"
+                        android:textColor="#1E293B"
+                        android:textSize="24sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvStudentId"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:fontFamily="@font/mulishbold"
+                        android:text="ID: HS001324"
+                        android:textColor="#64748B"
+                        android:textSize="14sp" />
+
+                </LinearLayout>
+
+                <!-- Attendance Statistics -->
+                <LinearLayout
+                    android:id="@+id/layoutAttendanceStats"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
                     android:orientation="horizontal"
-                    android:padding="16dp"
-                    android:gravity="center_vertical">
+                    android:gravity="center"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@+id/layoutStudentInfo">
 
-
-                    <!-- Student Info -->
+                    <!-- Left Side: Attended/Missed Rounds -->
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:layout_marginStart="12dp"
-                        android:orientation="vertical">
+                        android:layout_marginEnd="24dp"
+                        android:orientation="vertical"
+                        android:gravity="center">
+
+                        <!-- Attended Rounds -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            app:cardBackgroundColor="#10B981"
+                            app:cardCornerRadius="20dp"
+                            app:cardElevation="0dp">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:paddingHorizontal="16dp"
+                                android:paddingVertical="8dp"
+                                android:gravity="center_vertical">
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:fontFamily="@font/mulishextrabold"
+                                    android:text="Attended Rounds:"
+                                    android:textColor="#FFFFFF"
+                                    android:textSize="12sp" />
+
+                                <com.google.android.material.card.MaterialCardView
+                                    android:layout_width="24dp"
+                                    android:layout_height="24dp"
+                                    app:cardBackgroundColor="#FFFFFF"
+                                    app:cardCornerRadius="12dp"
+                                    app:cardElevation="0dp">
+
+                                    <TextView
+                                        android:id="@+id/tvAttendedRounds"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="match_parent"
+                                        android:fontFamily="@font/jostsemibold"
+                                        android:text="18"
+                                        android:textColor="#10B981"
+                                        android:textSize="12sp"
+                                        android:gravity="center"
+                                        android:textStyle="bold" />
+
+                                </com.google.android.material.card.MaterialCardView>
+
+                            </LinearLayout>
+
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <!-- Missed Rounds -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            app:cardBackgroundColor="#EF4444"
+                            app:cardCornerRadius="20dp"
+                            app:cardElevation="0dp">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:paddingHorizontal="16dp"
+                                android:paddingVertical="8dp"
+                                android:gravity="center_vertical">
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:fontFamily="@font/mulishextrabold"
+                                    android:text="Missed Rounds:"
+                                    android:textColor="#FFFFFF"
+                                    android:textSize="12sp" />
+
+                                <com.google.android.material.card.MaterialCardView
+                                    android:layout_width="24dp"
+                                    android:layout_height="24dp"
+                                    app:cardBackgroundColor="#FFFFFF"
+                                    app:cardCornerRadius="12dp"
+                                    app:cardElevation="0dp">
+
+                                    <TextView
+                                        android:id="@+id/tvMissedRounds"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="match_parent"
+                                        android:fontFamily="@font/jostsemibold"
+                                        android:text="7"
+                                        android:textColor="#EF4444"
+                                        android:textSize="12sp"
+                                        android:gravity="center"
+                                        android:textStyle="bold" />
+
+                                </com.google.android.material.card.MaterialCardView>
+
+                            </LinearLayout>
+
+                        </com.google.android.material.card.MaterialCardView>
+
+                    </LinearLayout>
+
+                    <!-- Right Side: Percentage Circle -->
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center">
+
+                        <!-- Circular Progress -->
+                        <FrameLayout
+                            android:layout_width="80dp"
+                            android:layout_height="80dp">
+
+                            <com.google.android.material.card.MaterialCardView
+                                android:layout_width="80dp"
+                                android:layout_height="80dp"
+                                app:cardBackgroundColor="#10B981"
+                                app:cardCornerRadius="40dp"
+                                app:cardElevation="0dp">
+
+                                <TextView
+                                    android:id="@+id/tvAttendancePercentage"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent"
+                                    android:fontFamily="@font/jostsemibold"
+                                    android:text="72%"
+                                    android:textColor="#FFFFFF"
+                                    android:textSize="18sp"
+                                    android:gravity="center"
+                                    android:textStyle="bold" />
+
+                            </com.google.android.material.card.MaterialCardView>
+
+                        </FrameLayout>
 
                         <TextView
-                            android:id="@+id/tvStudentName"
+                            android:id="@+id/tvTotalRounds"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:fontFamily="@font/jostsemibold"
-                            android:text="Daniel"
-                            android:textColor="#1E293B"
-                            android:textSize="16sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/tvStudentId"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="8dp"
                             android:fontFamily="@font/mulishbold"
-                            android:text="ID: HS001324"
+                            android:text="Total: 18/25"
                             android:textColor="#64748B"
                             android:textSize="12sp" />
 
                     </LinearLayout>
 
-                    <!-- Status -->
-                    <TextView
-                        android:id="@+id/tvStudentAttendanceStatus"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:fontFamily="@font/jostsemibold"
-                        android:paddingHorizontal="12dp"
-                        android:paddingVertical="6dp"
-                        android:text="Not yet"
-                        android:textColor="#10B981"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
-
                 </LinearLayout>
 
-            </com.google.android.material.card.MaterialCardView>
 
-            <!-- Empty Space for scrolling -->
-            <View
-                android:layout_width="0dp"
-                android:layout_height="100dp"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/cardStudentAttendanceItem" />
+                <!-- Final Status Button -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnFinalAttendanceStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:fontFamily="@font/jostsemibold"
+                    android:paddingHorizontal="32dp"
+                    android:paddingVertical="12dp"
+                    android:text="Attended"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    app:backgroundTint="#10B981"
+                    app:cornerRadius="25dp"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@+id/layoutAttendanceStats" />
 
-        </androidx.constraintlayout.widget.ConstraintLayout>
+                <!-- Bottom Spacer -->
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="32dp"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@+id/btnFinalAttendanceStatus" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+        </ScrollView>
 
     </com.google.android.material.card.MaterialCardView>
 
@@ -237,7 +395,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
             android:fontFamily="@font/jostsemibold"
-            android:text="My Class"
+            android:text="My Classes"
             android:textColor="#232B42"
             android:textSize="20sp"
             android:textStyle="bold"

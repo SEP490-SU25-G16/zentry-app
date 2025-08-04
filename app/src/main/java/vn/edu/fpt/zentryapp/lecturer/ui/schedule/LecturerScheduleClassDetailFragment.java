@@ -72,7 +72,7 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
 
     private void setupViewPager() {
         String[] tabTitles = {"History", "Attendance"};
-
+        binding.viewPagerScheduleClassDetail.setOffscreenPageLimit(2);
         binding.viewPagerScheduleClassDetail.setAdapter(new FragmentStateAdapter(this) {
             @NonNull
             @Override
@@ -164,6 +164,16 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
             }
         });
 
+        viewModel.listRoundAttendance().observe(getViewLifecycleOwner(), attendanceList -> {
+            if (attendanceList != null && attendanceFragment != null) {
+                // Get current round number
+                Integer roundNumber = viewModel.currentRoundNumber().getValue();
+                if (roundNumber != null) {
+                    attendanceFragment.updateRoundAttendanceData(attendanceList, roundNumber);
+                }
+            }
+        });
+
         // Observer for errors
         viewModel.errorMessage().observe(getViewLifecycleOwner(), error -> {
             if (error != null) {
@@ -178,13 +188,11 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
         // Class Detail Fragment sẽ gọi ViewModel để load attendance của round đó
         viewModel.loadListRoundAttendances(round.getRoundId());
 
-        // Chuyển sang tab Attendance để user xem kết quả
-        binding.viewPagerScheduleClassDetail.setCurrentItem(1, true);
-
-        Toast.makeText(requireContext(),
-                "Loading attendance for Round " + round.getRoundNumber(),
-                Toast.LENGTH_SHORT).show();
-    }
+        binding.viewPagerScheduleClassDetail.post(() -> {
+            // ✅ 3. Sau đó mới load data
+            viewModel.loadListRoundAttendances(round.getRoundId());
+            binding.viewPagerScheduleClassDetail.setCurrentItem(1, true);
+        });    }
 
     @Override
     public void onDestroyView() {

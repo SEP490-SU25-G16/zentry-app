@@ -1,6 +1,5 @@
 package vn.edu.fpt.zentryapp.lecturer.adapter;
 
-
 import android.annotation.SuppressLint;
 import android.view.LayoutInflater;
 import android.view.ViewGroup;
@@ -40,7 +39,8 @@ public class LecturerAttendanceAdapter extends RecyclerView.Adapter<LecturerAtte
 
     @Override
     public void onBindViewHolder(@NonNull AttendanceViewHolder holder, int position) {
-        holder.bind(finalAttendance.get(position));
+        // ✅ Pass position + 1 để bắt đầu từ 1 thay vì 0
+        holder.bind(finalAttendance.get(position), position + 1);
     }
 
     @Override
@@ -58,13 +58,17 @@ public class LecturerAttendanceAdapter extends RecyclerView.Adapter<LecturerAtte
             binding.getRoot().setOnClickListener(v -> {
                 int position = getAdapterPosition();
                 if (position != RecyclerView.NO_POSITION && listener != null) {
-                  //  listener.onStudentClick(finalAttendance.get(position));
+                    // listener.onStudentClick(finalAttendance.get(position));
                 }
             });
         }
 
+        // ✅ Thêm parameter studentNumber
         @SuppressLint("SetTextI18n")
-        public void bind(Attendance student) {
+        public void bind(Attendance student, int studentNumber) {
+            // ✅ Set student number (1, 2, 3, ...)
+            binding.tvStudentNumber.setText(String.valueOf(studentNumber));
+
             binding.tvStudentName.setText(student.getStudentName());
             binding.tvStudentCode.setText("ID: " + student.getStudentCode());
             binding.tvAttendanceStatus.setText(student.getAttendanceStatus());

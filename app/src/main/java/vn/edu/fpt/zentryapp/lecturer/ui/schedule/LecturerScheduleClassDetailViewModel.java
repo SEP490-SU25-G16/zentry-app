@@ -52,6 +52,8 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
     private final MutableLiveData<Boolean> _isLoadingRoundDetail = new MutableLiveData<>(false);
     private final MutableLiveData<String> _errorMessage = new MutableLiveData<>();
     private final MutableLiveData<Boolean> _canAddFaceId = new MutableLiveData<>(true);
+    private final MutableLiveData<List<Attendance>> _listRoundAttendance = new MutableLiveData<>();
+    private final MutableLiveData<Integer> _currentRoundNumber = new MutableLiveData<>();
 
     // API Service
     private AttendanceApiService apiService;
@@ -66,18 +68,70 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
 
     public LiveData<String> errorMessage() { return _errorMessage; }
     public LiveData<Boolean> canAddFaceId() { return _canAddFaceId; }
+    public LiveData<List<Attendance>> listRoundAttendance() { return _listRoundAttendance; }
+    public LiveData<Integer> currentRoundNumber() { return _currentRoundNumber; }
 
     public void init(Context context, AuthManager authManager, LecturerScheduleClassSection session) {
+        Log.d(TAG, "========== ViewModel init() started ==========");
+        Log.d(TAG, "📋 Context: " + (context != null ? "✅ Available" : "❌ NULL"));
+        Log.d(TAG, "📋 AuthManager: " + (authManager != null ? "✅ Available" : "❌ NULL"));
+        Log.d(TAG, "📋 Session: " + (session != null ? "✅ Available" : "❌ NULL"));
+
+        if (session != null) {
+            Log.d(TAG, "📋 Session details:");
+            Log.d(TAG, "    • SessionId: " + session.getSessionId());
+            Log.d(TAG, "    • CourseCode: " + session.getCourseCode());
+            Log.d(TAG, "    • CourseName: " + session.getCourseName());
+            Log.d(TAG, "    • Status: " + session.getSessionStatus());
+        }
+
         this.context = context;
         this.authManager = authManager;
         this.session = session;
-        this.apiService = ApiClient.getClient(context).create(AttendanceApiService.class);
 
-        setupAttendanceCalculatedReceiver();
-        loadSessionInfo();
-        loadListRounds();
-        loadListFinalAttendances();
+        Log.d(TAG, "🔧 Creating API service...");
+        try {
+            this.apiService = ApiClient.getClient(context).create(AttendanceApiService.class);
+            Log.d(TAG, "✅ API service created successfully");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Failed to create API service", e);
+            _errorMessage.setValue("Failed to initialize API service: " + e.getMessage());
+            return;
+        }
+
+        Log.d(TAG, "🔧 Setting up receivers and loading data...");
+        try {
+            setupAttendanceCalculatedReceiver();
+            Log.d(TAG, "✅ Receiver setup completed");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Failed to setup receiver", e);
+        }
+
+        try {
+            Log.d(TAG, "🔄 Starting loadSessionInfo()...");
+            loadSessionInfo();
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Failed to load session info", e);
+        }
+
+        try {
+            Log.d(TAG, "🔄 Starting loadListRounds()...");
+            loadListRounds();
+            Log.d(TAG, "✅ loadListRounds() call completed (async)");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Failed to call loadListRounds()", e);
+        }
+
+        try {
+            Log.d(TAG, "🔄 Starting loadListFinalAttendances()...");
+            loadListFinalAttendances();
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Failed to load final attendances", e);
+        }
+
+        Log.d(TAG, "========== ViewModel init() completed ==========");
     }
+
 
     private String getSessionId() {
         return session != null ? session.getSessionId() : "UNKNOWN_SESSION";
@@ -245,29 +299,91 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
      */
     private void loadListRounds() {
         if (session == null) {
+            Log.e(TAG, "❌ Session is null, cannot load rounds");
             _errorMessage.setValue("Session data not available");
             return;
         }
         _errorMessage.setValue(null);
 
         String sessionId = getSessionId();
-        Log.d(TAG, "Loading attendance rounds for session: " + sessionId);
+        Log.d(TAG, "========== loadListRounds() started ==========");
+        Log.d(TAG, "📤 Loading rounds for sessionId: " + sessionId);
 
         apiService.getListRounds(sessionId)
                 .enqueue(new Callback<RoundsDataResponse>() {
                     @Override
                     public void onResponse(Call<RoundsDataResponse> call, Response<RoundsDataResponse> response) {
+                        Log.d(TAG, "📥 API Response received");
+                        Log.d(TAG, "  • Response code: " + response.code());
+                        Log.d(TAG, "  • Response successful: " + response.isSuccessful());
+                        Log.d(TAG, "  • Response body null: " + (response.body() == null));
+
                         if (response.isSuccessful() && response.body() != null) {
                             RoundsDataResponse apiResponse = response.body();
+                            Log.d(TAG, "  • API Success: " + apiResponse.isSuccess());
+                            Log.d(TAG, "  • API Error: " + apiResponse.getError());
+                            Log.d(TAG, "  • API Message: " + apiResponse.getMessage());
 
                             if (apiResponse.isSuccess()) {
-                                // ✅ UPDATED: Map và filter chỉ completed rounds
-                                List<Round> allRounds = mapApiDataToAttendanceRounds(apiResponse.getData());
-                                List<Round> completedRounds = filterCompletedRounds(allRounds);
+                                Log.d(TAG, "🔄 Processing API data...");
 
+                                // Log raw API data
+                                if (apiResponse.getData() != null) {
+                                    Log.d(TAG, "📋 Raw API data count: " + apiResponse.getData().size());
+                                    for (int i = 0; i < apiResponse.getData().size(); i++) {
+                                        var roundDetail = apiResponse.getData().get(i);
+                                        Log.d(TAG, String.format("  Raw Round %d: ID=%s, Number=%d, Status=%s, Attended=%d/%d, StartTime=%s",
+                                                (i + 1),
+                                                roundDetail.getRoundId(),
+                                                roundDetail.getRoundNumber(),
+                                                roundDetail.getStatus(),
+                                                roundDetail.getAttendedCount(),
+                                                roundDetail.getTotalStudents(),
+                                                roundDetail.getStartTime()));
+                                    }
+                                } else {
+                                    Log.w(TAG, "⚠️ API data is null");
+                                }
+
+                                // Map data
+                                Log.d(TAG, "🔄 Mapping API data to Round objects...");
+                                List<Round> allRounds = mapApiDataToAttendanceRounds(apiResponse.getData());
+                                Log.d(TAG, "📊 Mapped rounds count: " + allRounds.size());
+
+                                // Log mapped rounds
+                                for (int i = 0; i < allRounds.size(); i++) {
+                                    Round round = allRounds.get(i);
+                                    Log.d(TAG, String.format("  Mapped Round %d: ID=%s, Number=%d, Status=%s, Attended=%d/%d",
+                                            (i + 1),
+                                            round.getRoundId(),
+                                            round.getRoundNumber(),
+                                            round.getStatus(),
+                                            round.getAttendedCount(),
+                                            round.getTotalStudents()));
+                                }
+
+                                // Filter completed rounds
+                                Log.d(TAG, "🔍 Filtering completed rounds...");
+                                List<Round> completedRounds = filterCompletedRounds(allRounds);
+                                Log.d(TAG, "📊 Completed rounds count: " + completedRounds.size());
+
+                                // Log filtered rounds
+                                for (int i = 0; i < completedRounds.size(); i++) {
+                                    Round round = completedRounds.get(i);
+                                    Log.d(TAG, String.format("  Completed Round %d: ID=%s, Number=%d, Status=%s, Attended=%d/%d",
+                                            (i + 1),
+                                            round.getRoundId(),
+                                            round.getRoundNumber(),
+                                            round.getStatus(),
+                                            round.getAttendedCount(),
+                                            round.getTotalStudents()));
+                                }
+
+                                // Set value to LiveData
+                                Log.d(TAG, "📡 Setting " + completedRounds.size() + " rounds to LiveData...");
                                 _listHistoryRounds.setValue(completedRounds);
 
-                                Log.d(TAG, "✅ Loaded " + allRounds.size() + " total rounds, " +
+                                Log.d(TAG, "✅ Successfully loaded " + allRounds.size() + " total rounds, " +
                                         completedRounds.size() + " completed rounds displayed");
 
                             } else {
@@ -277,16 +393,28 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                             }
                         } else {
                             String error = "HTTP Error: " + response.code();
+                            if (response.errorBody() != null) {
+                                try {
+                                    String errorBody = response.errorBody().string();
+                                    Log.e(TAG, "❌ Error body: " + errorBody);
+                                    error += " - " + errorBody;
+                                } catch (Exception e) {
+                                    Log.e(TAG, "Failed to read error body", e);
+                                }
+                            }
                             _errorMessage.setValue(error);
                             Log.e(TAG, "❌ " + error);
                         }
+                        Log.d(TAG, "========== loadListRounds() completed ==========");
                     }
 
                     @Override
                     public void onFailure(Call<RoundsDataResponse> call, Throwable t) {
                         String error = "Network Error: " + t.getMessage();
                         _errorMessage.setValue(error);
-                        Log.e(TAG, "❌ Network Error", t);
+                        Log.e(TAG, "❌ Network Error: " + error, t);
+                        Log.e(TAG, "❌ Call URL: " + call.request().url());
+                        Log.d(TAG, "========== loadListRounds() failed ==========");
                     }
                 });
     }
@@ -322,14 +450,29 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
         if (status == null) {
             return false;
         }
-
+        Date currentTime = new Date();
         // ✅ Check các status values có thể indicate completed
         switch (status.toLowerCase()) {
             case "completed":
                 return true;
 
             case "active":
-                return false;
+                // ✅ THÊM: Check nếu Active + đã quá endTime → coi như completed
+                if (round.getEndDateTime() != null) {
+                    boolean isPastEndTime = currentTime.after(round.getEndDateTime());
+
+                    Log.d(TAG, String.format("Round %d - Status: ACTIVE, EndTime: %s, CurrentTime: %s, isPastEndTime: %s → %s",
+                            round.getRoundNumber(),
+                            round.getEndDateTime(),
+                            currentTime,
+                            isPastEndTime,
+                            isPastEndTime ? "✅ Include (Past End)" : "❌ Skip (Still Active)"));
+
+                    return isPastEndTime; // Chỉ include nếu đã quá endTime
+                } else {
+                    Log.d(TAG, "Round " + round.getRoundNumber() + " - Status: ACTIVE, No EndTime → ❌ Skip");
+                    return false; // Active nhưng không có endTime → không include
+                }
 
             default:
                 // ✅ Additional check: nếu có endTime thì có thể coi là completed
@@ -344,41 +487,123 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
      * Load final attendance from API
      */
     public void loadListFinalAttendances() {
+        Log.d(TAG, "🚀 loadListFinalAttendances() method ENTRY");
+
+        // ✅ Check pre-conditions
+        Log.d(TAG, "📋 Pre-check values:");
+        Log.d(TAG, "    • session: " + (session != null ? "✅ Available" : "❌ NULL"));
+        Log.d(TAG, "    • apiService: " + (apiService != null ? "✅ Available" : "❌ NULL"));
+        Log.d(TAG, "    • context: " + (context != null ? "✅ Available" : "❌ NULL"));
+
+        if (session == null) {
+            Log.e(TAG, "❌ Session is null, cannot load final attendance");
+            _errorMessage.setValue("Session data not available");
+            return;
+        }
+
+        if (apiService == null) {
+            Log.e(TAG, "❌ API service is null, cannot load final attendance");
+            _errorMessage.setValue("API service not available");
+            return;
+        }
+
         String sessionId = getSessionId();
-        Log.d(TAG, "Loading final attendance for session: " + sessionId);
-        // TODO: Uncomment when API is ready
-        apiService.getListAttendances(sessionId)
-                .enqueue(new Callback<AttendanceResponse>() {
-                    @Override
-                    public void onResponse(Call<AttendanceResponse> call, Response<AttendanceResponse> response) {
-                        if (response.isSuccessful() && response.body() != null) {
-                            AttendanceResponse apiResponse = response.body();
+        Log.d(TAG, "========== loadListFinalAttendances() started ==========");
+        Log.d(TAG, "📤 Loading final attendance for sessionId: " + sessionId);
 
-                            if (apiResponse.isSuccess()) {
-                                List<Attendance> finalAttendance = mapApiDataToFinalAttendance(apiResponse.getData());
-                                _listAttendance.setValue(finalAttendance);
+        // ✅ Validate sessionId
+        if (sessionId == null || sessionId.isEmpty() || "UNKNOWN_SESSION".equals(sessionId)) {
+            Log.e(TAG, "❌ Invalid session ID: " + sessionId);
+            _errorMessage.setValue("Invalid session ID");
+            return;
+        }
 
-                                Log.d(TAG, "Loaded " + finalAttendance.size() + " final attendance records");
+        try {
+            Log.d(TAG, "🔄 Creating API call...");
+            Call<AttendanceResponse> call = apiService.getListAttendances(sessionId);
+            Log.d(TAG, "✅ API call created: " + call.request().url());
+
+            call.enqueue(new Callback<AttendanceResponse>() {
+                @Override
+                public void onResponse(Call<AttendanceResponse> call, Response<AttendanceResponse> response) {
+                    Log.d(TAG, "📥 Final Attendance API Response received");
+                    Log.d(TAG, "  • Response code: " + response.code());
+                    Log.d(TAG, "  • Response successful: " + response.isSuccessful());
+                    Log.d(TAG, "  • Response body null: " + (response.body() == null));
+
+                    if (response.isSuccessful() && response.body() != null) {
+                        AttendanceResponse apiResponse = response.body();
+                        Log.d(TAG, "  • API Success: " + apiResponse.isSuccess());
+                        Log.d(TAG, "  • API Error: " + apiResponse.getError());
+                        Log.d(TAG, "  • API Message: " + apiResponse.getMessage());
+
+                        if (apiResponse.isSuccess()) {
+                            Log.d(TAG, "🔄 Processing final attendance data...");
+
+                            // Log raw API data
+                            if (apiResponse.getData() != null) {
+                                Log.d(TAG, "📋 Raw final attendance count: " + apiResponse.getData().size());
+                                for (int i = 0; i < apiResponse.getData().size(); i++) {
+                                    FinalAttendance student = apiResponse.getData().get(i);
+                                    Log.d(TAG, String.format("  Student %d: ID=%s, Name=%s, Status=%s",
+                                            (i + 1),
+                                            student.getStudentId(),
+                                            student.getStudentFullName(),
+                                            student.getStatus()));
+                                }
                             } else {
-                                String error = apiResponse.getError() != null ? apiResponse.getError() : "Unknown API error";
-                                _errorMessage.setValue(error);
-                                Log.e(TAG, "Final Attendance API Error: " + error);
+                                Log.w(TAG, "⚠️ Final attendance API data is null");
                             }
-                        } else {
-                            String error = "HTTP Error: " + response.code();
-                            _errorMessage.setValue(error);
-                            Log.e(TAG, "Final Attendance HTTP Error: " + error);
-                        }
-                    }
 
-                    @Override
-                    public void onFailure(Call<AttendanceResponse> call, Throwable t) {
-                        String error = "Network Error: " + t.getMessage();
-                        _errorMessage.setValue(error);
-                        Log.e(TAG, "Final Attendance Network Error", t);
+                            List<Attendance> finalAttendance = mapApiDataToFinalAttendance(apiResponse.getData());
+                            Log.d(TAG, "📊 Mapped final attendance count: " + finalAttendance.size());
+
+                            Log.d(TAG, "📡 Setting final attendance to LiveData...");
+                            _listAttendance.setValue(finalAttendance);
+
+                            Log.d(TAG, "✅ Successfully loaded " + finalAttendance.size() + " final attendance records");
+                        } else {
+                            String error = apiResponse.getError() != null ? apiResponse.getError() : "Unknown API error";
+                            _errorMessage.setValue("Final Attendance: " + error);
+                            Log.e(TAG, "❌ Final Attendance API Error: " + error);
+                        }
+                    } else {
+                        String error = "HTTP Error: " + response.code();
+                        if (response.errorBody() != null) {
+                            try {
+                                String errorBody = response.errorBody().string();
+                                Log.e(TAG, "❌ Final Attendance Error body: " + errorBody);
+                                error += " - " + errorBody;
+                            } catch (Exception e) {
+                                Log.e(TAG, "Failed to read final attendance error body", e);
+                            }
+                        }
+                        _errorMessage.setValue("Final Attendance: " + error);
+                        Log.e(TAG, "❌ Final Attendance " + error);
                     }
-                });
+                    Log.d(TAG, "========== loadListFinalAttendances() response completed ==========");
+                }
+
+                @Override
+                public void onFailure(Call<AttendanceResponse> call, Throwable t) {
+                    String error = "Network Error: " + t.getMessage();
+                    _errorMessage.setValue("Final Attendance: " + error);
+                    Log.e(TAG, "❌ Final Attendance Network Error: " + error, t);
+                    Log.e(TAG, "❌ Final Attendance Call URL: " + call.request().url());
+                    Log.d(TAG, "========== loadListFinalAttendances() failed ==========");
+                }
+            });
+
+            Log.d(TAG, "✅ Final attendance API call enqueued successfully");
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Exception during final attendance API call setup", e);
+            _errorMessage.setValue("Failed to load final attendance: " + e.getMessage());
+        }
+
+        Log.d(TAG, "========== loadListFinalAttendances() call setup completed ==========");
     }
+
 
     /**
      * Load attendance for specific round
@@ -408,7 +633,10 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                                 _roundResult.setValue(roundResult);
 
                                 List<Attendance> attendanceList = mapRoundResultToAttendanceList(roundResult);
-                                _listAttendance.setValue(attendanceList);
+
+                                // ✅ CHANGED: Set to round attendance LiveData instead of general attendance
+                                _listRoundAttendance.setValue(attendanceList);
+                                _currentRoundNumber.setValue(roundResult.getRoundNumber());
 
                                 Log.d(TAG, "✅ Loaded round " + roundResult.getRoundNumber() +
                                         " attendance: " + roundResult.getAttendedCount() + "/" +
@@ -443,8 +671,22 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
             return attendanceList;
         }
 
+        // ✅ Get current user ID to exclude lecturer
+        String currentUserId = null;
+        if (authManager != null) {
+            currentUserId = authManager.getCurrentUserId();
+            Log.d(TAG, "Current user ID (lecturer): " + currentUserId);
+        }
+
         for (StudentAttendanceDto studentDto : roundResult.getStudentsAttendance()) {
             try {
+                // ✅ Skip lecturer's record
+                if (currentUserId != null && currentUserId.equals(studentDto.getStudentId())) {
+                    Log.d(TAG, "⏭️ Skipping lecturer record: " + studentDto.getDisplayName() +
+                            " (ID: " + studentDto.getStudentId() + ")");
+                    continue;
+                }
+
                 Attendance attendance = new Attendance();
 
                 // ✅ Map basic student info
@@ -454,12 +696,16 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                 attendance.setRoundNumber(roundResult.getRoundNumber());
                 attendanceList.add(attendance);
 
+                Log.d(TAG, "✅ Added student: " + studentDto.getDisplayName() +
+                        " (ID: " + studentDto.getStudentId() + ")");
+
             } catch (Exception e) {
                 Log.e(TAG, "Error mapping round attendance for student: " + studentDto.getFullName(), e);
             }
         }
 
-        Log.d(TAG, "✅ Mapped " + attendanceList.size() + " students for round " + roundResult.getRoundNumber());
+        Log.d(TAG, "✅ Mapped " + attendanceList.size() + " students for round " + roundResult.getRoundNumber() +
+                " (excluding lecturer)");
         return attendanceList;
     }
 

@@ -19,6 +19,7 @@ import java.util.Locale;
 public class StudentScheduleClassSection implements Serializable {
     private static final long serialVersionUID = 1L;
 
+    // Các trường đã có
     @SerializedName("SessionId")
     private String sessionId;
 
@@ -55,41 +56,45 @@ public class StudentScheduleClassSection implements Serializable {
     @SerializedName("SessionStatus")
     private String status;
 
-    // Display methods - similar to lecturer
-    public String getDateTimeDisplay() {
-        Date today = new Date();
-        SimpleDateFormat dayFormat = new SimpleDateFormat("EEEE", Locale.getDefault());
-        SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM", Locale.getDefault());
+    // ===== CÁC TRƯỜNG MỚI BỔ SUNG =====
+    @SerializedName("ScheduleId")
+    private String scheduleId;
 
-        return dayFormat.format(today) + " " + dateFormat.format(today) +
-                " " + formatTime(startTime) + " - " + formatTime(endTime);
-    }
+    @SerializedName("CourseId")
+    private String courseId;
 
-    public String getRoomDisplay() {
-        return building + " - " + room;
-    }
+    @SerializedName("LecturerId")
+    private String lecturerId;
 
+    @SerializedName("RoomId")
+    private String roomId;
+
+    @SerializedName("DateInfo")
+    private String dateInfo;
+
+    @SerializedName("StudentAttendanceStatus")
+    private String studentAttendanceStatus;
+    // Đã có sẵn trong model
     public String getCourseDisplay() {
         return courseName + " - " + sectionCode;
     }
 
-    // Helper method to format time from "13:04:24" to "13:04"
+    public String getDayTimeDisplay() {
+        return dayOfWeek + " " + getTimeDisplay();
+    }
+
+    public String getTimeDisplay() {
+        return formatTime(startTime) + " - " + formatTime(endTime);
+    }
     private String formatTime(String timeStr) {
         if (timeStr != null && timeStr.length() >= 5) {
-            return timeStr.substring(0, 5);
+            return timeStr.substring(0, 5); // Chỉ lấy HH:mm
         }
         return timeStr;
     }
-
-    // Convert API time string to Date object for comparison
-    public Date getStartTimeAsDate() {
-        return parseTimeToDate(startTime);
-    }
-
     public Date getEndTimeAsDate() {
         return parseTimeToDate(endTime);
     }
-
     private Date parseTimeToDate(String timeStr) {
         try {
             if (timeStr == null) return null;
@@ -113,26 +118,8 @@ public class StudentScheduleClassSection implements Serializable {
         return null;
     }
 
-    // Display methods for UI
-    public String getTimeDisplay() {
-        return formatTime(startTime) + " - " + formatTime(endTime);
-    }
-
-    public String getDayTimeDisplay() {
-        return dayOfWeek + " " + getTimeDisplay();
-    }
-
     public String getBuildingRoomDisplay() {
         return building + " - " + room;
-    }
-
-    // Legacy compatibility methods (for existing adapter code)
-    public String getClassNameWithGrade() {
-        return courseName + " - " + sectionCode;
-    }
-
-    public String getScheduleTime() {
-        return dayOfWeek + " " + formatTime(startTime) + " - " + formatTime(endTime);
     }
 
     // Alias methods for compatibility
@@ -157,5 +144,14 @@ public class StudentScheduleClassSection implements Serializable {
         return "Missed".equalsIgnoreCase(status);
     }
 
+    // Kiểm tra trạng thái điểm danh của sinh viên
+    public boolean hasAttended() {
+        return "Present".equalsIgnoreCase(studentAttendanceStatus) ||
+                "Attended".equalsIgnoreCase(studentAttendanceStatus);
+    }
+
+    public boolean isAbsent() {
+        return "Absent".equalsIgnoreCase(studentAttendanceStatus);
+    }
 
 }

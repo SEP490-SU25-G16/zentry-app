@@ -19,140 +19,143 @@
         app:cardCornerRadius="20dp"
         app:cardElevation="8dp">
 
-        <androidx.constraintlayout.widget.ConstraintLayout
+        <!-- ✅ LinearLayout để split header và viewpager -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:padding="24dp">
+            android:orientation="vertical">
 
-            <!-- Header Info -->
-            <TextView
-                android:id="@+id/tvScheduleClassDetailCourseName"
-                android:layout_width="0dp"
+            <!-- ✅ Header section với padding -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:fontFamily="@font/mulishextrabold"
-                android:text="Mathematics - G701"
-                android:textColor="#1E293B"
-                android:textSize="22sp"
-                android:textStyle="bold"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
+                android:padding="24dp">
 
-            <!-- Class Info Section - Equal Distribution -->
-            <LinearLayout
-                android:id="@+id/layoutClassInfo"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:weightSum="3"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/tvScheduleClassDetailCourseName">
-
-                <!-- Students Count -->
+                <!-- Header Info -->
                 <TextView
-                    android:id="@+id/tvScheduleClassDetailCountStudents"
+                    android:id="@+id/tvScheduleClassDetailCourseName"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:fontFamily="@font/mulishbold"
-                    android:text="21 Students"
-                    android:textAlignment="center"
-                    android:textColor="#64748B"
-                    android:textSize="14sp" />
-
-                <!-- Duration -->
-                <TextView
-                    android:id="@+id/tvScheduleClassDetailDuration"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:fontFamily="@font/mulishbold"
-                    android:text="2 hours 30mins"
-                    android:textAlignment="center"
-                    android:textColor="#64748B"
-                    android:textSize="14sp" />
-
-                <!-- Room -->
-                <TextView
-                    android:id="@+id/tvScheduleClassDetailRoom"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:fontFamily="@font/mulishbold"
-                    android:text="BE201"
-                    android:textAlignment="center"
-                    android:textColor="#64748B"
-                    android:textSize="14sp" />
-
-            </LinearLayout>
-
-
-            <!-- Buttons Section -->
-            <LinearLayout
-                android:id="@+id/layoutButtons"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/layoutClassInfo">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnScheduleClassDetailRequestFaceId"
-                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:fontFamily="@font/mulishextrabold"
-                    android:paddingHorizontal="16dp"
-                    android:text="Request Face Now"
-                    android:textAllCaps="false"
-                    android:textColor="#FFFFFF"
-                    android:textSize="14sp"
-                    app:backgroundTint="#A3BFED"
-                    app:cornerRadius="20dp"
-                    app:icon="@drawable/ic_face_id_request"
-                    app:iconGravity="textStart"
-                    app:iconPadding="8dp"
-                    app:iconSize="18dp" />
+                    android:text="Mathematics - G701"
+                    android:textColor="#1E293B"
+                    android:textSize="22sp"
+                    android:textStyle="bold"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent" />
 
-                <View
+                <!-- Class Info Section -->
+                <LinearLayout
+                    android:id="@+id/layoutClassInfo"
                     android:layout_width="0dp"
-                    android:layout_height="0dp"
-                    android:layout_weight="1" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnScheduleClassDetailEndSession"
-                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:fontFamily="@font/mulishextrabold"
-                    android:paddingHorizontal="16dp"
-                    android:text="End time"
-                    android:textAllCaps="false"
-                    android:textColor="#FFFFFF"
-                    android:textSize="14sp"
-                    app:backgroundTint="#FF6B00"
-                    app:cornerRadius="20dp"
-                    app:icon="@drawable/ic_clock_end_time"
-                    app:iconGravity="textStart"
-                    app:iconPadding="8dp"
-                    app:iconSize="18dp" />
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:weightSum="3"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@+id/tvScheduleClassDetailCourseName">
 
-            </LinearLayout>
+                    <TextView
+                        android:id="@+id/tvScheduleClassDetailCountStudents"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fontFamily="@font/mulishbold"
+                        android:text="21 Students"
+                        android:textAlignment="center"
+                        android:textColor="#64748B"
+                        android:textSize="14sp" />
 
-            <!-- TabLayout -->
+                    <TextView
+                        android:id="@+id/tvScheduleClassDetailDuration"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fontFamily="@font/mulishbold"
+                        android:text="2 hours 30mins"
+                        android:textAlignment="center"
+                        android:textColor="#64748B"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/tvScheduleClassDetailRoom"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fontFamily="@font/mulishbold"
+                        android:text="BE201"
+                        android:textAlignment="center"
+                        android:textColor="#64748B"
+                        android:textSize="14sp" />
+
+                </LinearLayout>
+
+                <!-- Buttons Section -->
+                <LinearLayout
+                    android:id="@+id/layoutButtons"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@+id/layoutClassInfo"
+                    app:layout_constraintBottom_toBottomOf="parent">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnScheduleClassDetailRequestFaceId"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/mulishextrabold"
+                        android:paddingHorizontal="16dp"
+                        android:text="Request Face Now"
+                        android:textAllCaps="false"
+                        android:textColor="#FFFFFF"
+                        android:textSize="14sp"
+                        app:backgroundTint="#A3BFED"
+                        app:cornerRadius="20dp"
+                        app:icon="@drawable/ic_face_id_request"
+                        app:iconGravity="textStart"
+                        app:iconPadding="8dp"
+                        app:iconSize="18dp" />
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnScheduleClassDetailEndSession"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/mulishextrabold"
+                        android:paddingHorizontal="16dp"
+                        android:text="End time"
+                        android:textAllCaps="false"
+                        android:textColor="#FFFFFF"
+                        android:textSize="14sp"
+                        app:backgroundTint="#FF6B00"
+                        app:cornerRadius="20dp"
+                        app:icon="@drawable/ic_clock_end_time"
+                        app:iconGravity="textStart"
+                        app:iconPadding="8dp"
+                        app:iconSize="18dp" />
+
+                </LinearLayout>
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <!-- ✅ TabLayout với padding riêng -->
             <com.google.android.material.tabs.TabLayout
                 android:id="@+id/tabLayoutScheduleClassDetail"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginHorizontal="24dp"
                 android:background="@android:color/transparent"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/layoutButtons"
                 app:tabIndicatorAnimationMode="elastic"
                 app:tabIndicatorColor="#3B82F6"
                 app:tabIndicatorFullWidth="false"
@@ -162,17 +165,15 @@
                 app:tabSelectedTextColor="#1E293B"
                 app:tabTextColor="#64748B" />
 
+            <!-- ✅ ViewPager2 KHÔNG có padding - full width -->
             <androidx.viewpager2.widget.ViewPager2
                 android:id="@+id/viewPagerScheduleClassDetail"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_marginTop="16dp"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/tabLayoutScheduleClassDetail" />
+                android:layout_weight="1"
+                android:layout_marginTop="8dp" />
 
-        </androidx.constraintlayout.widget.ConstraintLayout>
+        </LinearLayout>
 
     </com.google.android.material.card.MaterialCardView>
 

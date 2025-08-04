@@ -61,15 +61,15 @@ public class MainActivity extends AppCompatActivity {
                         }
                     }
 
-                    if (allGranted) {
-                        android.util.Log.d("MainActivity", "✅ All BLE permissions granted");
-                        Toast.makeText(this, "✅ BLE permissions granted - Ready for attendance!",
-                                Toast.LENGTH_SHORT).show();
-                    } else {
-                        android.util.Log.w("MainActivity", "❌ Some permissions denied: " + deniedPerms);
-                        Toast.makeText(this, "⚠️ Some BLE permissions denied. Features may be limited.",
-                                Toast.LENGTH_LONG).show();
-                    }
+//                    if (allGranted) {
+//                        android.util.Log.d("MainActivity", "✅ All BLE permissions granted");
+//                        Toast.makeText(this, "✅ BLE permissions granted - Ready for attendance!",
+//                                Toast.LENGTH_SHORT).show();
+//                    } else {
+//                        android.util.Log.w("MainActivity", "❌ Some permissions denied: " + deniedPerms);
+//                        Toast.makeText(this, "⚠️ Some BLE permissions denied. Features may be limited.",
+//                                Toast.LENGTH_LONG).show();
+//                    }
                 }
         );
     }
