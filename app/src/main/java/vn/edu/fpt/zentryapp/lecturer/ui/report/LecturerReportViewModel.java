@@ -15,248 +15,183 @@ import java.util.Locale;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
-import vn.edu.fpt.zentryapp.lecturer.data.model.response.Session;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerReportClassSection;
 
 public class LecturerReportViewModel extends ViewModel {
 
     // LiveData cho UI state
     private final MutableLiveData<Boolean> _isLoading = new MutableLiveData<>(false);
-    private final MutableLiveData<List<Session>> _todaySessions = new MutableLiveData<>();
+    private final MutableLiveData<List<LecturerReportClassSection>> _classrooms = new MutableLiveData<>();
     private final MutableLiveData<String> _errorMessage = new MutableLiveData<>();
-    private final MutableLiveData<UserProfile> _userProfile = new MutableLiveData<>();
-    private final MutableLiveData<String> _greeting = new MutableLiveData<>();
-    private final MutableLiveData<String> _currentDate = new MutableLiveData<>();
 
     // Public getters cho Fragment observe
     public LiveData<Boolean> isLoading() {
         return _isLoading;
     }
 
-    public LiveData<List<Session>> todaySessions() {
-        return _todaySessions;
+    public LiveData<List<LecturerReportClassSection>> classrooms() {
+        return _classrooms;
     }
 
     public LiveData<String> errorMessage() {
         return _errorMessage;
     }
-
-    public LiveData<UserProfile> userProfile() {
-        return _userProfile;
-    }
-
-    public LiveData<String> greeting() {
-        return _greeting;
-    }
-
-    public LiveData<String> currentDate() {
-        return _currentDate;
-    }
-
     private AuthManager authManager;
 
     public void init(AuthManager authManager) {
         this.authManager = authManager;
-        loadUserProfile();
-        loadTodaySessions();
-        generateGreeting();
-        updateCurrentDate();
+        loadClassrooms();
     }
 
     /**
-     * Load today's sessions (fake data for now)
+     * Load classrooms data (main method for this screen)
      */
-    public void loadTodaySessions() {
+    public void loadClassrooms() {
         _isLoading.setValue(true);
 
         // Simulate network delay
         new Handler().postDelayed(() -> {
-            List<Session> mockSessions = generateMockSessions();
-            _todaySessions.setValue(mockSessions);
+            List<LecturerReportClassSection> mockClassrooms = generateMockClassrooms();
+            _classrooms.setValue(mockClassrooms);
             _isLoading.setValue(false);
         }, 1000);
     }
 
     /**
-     * Refresh today's sessions
+     * Generate mock classrooms data matching the new model structure
      */
-    public void refreshSessions() {
-        loadTodaySessions();
-    }
+    private List<LecturerReportClassSection> generateMockClassrooms() {
+        List<LecturerReportClassSection> classrooms = new ArrayList<>();
 
-    /**
-     * Load user profile from AuthManager
-     */
-    private void loadUserProfile() {
-        if (authManager != null && authManager.isLoggedIn()) {
-            String email = authManager.getCurrentUserEmail();
-            String role = authManager.getCurrentUserRole();
-            String userId = authManager.getCurrentUserId();
-
-            String name = extractNameFromEmail(email);
-            _userProfile.setValue(new UserProfile(userId, name, email, role));
-        }
-    }
-
-    /**
-     * Generate greeting based on time of day
-     */
-    private void generateGreeting() {
-        java.util.Calendar calendar = java.util.Calendar.getInstance();
-        int hour = calendar.get(java.util.Calendar.HOUR_OF_DAY);
-
-        String greeting;
-        if (hour < 12) {
-            greeting = "Good Morning";
-        } else if (hour < 17) {
-            greeting = "Good Afternoon";
-        } else {
-            greeting = "Good Evening";
-        }
-
-        if (authManager != null && authManager.isLoggedIn()) {
-            String email = authManager.getCurrentUserEmail();
-            String name = extractNameFromEmail(email);
-            greeting += ", " + name + "!";
-        }
-
-        _greeting.setValue(greeting);
-    }
-
-    /**
-     * Update current date
-     */
-    private void updateCurrentDate() {
-        SimpleDateFormat dateFormat = new SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.getDefault());
-        String currentDate = dateFormat.format(new Date());
-        _currentDate.setValue(currentDate);
-    }
-
-    /**
-     * Extract name from email
-     */
-    private String extractNameFromEmail(String email) {
-        if (email == null || !email.contains("@")) {
-            return "Lecturer";
-        }
-
-        String username = email.split("@")[0];
-        if (username.length() > 0) {
-            return username.substring(0, 1).toUpperCase() + username.substring(1);
-        }
-
-        return "Lecturer";
-    }
-
-    /**
-     * Generate mock sessions data for today
-     */
-    private List<Session> generateMockSessions() {
-        List<Session> sessions = new ArrayList<>();
-
-        String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
-
-        sessions.add(new Session(
-                "S001",
-                "Lập trình căn bản",
-                "CSE101",
-                "SE1801",
-                "DE-201",
-                "08:00",
-                "09:30",
-                35,
-                33,
-                5,
-                5,
-                today,
-                "COMPLETED"
+        // Mathematics classes
+        classrooms.add(new LecturerReportClassSection(
+                "Mathematics -G701",
+                20,
+                15,
+                20,
+                90.0,
+                "SE1801 - Room DE-201",
+                "Mon 08:00-09:30",
+                "ACTIVE"
         ));
 
-        sessions.add(new Session(
-                "S002",
-                "Cấu trúc dữ liệu và giải thuật",
-                "CSE201",
-                "SE1802",
-                "DE-203",
-                "09:45",
-                "11:15",
-                32,
-                29,
-                8,
-                7,
-                today,
-                "COMPLETED"
+        classrooms.add(new LecturerReportClassSection(
+                "Mathematics -G702",
+                20,
+                15,
+                20,
+                75.0,
+                "SE1802 - Room DE-203",
+                "Tue 09:45-11:15",
+                "ACTIVE"
         ));
 
-        sessions.add(new Session(
-                "S003",
-                "Lập trình Web",
-                "CSE301",
-                "SE1803",
-                "DE-105",
-                "13:30",
-                "15:00",
-                30,
-                27,
-                6,
-                4,
-                today,
-                "ONGOING"
-        ));
-
-        sessions.add(new Session(
-                "S004",
-                "Phát triển ứng dụng di động",
-                "CSE401",
-                "SE1804",
-                "DE-302",
-                "15:15",
-                "16:45",
-                28,
-                0,
-                10,
-                6,
-                today,
-                "SCHEDULED"
-        ));
-
-        sessions.add(new Session(
-                "S005",
-                "Machine Learning",
-                "CSE501",
-                "AI1801",
-                "DE-401",
-                "17:00",
-                "18:30",
-                25,
-                0,
+        classrooms.add(new LecturerReportClassSection(
+                "Mathematics -G703",
+                18,
                 12,
-                8,
-                today,
-                "SCHEDULED"
+                18,
+                85.0,
+                "SE1803 - Room DE-105",
+                "Wed 13:30-15:00",
+                "ACTIVE"
         ));
 
-        return sessions;
+        // Computer Science classes
+        classrooms.add(new LecturerReportClassSection(
+                "Data Structures -G801",
+                25,
+                18,
+                22,
+                88.0,
+                "CS1801 - Room IT-301",
+                "Thu 15:15-16:45",
+                "ACTIVE"
+        ));
+
+        classrooms.add(new LecturerReportClassSection(
+                "Web Development -G901",
+                22,
+                16,
+                20,
+                92.0,
+                "CS1802 - Room IT-302",
+                "Fri 17:00-18:30",
+                "ACTIVE"
+        ));
+
+        // Physics classes
+        classrooms.add(new LecturerReportClassSection(
+                "Physics Lab -P501",
+                15,
+                10,
+                15,
+                67.0,
+                "PH1801 - Lab P-201",
+                "Mon 14:00-16:00",
+                "ACTIVE"
+        ));
+
+        return classrooms;
     }
 
     /**
-     * Handle session item click
+     * Handle classroom item click
      */
-    public void onSessionClicked(Session session) {
-        // This can be observed by Fragment to navigate
-    }
+    public void onClassroomClicked(LecturerReportClassSection classroom) {
+        // Log the click for debugging
+        android.util.Log.d("LecturerReport", "Classroom clicked: " + classroom.getCourseName());
 
-    // Inner Classes
+        // This method can be extended to handle specific business logic
+        // before navigation (e.g., tracking analytics, preparing data, etc.)
+    }
 
     /**
-     * User profile data
+     * Search classrooms by name
      */
-    @Getter
-    @AllArgsConstructor
-    public static class UserProfile {
-        private final String id;
-        private final String name;
-        private final String email;
-        private final String role;
+    public void searchClassrooms(String query) {
+        List<LecturerReportClassSection> currentList = _classrooms.getValue();
+        if (currentList == null) return;
 
+        if (query == null || query.trim().isEmpty()) {
+            // Show all classrooms if query is empty
+            loadClassrooms();
+            return;
+        }
+
+        List<LecturerReportClassSection> filteredList = new ArrayList<>();
+        String lowerQuery = query.toLowerCase().trim();
+
+        for (LecturerReportClassSection classroom : currentList) {
+            if (classroom.getCourseName().toLowerCase().contains(lowerQuery) ||
+                    classroom.getClassInfo().toLowerCase().contains(lowerQuery)) {
+                filteredList.add(classroom);
+            }
+        }
+
+        _classrooms.setValue(filteredList);
     }
+
+    /**
+     * Get classrooms by status
+     */
+    public void filterByStatus(String status) {
+        List<LecturerReportClassSection> currentList = _classrooms.getValue();
+        if (currentList == null) return;
+
+        if (status == null || status.equals("ALL")) {
+            loadClassrooms();
+            return;
+        }
+
+        List<LecturerReportClassSection> filteredList = new ArrayList<>();
+        for (LecturerReportClassSection classroom : currentList) {
+            if (status.equals(classroom.getStatus())) {
+                filteredList.add(classroom);
+            }
+        }
+
+        _classrooms.setValue(filteredList);
+    }
+
 }

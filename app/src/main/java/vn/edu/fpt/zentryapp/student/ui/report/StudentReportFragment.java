@@ -78,59 +78,19 @@ public class StudentReportFragment extends Fragment implements StudentReportAdap
             }
         });
 
-        viewModel.greeting().observe(getViewLifecycleOwner(), greeting -> {
-            if (greeting != null) {
-                binding.tvStudentReportGreeting.setText(greeting);
-            }
-        });
-
-        viewModel.subGreeting().observe(getViewLifecycleOwner(), subGreeting -> {
-            if (subGreeting != null) {
-                binding.tvStudentReportSubGreeting.setText(subGreeting);
-            }
-        });
-
-        viewModel.userProfile().observe(getViewLifecycleOwner(), profile -> {
-            if (profile != null) {
-                Log.d("StudentReport", "User loaded: " + profile.getName() + " (" + profile.getRole() + ")");
-            }
-        });
-
-        viewModel.successMessage().observe(getViewLifecycleOwner(), message -> {
-            if (message != null) {
-                Log.d("StudentReport", message);
-            }
-        });
-
         viewModel.errorMessage().observe(getViewLifecycleOwner(), error -> {
             if (error != null) {
                 Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
-
-                if (error.contains("network") || error.contains("connection")) {
-                    showRetryDialog();
-                }
             }
         });
-    }
-
-    private void showRetryDialog() {
-        new AlertDialog.Builder(requireContext())
-                .setTitle("Connection Error")
-                .setMessage("Unable to load reports. Would you like to retry?")
-                .setPositiveButton("Retry", (dialog, which) -> {
-                    viewModel.loadReports();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
     }
 
     @Override
     public void onReportClick(StudentReport report) {
-        Toast.makeText(requireContext(), "Clicked: " + report.getCourseName(), Toast.LENGTH_SHORT).show();
-        // Navigate to session list
-        navController.navigate(R.id.action_studentReport_to_listSession);
-        viewModel.onReportClicked(report);
-    }
+        Bundle args = new Bundle();
+        args.putSerializable("studentReport", report);
+
+        navController.navigate(R.id.action_studentReport_to_listSession, args);    }
 
     @Override
     public void onDestroyView() {

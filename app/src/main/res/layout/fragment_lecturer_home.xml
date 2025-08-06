@@ -1,73 +1,245 @@
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/llHomeRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F9FF"
-    android:orientation="vertical"
-    android:padding="16dp">
+    android:background="@color/backgroundLight">
 
-    <!-- Header - Fixed at top -->
+    <!-- Header đơn giản cố định -->
     <LinearLayout
-        android:id="@+id/llHomeHeader"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="24dp"
-        android:gravity="center_vertical"
-        android:orientation="vertical">
+        android:id="@+id/simple_header"
+        android:layout_width="273dp"
+        android:layout_height="127dp"
+        android:background="@drawable/bg_expanded_header"
+        android:elevation="4dp"
+        android:orientation="vertical"
+        android:paddingStart="24dp"
+        android:paddingTop="16dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="16dp">
 
         <TextView
-            android:id="@+id/tvHomeGreeting"
+            android:id="@+id/tvGreeting"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:fontFamily="@font/jostsemibold"
-            android:text="Good Morning, Lecturer!"
-            android:textColor="#232B42"
-            android:textSize="20sp"
+            android:text="Hi, Daniel"
+            android:textColor="@color/white"
+            android:textSize="24sp"
             android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/tvHomeSubGreeting"
+            android:id="@+id/tvSubGreeting"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:fontFamily="@font/jostsemibold"
-            android:text="Are you ready to teach Today? Let's begin."
-            android:textColor="#666666"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:alpha="0.8"
+            android:fontFamily="@font/mulishbold"
+            android:text="Ready to take on a productive week?"
+            android:textColor="@color/white"
+            android:textSize="14sp" />
 
     </LinearLayout>
 
-
-    <!-- Section Title -->
-    <TextView
-        android:id="@+id/tvHomeSectionTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
-        android:fontFamily="@font/jostsemibold"
-        android:text="My Classroom"
-        android:textColor="#232B42"
-        android:textSize="16sp"
-        android:textStyle="bold" />
-
-    <!-- Loading Progress -->
-    <ProgressBar
-        android:id="@+id/progressLoading"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:layout_marginTop="32dp"
-        android:visibility="gone" />
-
-    <!-- Courses RecyclerView - Takes remaining space -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvCourses"
+    <!-- Nội dung chính -->
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+        android:layout_height="match_parent"
+        android:layout_marginTop="120dp"
+        android:paddingBottom="24dp">
 
-</LinearLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+
+            <!-- Exam Slider Section -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="16dp">
+
+                <TextView
+                    android:fontFamily="@font/mulishextrabold"
+                    android:text="Exams"
+                    android:textColor="#99ABF7"
+                    android:textStyle="bold"
+                    android:textSize="18sp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"/>
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvExams"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false" />
+
+                <!-- Indicator Dots -->
+                <LinearLayout
+                    android:id="@+id/dotsIndicator"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal" />
+
+            </LinearLayout>
+
+            <!-- Next Sessions Section -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="20dp">
+
+                <!-- Header với title và See All button -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="6dp">
+
+                    <TextView
+                        android:fontFamily="@font/mulishextrabold"
+                        android:text="Next studentSession"
+                        android:textSize="15sp"
+                        android:textStyle="bold"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textColor="#99ABF7"/>
+
+                    <TextView
+                        android:id="@+id/btnSeeAllSessions"
+                        android:text="See All"
+                        android:textColor="#99ABF7"
+                        android:textStyle="bold"
+                        android:fontFamily="@font/mulishbold"
+                        android:textSize="14sp"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:padding="8dp"
+                        android:background="?android:attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"/>
+                </LinearLayout>
+
+                <!-- Sessions Container -->
+                <LinearLayout
+                    android:id="@+id/sessionsContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <!-- Sessions sẽ được add programmatically -->
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Actions -->
+            <TextView
+                android:fontFamily="@font/mulishextrabold"
+                android:text="Actions"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:textColor="#99ABF7"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp"
+                android:gravity="start">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center_horizontal"
+                    android:layout_marginEnd="24dp">
+                    <ImageView
+                        android:src="@drawable/ic_last_report"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"/>
+                    <TextView
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Last report"
+                        android:textColor="@color/bodyText"
+                        android:textSize="12sp"/>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center_horizontal">
+                    <FrameLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content">
+                        <ImageView
+                            android:src="@drawable/ic_claim"
+                            android:layout_width="36dp"
+                            android:layout_height="36dp"/>
+                        <!-- Red dot notification -->
+                        <View
+                            android:layout_width="10dp"
+                            android:layout_height="10dp"
+                            android:background="@drawable/bg_red_dot"
+                            android:layout_gravity="end|top"/>
+                    </FrameLayout>
+                    <TextView
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Claim"
+                        android:textColor="@color/bodyText"
+                        android:textSize="12sp"/>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Weekly Overview Slider Section -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="20dp">
+
+                <TextView
+                    android:fontFamily="@font/mulishextrabold"
+                    android:text="Weekly Overview"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:textColor="#99ABF7"/>
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvWeekly"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false" />
+
+                <!-- Weekly Indicator Dots -->
+                <LinearLayout
+                    android:id="@+id/weeklyDotsIndicator"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

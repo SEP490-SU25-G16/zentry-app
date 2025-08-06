@@ -32,7 +32,7 @@ public class AttendanceModels {
     @Getter
     @AllArgsConstructor
     public static class ScannedDevice {
-        private final String macAddress;
+        private final String deviceId;
         private final int rssi;
     }
 

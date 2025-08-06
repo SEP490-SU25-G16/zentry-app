@@ -176,14 +176,14 @@ public class AttendanceSubmissionHandler {
             }
 
             Log.d(TAG, "  Device[" + i + "]:");
-            Log.d(TAG, "    MAC: '" + device.getMacAddress() + "'");
+            Log.d(TAG, "    MAC: '" + device.getDeviceId() + "'");
             Log.d(TAG, "    RSSI: " + device.getRssi() + " dBm");
             Log.d(TAG, "    Signal strength: " + getSignalStrengthDescription(device.getRssi()));
 
             // Validate device data
-            if (device.getMacAddress() == null || device.getMacAddress().trim().isEmpty()) {
+            if (device.getDeviceId() == null || device.getDeviceId().trim().isEmpty()) {
                 Log.w(TAG, "    ⚠️ Device MAC is null or empty");
-            } else if (!isValidMacAddress(device.getMacAddress())) {
+            } else if (!isValidMacAddress(device.getDeviceId())) {
                 Log.w(TAG, "    ⚠️ Device MAC format might be invalid");
             }
         }
@@ -243,7 +243,7 @@ public class AttendanceSubmissionHandler {
                     Log.d(TAG, "  Scanned devices count: " + scannedDevices.size());
                     for (int i = 0; i < scannedDevices.size(); i++) {
                         AttendanceModels.ScannedDevice device = scannedDevices.get(i);
-                        Log.d(TAG, "    Device " + (i + 1) + " - MAC: " + device.getMacAddress() + ", RSSI: " + device.getRssi());
+                        Log.d(TAG, "    Device " + (i + 1) + " - MAC: " + device.getDeviceId() + ", RSSI: " + device.getRssi());
                     }
                 } else {
                     Log.d(TAG, " No scanned devices");

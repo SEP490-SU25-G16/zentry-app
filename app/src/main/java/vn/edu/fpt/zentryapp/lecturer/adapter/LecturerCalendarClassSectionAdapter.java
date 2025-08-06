@@ -57,13 +57,6 @@ public class LecturerCalendarClassSectionAdapter extends RecyclerView.Adapter<Le
             super(binding.getRoot());
             this.binding = binding;
 
-            // Set click listener
-            binding.getRoot().setOnClickListener(v -> {
-                int position = getAdapterPosition();
-                if (position != RecyclerView.NO_POSITION && listener != null) {
-                    listener.onSessionClick(sessions.get(position));
-                }
-            });
         }
 
         public void bind(CalendarSession session, boolean isLastItem) {

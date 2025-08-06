@@ -10,52 +10,32 @@ import android.util.Log;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.Arrays;
 import java.util.UUID;
 
 public class DeviceInfoHelper {
     private static final String TAG = "DeviceInfoHelper";
 
     /**
-     * Tạo MAC address từ Android ID
+     * Lấy Android ID trực tiếp (thay thế cho generateMacAddress)
      */
     @SuppressLint("HardwareIds")
-    public static String generateMacAddress(Context context) {
+    public static String getAndroidId(Context context) {
         try {
             String androidId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
-            byte[] idBytes = generateIdBytes(androidId);
 
-            // Format thành XX:XX:XX:XX:XX:XX
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < idBytes.length; i++) {
-                sb.append(String.format("%02X", idBytes[i]));
-                if (i < idBytes.length - 1) sb.append(":");
+            if (androidId == null || androidId.isEmpty()) {
+                Log.w(TAG, "Android ID is null or empty, using fallback");
+                return "0000000000000000"; // Fallback 16-char ID
             }
 
-            String macAddress = sb.toString();
-            Log.d(TAG, "Generated MAC address: " + macAddress);
-            return macAddress;
+            Log.d(TAG, "Android ID: " + androidId);
+            Log.d(TAG, "Android ID length: " + androidId.length() + " chars");
+            return androidId;
         } catch (Exception e) {
-            Log.e(TAG, "Error generating MAC address", e);
-            return "00:00:00:00:00:00"; // Fallback
+            Log.e(TAG, "Error getting Android ID", e);
+            return "0000000000000000"; // Fallback
         }
     }
-
-    /**
-     * Hash input string thành 6 bytes để làm MAC address
-     */
-    private static byte[] generateIdBytes(String input) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));
-            return Arrays.copyOf(hash, 6); // Lấy 6 bytes đầu
-        } catch (Exception e) {
-            // Fallback nếu SHA-256 không available
-            byte[] raw = input.getBytes(StandardCharsets.UTF_8);
-            return Arrays.copyOf(raw, Math.min(6, raw.length));
-        }
-    }
-
     /**
      * Lấy tên thiết bị thân thiện
      */
@@ -143,8 +123,7 @@ public class DeviceInfoHelper {
     public static String generatePushNotificationToken(Context context) {
         try {
             // Tạo unique token từ Android ID + timestamp
-            @SuppressLint("HardwareIds")
-            String androidId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
+            String androidId = getAndroidId(context);
             String timestamp = String.valueOf(System.currentTimeMillis());
             String input = androidId + "_" + timestamp;
 
@@ -168,4 +147,5 @@ public class DeviceInfoHelper {
             return UUID.randomUUID().toString().replace("-", "");
         }
     }
+
 }

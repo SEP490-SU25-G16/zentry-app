@@ -62,7 +62,7 @@ public class StudentSettingDeviceRegisterViewModel extends ViewModel {
 
         Log.d(TAG, "Registration request created:");
         Log.d(TAG, "  User ID: " + request.getUserId());
-        Log.d(TAG, "  MAC Address: " + request.getMacAddress());
+        Log.d(TAG, "  MAC Address: " + request.getAndroidId());
         Log.d(TAG, "  Device Name: " + request.getDeviceName());
         Log.d(TAG, "  Platform: " + request.getPlatform());
 
@@ -117,7 +117,7 @@ public class StudentSettingDeviceRegisterViewModel extends ViewModel {
         DeviceRegistrationRequest request = new DeviceRegistrationRequest();
 
         request.setUserId(authManager.getCurrentUserId());
-        request.setMacAddress(DeviceInfoHelper.generateMacAddress(context));
+        request.setAndroidId(DeviceInfoHelper.getAndroidId(context));
         request.setDeviceName(DeviceInfoHelper.getDeviceName());
         request.setPlatform(DeviceInfoHelper.getPlatform());
         request.setOsVersion(DeviceInfoHelper.getOsVersion());

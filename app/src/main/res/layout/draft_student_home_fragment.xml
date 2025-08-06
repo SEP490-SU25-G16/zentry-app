@@ -121,7 +121,7 @@
 
             <!-- Card: Next Session -->
             <TextView
-                android:text="Next session"
+                android:text="Next studentSession"
                 android:textSize="15sp"
                 android:textStyle="bold"
                 android:layout_width="wrap_content"

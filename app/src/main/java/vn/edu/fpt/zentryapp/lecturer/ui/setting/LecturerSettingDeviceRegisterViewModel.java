@@ -68,7 +68,7 @@ public class LecturerSettingDeviceRegisterViewModel extends ViewModel {
 
         Log.d(TAG, "Lecturer registration request created:");
         Log.d(TAG, "  User ID: " + request.getUserId());
-        Log.d(TAG, "  MAC Address: " + request.getMacAddress());
+        Log.d(TAG, "  MAC Address: " + request.getAndroidId());
         Log.d(TAG, "  Device Name: " + request.getDeviceName());
         Log.d(TAG, "  Platform: " + request.getPlatform());
         Log.d(TAG, "  User Role: " + authManager.getCurrentUserRole());
@@ -125,8 +125,7 @@ public class LecturerSettingDeviceRegisterViewModel extends ViewModel {
         DeviceRegistrationRequest request = new DeviceRegistrationRequest();
 
         request.setUserId(authManager.getCurrentUserId());
-        request.setMacAddress(DeviceInfoHelper.generateMacAddress(context));
-
+        request.setAndroidId(DeviceInfoHelper.getAndroidId(context));
         // Enhanced device name for lecturer
         String baseName = DeviceInfoHelper.getDeviceName();
         request.setDeviceName("Lecturer " + baseName);
@@ -139,15 +138,5 @@ public class LecturerSettingDeviceRegisterViewModel extends ViewModel {
         request.setPushNotificationToken(DeviceInfoHelper.generatePushNotificationToken(context));
 
         return request;
-    }
-
-    /**
-     * Logout lecturer
-     */
-    public void logout() {
-        if (authManager != null) {
-            authManager.logout();
-            Log.d(TAG, "Lecturer logged out successfully");
-        }
     }
 }

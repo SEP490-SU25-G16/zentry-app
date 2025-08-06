@@ -12,8 +12,8 @@ public class DeviceRegistrationRequest {
     @SerializedName("userId")
     private String userId;
 
-    @SerializedName("macAddress")
-    private String macAddress;
+    @SerializedName("androidId")
+    private String androidId;
 
     @SerializedName("deviceName")
     private String deviceName;

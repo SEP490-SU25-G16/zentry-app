@@ -15,6 +15,7 @@
         android:orientation="vertical"
         android:padding="16dp"
         android:paddingTop="?attr/actionBarSize">
+
         <!-- Header Card -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardStudentReportListSessionHeader"
@@ -34,37 +35,82 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <TextView
-                    android:id="@+id/tvStudentReportListSessionGrade"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="@font/mulishbold"
-                    android:text="Grade 07"
-                    android:textColor="#F57C00"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvStudentReportListSessionSubject"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:fontFamily="@font/jostsemibold"
-                    android:text="Mathematics"
-                    android:textColor="#232B42"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvStudentReportListSessionCount"
+                <!-- Header - Subject và Grade trên cùng 1 dòng -->
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:fontFamily="@font/mulishextrabold"
-                    android:gravity="center"
-                    android:text="12/20 Sessions"
-                    android:textColor="#202244"
-                    android:textSize="14sp" />
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/tvStudentReportListSessionSubject"
+                        android:fontFamily="@font/jostsemibold"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Mathematics"
+                        android:textColor="#232B42"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvStudentReportListSessionGrade"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/mulishbold"
+                        android:text="G701"
+                        android:textColor="#232B42"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                </LinearLayout>
+
+                <!-- Stats Section -->
+                <LinearLayout
+                    android:id="@+id/llStudentReportListSessionStats"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp">
+
+                    <LinearLayout
+                        android:id="@+id/llStudentReportListSessionCount"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <ImageView
+                            android:id="@+id/ivStudentReportListSessionIcon"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_student"
+                            app:tint="#202244" />
+
+                        <TextView
+                            android:id="@+id/tvStudentReportListSessionCount"
+                            android:fontFamily="@font/mulishextrabold"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:text="12/20 Sessions"
+                            android:textSize="14sp"
+                            android:textColor="#202244"/>
+                    </LinearLayout>
+
+                    <!-- Lecturer Name ở bên phải -->
+                    <TextView
+                        android:id="@+id/tvStudentReportListSessionLecturer"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/jostsemibold"
+                        android:text="Lecturer: Hasha"
+                        android:textColor="#6B7280"
+                        android:textSize="14sp" />
+
+                </LinearLayout>
+
 
                 <!-- Loading Progress -->
                 <ProgressBar
@@ -108,7 +154,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="No sessions found"
+                        android:text="No studentSessions found"
                         android:textColor="#666666"
                         android:textSize="16sp" />
 

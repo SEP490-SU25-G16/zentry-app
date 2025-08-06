@@ -5,7 +5,7 @@ import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public class Session {
+public class StudentSession {
     private final String id;
     private final String title;
     private final String date;

@@ -19,7 +19,7 @@ import vn.edu.fpt.zentryapp.databinding.FragmentLecturerScheduleCalendarBinding;
 import vn.edu.fpt.zentryapp.lecturer.adapter.LecturerCalendarClassSectionAdapter;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.CalendarSession;
 
-public class LecturerScheduleCalendarFragment extends Fragment implements LecturerCalendarClassSectionAdapter.OnLecturerCalendarClassSectionListener {
+public class LecturerScheduleCalendarFragment extends Fragment {
 
     private FragmentLecturerScheduleCalendarBinding binding;
     private LecturerScheduleCalendarViewModel viewModel;
@@ -54,7 +54,6 @@ public class LecturerScheduleCalendarFragment extends Fragment implements Lectur
 
     private void setupRecyclerView() {
         sessionAdapter = new LecturerCalendarClassSectionAdapter();
-        sessionAdapter.setOnSessionClickListener(this);
 
         binding.rvSessions.setLayoutManager(new LinearLayoutManager(requireContext()));
         binding.rvSessions.setAdapter(sessionAdapter);
@@ -101,18 +100,6 @@ public class LecturerScheduleCalendarFragment extends Fragment implements Lectur
                 Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
             }
         });
-    }
-
-    @Override
-    public void onSessionClick(CalendarSession session) {
-        Toast.makeText(requireContext(),
-                "Session: " + session.getCourseName() + " at " + session.getStartTimeDisplay(),
-                Toast.LENGTH_SHORT).show();
-
-        // TODO: Navigate to session detail if needed
-        // Bundle args = new Bundle();
-        // args.putString("sessionId", session.getSessionId());
-        // navController.navigate(R.id.action_calendar_to_sessionDetail, args);
     }
 
     @Override

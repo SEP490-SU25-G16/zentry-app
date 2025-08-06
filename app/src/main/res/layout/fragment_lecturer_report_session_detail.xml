@@ -35,27 +35,36 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <!-- Header -->
-                <TextView
-                    android:id="@+id/tvSessionDetailGrade"
-                    android:fontFamily="@font/mulishbold"
-                    android:layout_width="wrap_content"
+                <!-- Header - Subject và Grade trên cùng 1 dòng -->
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Grade 07"
-                    android:textColor="#F57C00"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
 
-                <TextView
-                    android:id="@+id/tvSessionDetailSubject"
-                    android:fontFamily="@font/jostsemibold"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="Mathematics"
-                    android:textColor="#232B42"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
+                    <TextView
+                        android:id="@+id/tvSessionDetailSubject"
+                        android:fontFamily="@font/jostsemibold"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Mathematics"
+                        android:textColor="#232B42"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvSessionDetailGrade"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="@font/mulishbold"
+                        android:text="G701"
+                        android:textColor="#232B42"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                </LinearLayout>
+
 
                 <LinearLayout
                     android:id="@+id/llSessionDetailStats"
@@ -90,31 +99,24 @@
                             android:textColor="#202244"/>
                     </LinearLayout>
 
-                    <View
-                        android:id="@+id/viewSessionDetailSeparator"
-                        android:layout_width="1dp"
-                        android:layout_height="16dp"
-                        android:layout_marginHorizontal="8dp"
-                        android:background="#CCCCCC" />
-
                     <LinearLayout
                         android:id="@+id/llSessionDetailSessionInfo"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:orientation="horizontal"
-                        android:gravity="center_vertical">
+                        android:gravity="center_vertical|end">
 
                         <TextView
                             android:id="@+id/tvSessionDetailSessionNumber"
                             android:fontFamily="@font/jostsemibold"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="8dp"
                             android:text="Session - 4"
                             android:textSize="14sp"
                             android:textColor="#202244" />
                     </LinearLayout>
+
                 </LinearLayout>
 
                 <!-- Edit Time Warning -->

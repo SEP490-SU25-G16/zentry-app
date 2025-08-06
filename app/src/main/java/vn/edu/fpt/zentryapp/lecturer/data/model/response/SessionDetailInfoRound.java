@@ -29,10 +29,27 @@ public class SessionDetailInfoRound {
         return totalStudents + " Students";
     }
 
-    public String getDurationDisplay() {
-        long hours = duration / (60 * 60 * 1000);
-        long minutes = (duration % (60 * 60 * 1000)) / (60 * 1000);
+    // Thêm method formatDuration vào class SessionDetailInfoRound
+    private String formatDuration(long milliseconds) {
+        if (milliseconds < 0) {
+            return "PAST (" + formatDuration(-milliseconds) + " ago)";
+        }
 
-        return String.format(Locale.getDefault(), "%02d:%02d", hours, minutes);
+        long seconds = milliseconds / 1000;
+        long minutes = seconds / 60;
+        long hours = minutes / 60;
+
+        if (hours > 0) {
+            return hours + "h " + (minutes % 60) + "m " + (seconds % 60) + "s";
+        } else if (minutes > 0) {
+            return minutes + "m " + (seconds % 60) + "s";
+        } else {
+            return seconds + "s";
+        }
     }
+
+    public String getDurationDisplay() {
+        return formatDuration(duration);
+    }
+
 }

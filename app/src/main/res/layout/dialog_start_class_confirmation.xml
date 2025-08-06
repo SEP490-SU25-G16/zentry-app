@@ -35,7 +35,7 @@
             android:fontFamily="@font/mulishbold"
             android:gravity="center"
             android:lineSpacingExtra="6dp"
-            android:text="Are you sure you want to start this class session?"
+            android:text="Are you sure you want to start this class studentSession?"
             android:textColor="#64748B"
             android:textSize="16sp" />
 

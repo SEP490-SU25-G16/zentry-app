@@ -30,7 +30,6 @@ import androidx.annotation.RequiresPermission;
 import androidx.core.app.NotificationCompat;
 
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,7 +37,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
 
 import vn.edu.fpt.zentryapp.MainActivity;
@@ -65,10 +63,10 @@ public class BLEAttendanceService extends Service {
     // ======= BLE CONSTANTS =======
     private static final int COMPANY_ID = 0x1234; // Manufacturer ID cho BLE advertising
     private static final int ROOM_BYTES_MAX = 10; // Tăng từ 4 lên 10 để hỗ trợ room name dài
-    private static final long SCAN_DURATION_MS = 3000; // Scan trong 1 giây mỗi round
+    private static final long SCAN_DURATION_MS = 3000; // Scan trong 3 giây mỗi round
 
     // ======= BLE COMPONENTS =======
-    private byte[] idBytes; // Device ID đã hash thành 6 bytes
+    private byte[] idBytes; // Android ID bytes (16 bytes)
     private AdvertiseSettings advertiseSettings;
     private AdvertiseCallback advCallback;
     private BluetoothLeAdvertiser advertiser;
@@ -86,7 +84,7 @@ public class BLEAttendanceService extends Service {
     private String roomName; // ID phòng học
     private String userId; // ID người dùng
     private String userRole; // STUDENT hoặc LECTURER
-    private String deviceId; // Device ID formatted (XX:XX:XX:XX:XX:XX)
+    private String deviceId; // Android ID (16-character string)
 
     // ======= CORE COMPONENTS =======
     private AttendanceRoundScheduler roundScheduler; // Quản lý lịch trình các round
@@ -122,38 +120,27 @@ public class BLEAttendanceService extends Service {
     /**
      * Tạo device ID duy nhất từ ANDROID_ID và hash thành 6 bytes
      */
+    /**
+     * Tạo device ID từ ANDROID_ID (dùng trực tiếp, không convert sang MAC format)
+     */
     private void generateDeviceId() {
         try {
             @SuppressLint("HardwareIds")
             String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
-            this.idBytes = generateIdBytes(androidId);
-            // Format thành XX:XX:XX:XX:XX:XX để dễ đọc
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < idBytes.length; i++) {
-                sb.append(String.format("%02X", idBytes[i]));
-                if (i < idBytes.length - 1) sb.append(":");
-            }
-            this.deviceId = sb.toString();
+
+            // Dùng trực tiếp Android ID, không cần hash và format
+            this.deviceId = androidId;
+
+            // Convert Android ID thành bytes để truyền qua BLE
+            this.idBytes = androidId.getBytes(StandardCharsets.UTF_8);
 
             Log.d(TAG, "Generated device ID: " + deviceId);
+            Log.d(TAG, "Device ID length: " + deviceId.length() + " chars");
+            Log.d(TAG, "Device ID bytes: " + idBytes.length + " bytes");
         } catch (Exception e) {
             Log.e(TAG, "Error generating device ID", e);
-            this.deviceId = "00:00:00:00:00:00"; // Fallback ID
-        }
-    }
-
-    /**
-     * Hash input string thành 6 bytes để làm device ID
-     */
-    private byte[] generateIdBytes(String input) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));
-            return Arrays.copyOf(hash, 6); // Lấy 6 bytes đầu
-        } catch (Exception e) {
-            // Fallback nếu SHA-256 không available
-            byte[] raw = input.getBytes(StandardCharsets.UTF_8);
-            return Arrays.copyOf(raw, Math.min(6, raw.length));
+            this.deviceId = "0000000000000000"; // Fallback 16-char Android ID format
+            this.idBytes = this.deviceId.getBytes(StandardCharsets.UTF_8);
         }
     }
 
@@ -203,26 +190,19 @@ public class BLEAttendanceService extends Service {
      * Xử lý kết quả scan từ một device
      */
     private void processScanResult(ScanResult result) {
-
         ScanRecord rec = result.getScanRecord();
-        if (rec == null) {
-            return;
-        }
+        if (rec == null) return;
 
         // Tìm Manufacturer Data
         byte[] payload = rec.getManufacturerSpecificData().get(COMPANY_ID);
-        if (payload == null) {
-            return;
-        }
-
-        if (payload.length < idBytes.length) {
-            Log.d(TAG, "  Payload too short: " + payload.length + " < " + idBytes.length);
-            return;
-        }
+        if (payload == null || payload.length < idBytes.length) return;
 
         // Parse data
-        byte[] deviceBytes = Arrays.copyOfRange(payload, 0, idBytes.length);
+        byte[] deviceIdBytes = Arrays.copyOfRange(payload, 0, idBytes.length);
         byte[] roomBytes = Arrays.copyOfRange(payload, idBytes.length, payload.length);
+
+        // Convert bytes về Android ID string (16 chars)
+        String scannedDeviceId = new String(deviceIdBytes, StandardCharsets.UTF_8);
 
         String advertisedRoom;
         if (roomBytes.length >= 4) {
@@ -232,24 +212,13 @@ public class BLEAttendanceService extends Service {
             advertisedRoom = new String(roomBytes, StandardCharsets.UTF_8);
         }
 
-        // ✅ FIXED: Lấy 4 ký tự đầu của my room để compare
+        // Check room matching
         String myRoomPrefix = roomName.length() >= 4 ? roomName.substring(0, 4) : roomName;
-
-     //   Log.d(TAG, "  Advertised room (4 chars): '" + advertisedRoom + "'");
-      //  Log.d(TAG, "  My room (4 chars): '" + myRoomPrefix + "'");
-
-        // ✅ Compare 4 ký tự đầu của cả 2 bên
         if (!advertisedRoom.equals(myRoomPrefix)) {
-        //    Log.d(TAG, "  Room mismatch, ignoring");
             return;
         }
 
-        // Format device ID
-        StringBuilder sb = new StringBuilder();
-        for (byte b : deviceBytes) sb.append(String.format("%02X:", b));
-        String scannedDeviceId = sb.substring(0, sb.length() - 1);
-
-        // ✅ FIXED: Sử dụng đúng variable name
+        // Store detected device
         long now = System.currentTimeMillis();
         deviceLastSeen.put(scannedDeviceId, now);
 
@@ -257,11 +226,11 @@ public class BLEAttendanceService extends Service {
         Log.d(TAG, "  RSSI: " + result.getRssi() + " dBm");
         Log.d(TAG, "✅ Device accepted!");
 
-        // ✅ FIXED: Store detected device với đúng variable name
         AttendanceModels.ScannedDevice device =
                 new AttendanceModels.ScannedDevice(scannedDeviceId, result.getRssi());
         detectedDevices.put(scannedDeviceId, device);
     }
+
 
     @SuppressLint("ForegroundServiceType")
     @RequiresApi(api = Build.VERSION_CODES.O)
@@ -375,7 +344,7 @@ public class BLEAttendanceService extends Service {
                     new String(roomBytes, StandardCharsets.UTF_8) + "'");
         }
 
-        // Tạo payload = device ID (6 bytes) + room name (≤10 bytes)
+        // Tạo payload = Android ID (16 bytes) + room name (≤10 bytes)
         byte[] advertPayload = new byte[idBytes.length + roomBytes.length];
         System.arraycopy(idBytes, 0, advertPayload, 0, idBytes.length);
         System.arraycopy(roomBytes, 0, advertPayload, idBytes.length, roomBytes.length);
@@ -462,7 +431,7 @@ public class BLEAttendanceService extends Service {
 
     /**
      * Execute attendance round - được gọi bởi AttendanceRoundScheduler
-     * Timeline: Round execution time + 10s = scan time
+     * Timeline: Round execution time -> scan 3s -> process results
      */
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     private void executeRound(AttendanceModels.AttendanceRound round) {
@@ -488,7 +457,7 @@ public class BLEAttendanceService extends Service {
 
         Log.d(TAG, "Round " + round.getRoundNumber() + ": " + topDevices.size() + " devices detected");
         for (AttendanceModels.ScannedDevice device : topDevices) {
-            Log.d(TAG, "  " + device.getMacAddress() + " RSSI: " + device.getRssi());
+            Log.d(TAG, "  " + device.getDeviceId() + " RSSI: " + device.getRssi());
         }
 
         String timestamp = createTimestamp();

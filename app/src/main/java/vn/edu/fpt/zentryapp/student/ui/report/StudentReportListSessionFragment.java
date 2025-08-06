@@ -2,11 +2,9 @@ package vn.edu.fpt.zentryapp.student.ui.report;
 
 import android.os.Bundle;
 import android.util.Log;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.navigation.NavController;
@@ -17,17 +15,15 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
-import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentReportListSessionBinding;
-import vn.edu.fpt.zentryapp.student.adapter.SessionAdapter;
-import vn.edu.fpt.zentryapp.student.data.model.response.Session;
+import vn.edu.fpt.zentryapp.student.adapter.StudentListReportSessionAdapter;
 
-public class StudentReportListSessionFragment extends Fragment implements SessionAdapter.OnSessionClickListener {
+public class StudentReportListSessionFragment extends Fragment  {
 
     private FragmentStudentReportListSessionBinding binding;
     private StudentReportListSessionViewModel viewModel;
-    private SessionAdapter sessionAdapter;
+    private StudentListReportSessionAdapter studentListReportSessionAdapter;
     private NavController navController;
 
     @Nullable
@@ -62,11 +58,11 @@ public class StudentReportListSessionFragment extends Fragment implements Sessio
     }
 
     private void setupRecyclerView() {
-        sessionAdapter = new SessionAdapter();
+        studentListReportSessionAdapter = new StudentListReportSessionAdapter();
 //        sessionAdapter.setOnSessionClickListener(this);
 
         binding.rvSessions.setLayoutManager(new LinearLayoutManager(requireContext()));
-        binding.rvSessions.setAdapter(sessionAdapter);
+        binding.rvSessions.setAdapter(studentListReportSessionAdapter);
     }
 
     private void setupToolbar() {
@@ -81,7 +77,7 @@ public class StudentReportListSessionFragment extends Fragment implements Sessio
 
         viewModel.sessions().observe(getViewLifecycleOwner(), sessions -> {
             if (sessions != null) {
-                sessionAdapter.setSessions(sessions);
+                studentListReportSessionAdapter.setSessions(sessions);
 
                 boolean isEmpty = sessions.isEmpty();
                 binding.rvSessions.setVisibility(isEmpty ? View.GONE : View.VISIBLE);
@@ -102,43 +98,7 @@ public class StudentReportListSessionFragment extends Fragment implements Sessio
                 Log.d("SessionList", message);
             }
         });
-
-        viewModel.errorMessage().observe(getViewLifecycleOwner(), error -> {
-            if (error != null) {
-                Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
-
-                if (error.contains("network") || error.contains("connection")) {
-                    showRetryDialog();
-                }
-            }
-        });
     }
-
-    private void showRetryDialog() {
-        new AlertDialog.Builder(requireContext())
-                .setTitle("Connection Error")
-                .setMessage("Unable to load sessions. Would you like to retry?")
-                .setPositiveButton("Retry", (dialog, which) -> {
-                    String courseId = getArguments() != null ?
-                            getArguments().getString("courseId", "MATH101") : "MATH101";
-                    viewModel.loadSessions(courseId);
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    @Override
-    public void onSessionClick(Session session) {
-//        Toast.makeText(requireContext(), "Clicked: " + session.getTitle(), Toast.LENGTH_SHORT).show();
-//
-//        Bundle args = new Bundle();
-//        args.putString("sessionId", session.getId());
-//        args.putString("sessionTitle", session.getTitle());
-//        navController.navigate(R.id.action_listSession_to_sessionDetail, args);
-//
-//        viewModel.onSessionClicked(session);
-    }
-
     @Override
     public void onDestroyView() {
         super.onDestroyView();

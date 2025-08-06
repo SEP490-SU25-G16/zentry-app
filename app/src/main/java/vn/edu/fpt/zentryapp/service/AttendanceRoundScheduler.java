@@ -14,8 +14,8 @@ import java.util.concurrent.TimeUnit;
 
 public class AttendanceRoundScheduler {
     private static final String TAG = "AttendanceRoundScheduler";
-    private static final long SCAN_DELAY_MS = 20 * 1000; // 10 seconds after execution time
-    private static final long CALCULATE_DELAY_MS = 40 * 1000; // 30 seconds after scan starts
+    private static final long SCAN_DELAY_MS = 20 * 1000; // 20 seconds after execution time
+    private static final long CALCULATE_DELAY_MS = 40 * 1000; // 40 seconds after scan starts
     private static final long MAX_LATE_TOLERANCE_MS = 0; // 1 phút tolerance
     private final List<AttendanceModels.AttendanceRound> rounds;
     private final RoundExecutionCallback executionCallback;

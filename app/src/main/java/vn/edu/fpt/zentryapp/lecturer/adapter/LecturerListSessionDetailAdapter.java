@@ -1,27 +1,25 @@
 package vn.edu.fpt.zentryapp.lecturer.adapter;
 
 import android.view.LayoutInflater;
-import android.view.View;
 import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import java.util.ArrayList;
 import java.util.List;
 
-import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.databinding.ItemSessionDetailBinding;
-import vn.edu.fpt.zentryapp.lecturer.data.model.response.SessionDetail;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.OverviewSession;
 
-public class SessionDetailAdapter extends RecyclerView.Adapter<SessionDetailAdapter.SessionDetailViewHolder> {
+public class LecturerListSessionDetailAdapter extends RecyclerView.Adapter<LecturerListSessionDetailAdapter.SessionDetailViewHolder> {
 
-    private List<SessionDetail> sessions = new ArrayList<>();
+    private List<OverviewSession> sessions = new ArrayList<>();
     private OnSessionDetailClickListener listener;
 
     public interface OnSessionDetailClickListener {
-        void onSessionDetailClick(SessionDetail session);
+        void onSessionDetailClick(OverviewSession session);
     }
 
-    public void setSessions(List<SessionDetail> sessions) {
+    public void setSessions(List<OverviewSession> sessions) {
         this.sessions = sessions != null ? sessions : new ArrayList<>();
         notifyDataSetChanged();
     }
@@ -65,36 +63,10 @@ public class SessionDetailAdapter extends RecyclerView.Adapter<SessionDetailAdap
 
         }
 
-        public void bind(SessionDetail session) {
+        public void bind(OverviewSession session) {
             binding.tvSessionTitle.setText(session.getSessionTitle());
             binding.tvSessionAttendance.setText(session.getAttendanceSummary());
             binding.tvSessionDate.setText(session.getFormattedDate());
-
-            // Set status-based styling
-            setStatusStyling(session.getStatus());
-        }
-
-        private void setStatusStyling(String status) {
-            switch (status) {
-                case "COMPLETED":
-                    binding.tvSessionDate.setTextColor(0xFF666666);
-                //    binding.ivSessionArrow.setVisibility(View.VISIBLE);
-                    break;
-                case "ONGOING":
-                    binding.tvSessionDate.setTextColor(0xFFFF9800); // Orange
-                 //   binding.ivSessionArrow.setVisibility(View.VISIBLE);
-                    break;
-                case "UPCOMING":
-                    binding.tvSessionDate.setTextColor(0xFF2196F3); // Blue
-                    binding.tvSessionAttendance.setText("Not started");
-                  //  binding.ivSessionArrow.setVisibility(View.GONE);
-                    break;
-                case "CANCELLED":
-                    binding.tvSessionDate.setTextColor(0xFFE53935); // Red
-                    binding.tvSessionAttendance.setText("Cancelled");
-                 //F   binding.ivSessionArrow.setVisibility(View.GONE);
-                    break;
-            }
         }
     }
 }
