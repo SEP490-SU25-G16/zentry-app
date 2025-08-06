@@ -6,18 +6,22 @@ import android.util.Log;
 import java.util.ArrayList;
 import java.util.List;
 
+import lombok.Getter;
+
 /**
  * Detector for eye blinks using the Eye Aspect Ratio (EAR) algorithm
  * Based on the paper: "Real-Time Eye Blink Detection using Facial Landmarks"
  * by Soukupová and Čech (2016)
+ * 
+ * OPTIMIZED FOR REAL DATA PERFORMANCE
  */
 public class EyeBlinkDetector {
     private static final String TAG = "EyeBlinkDetector";
     
-    // Constants for blink detection
-    private static final float EAR_THRESHOLD = 0.2f;       // Eye aspect ratio threshold for considering an eye as closed
-    private static final int BLINK_FRAME_THRESHOLD = 2;    // Minimum frames for a valid blink
-    private static final int MAX_BLINK_DURATION = 10;      // Maximum frames for a valid blink
+    // Constants for blink detection - OPTIMIZED FOR REAL DATA
+    private static final float EAR_THRESHOLD = 0.25f;      // Standard threshold for real data
+    private static final int BLINK_FRAME_THRESHOLD = 1;    // Fast detection for real data
+    private static final int MAX_BLINK_DURATION = 15;      // Maximum blink duration
     
     // State tracking
     private boolean isBlinking = false;
@@ -28,11 +32,16 @@ public class EyeBlinkDetector {
     private final List<Float> leftEyeEARHistory = new ArrayList<>();
     private final List<Float> rightEyeEARHistory = new ArrayList<>();
     private static final int HISTORY_SIZE = 10;
-    
+
+    /**
+     * -- GETTER --
+     *  Get the current normal EAR value
+     */
     // For calculating average EAR in normal state
+    @Getter
     private float normalEAR = 0.3f;
     private int calibrationFrames = 0;
-    private static final int CALIBRATION_FRAMES_NEEDED = 30;
+    private static final int CALIBRATION_FRAMES_NEEDED = 15; // Fast calibration for real data
     private boolean isCalibrated = false;
     
     // For detecting intentional blinks (multiple blinks in sequence)
@@ -40,6 +49,9 @@ public class EyeBlinkDetector {
     private static final long INTENTIONAL_BLINK_INTERVAL_MS = 1000; // Maximum time between intentional blinks
     private int consecutiveBlinkCount = 0;
     private static final int INTENTIONAL_BLINK_COUNT = 2; // Number of blinks to consider intentional
+    
+    // Debug logging
+    private boolean debugMode = true;
     
     /**
      * Callback for blink detection events
@@ -52,16 +64,16 @@ public class EyeBlinkDetector {
     private BlinkDetectionCallback callback;
     
     /**
-     * Create a new blink detector
+     * Create a new blink detector optimized for real data
      * @param callback The callback for blink detection events
      */
     public EyeBlinkDetector(BlinkDetectionCallback callback) {
         this.callback = callback;
-        Log.d(TAG, "Blink detector initialized");
+        Log.d(TAG, "Blink detector initialized for real data performance");
     }
     
     /**
-     * Process eye landmarks to detect blinks
+     * Process eye landmarks to detect blinks (REAL DATA ONLY)
      * 
      * @param leftEyePoints The 6 key points for the left eye
      * @param rightEyePoints The 6 key points for the right eye
@@ -77,7 +89,9 @@ public class EyeBlinkDetector {
         
         // Check if we have valid eye points
         if (leftEyePoints.size() < 6 || rightEyePoints.size() < 6) {
-            Log.w(TAG, "Insufficient eye points for EAR calculation");
+            if (debugMode) {
+                Log.w(TAG, "Insufficient eye points for EAR calculation. Left: " + leftEyePoints.size() + ", Right: " + rightEyePoints.size());
+            }
             return false;
         }
         
@@ -91,32 +105,55 @@ public class EyeBlinkDetector {
         // Update history
         updateEARHistory(leftEAR, rightEAR);
         
+        // Debug logging for real data
+        if (debugMode) {
+            Log.d(TAG, String.format("REAL DATA EAR - Left: %.3f, Right: %.3f, Avg: %.3f, LeftProb: %.3f, RightProb: %.3f", 
+                leftEAR, rightEAR, avgEAR, leftEyeOpenProbability, rightEyeOpenProbability));
+        }
+        
         // Calibrate if needed
         if (!isCalibrated) {
             calibrateEAR(avgEAR);
+            if (debugMode) {
+                Log.d(TAG, "Calibrating EAR for real data. Frames: " + calibrationFrames + "/" + CALIBRATION_FRAMES_NEEDED);
+            }
             return false;
         }
         
-        // Dynamically adjust threshold based on the normal EAR for this person
-        float dynamicThreshold = normalEAR * 0.7f;
+        // Use optimized threshold for real data
+        float absoluteThreshold = 0.25f; // Standard threshold for real data
+        float dynamicThreshold = Math.min(normalEAR * 0.65f, absoluteThreshold);
         
-        // Detect blink state
-        boolean leftEyeClosed = leftEAR < dynamicThreshold;
-        boolean rightEyeClosed = rightEAR < dynamicThreshold;
+        if (debugMode) {
+            Log.d(TAG, String.format("REAL DATA Thresholds - Absolute: %.3f, Dynamic: %.3f, NormalEAR: %.3f", 
+                absoluteThreshold, dynamicThreshold, normalEAR));
+        }
+        
+        // Detect blink state using real data thresholds
+        boolean leftEyeClosed = leftEAR < absoluteThreshold;
+        boolean rightEyeClosed = rightEAR < absoluteThreshold;
         boolean bothEyesClosed = leftEyeClosed && rightEyeClosed;
         
         // Use the ML Kit's probability as additional evidence
-        boolean mlKitDetectedBlink = leftEyeOpenProbability < 0.3f && rightEyeOpenProbability < 0.3f;
+        boolean mlKitDetectedBlink = leftEyeOpenProbability < 0.4f && rightEyeOpenProbability < 0.4f;
         
-        // If ML Kit and EAR metrics disagree, we need strong evidence for a blink
-        boolean strongBlinkEvidence = bothEyesClosed && (mlKitDetectedBlink || avgEAR < dynamicThreshold * 0.8f);
+        // Enhanced blink detection logic for real data
+        boolean strongBlinkEvidence = bothEyesClosed || 
+                                    (leftEyeClosed && rightEyeClosed) ||
+                                    (avgEAR < absoluteThreshold * 0.8f) ||
+                                    mlKitDetectedBlink;
+        
+        if (debugMode && (leftEyeClosed || rightEyeClosed || strongBlinkEvidence)) {
+            Log.d(TAG, String.format("REAL DATA Blink detected - Left: %s, Right: %s, MLKit: %s, Strong: %s, AvgEAR: %.3f", 
+                leftEyeClosed, rightEyeClosed, mlKitDetectedBlink, strongBlinkEvidence, avgEAR));
+        }
         
         // Update blink state machine
         return updateBlinkState(leftEyeClosed, rightEyeClosed, strongBlinkEvidence);
     }
     
     /**
-     * Calculate the Eye Aspect Ratio (EAR)
+     * Calculate the Eye Aspect Ratio (EAR) for real data
      * EAR = (||p2-p6|| + ||p3-p5||) / (2 * ||p1-p4||)
      * Where p1-p6 are the 6 landmarks of the eye
      */
@@ -137,8 +174,26 @@ public class EyeBlinkDetector {
             return 1.0f;
         }
         
-        // Calculate EAR
+        // Calculate EAR for real data
         float ear = (verticalDist1 + verticalDist2) / (2 * horizontalDist);
+        
+        // Validate EAR for real data (should be between 0.0 and 1.0)
+        if (ear < 0.0f) {
+            ear = 0.0f;
+            if (debugMode) {
+                Log.d(TAG, "EAR value too low (" + ear + "), setting to 0.0f");
+            }
+        } else if (ear > 1.0f) {
+            ear = 1.0f;
+            if (debugMode) {
+                Log.d(TAG, "EAR value too high (" + ear + "), setting to 1.0f");
+            }
+        }
+        
+        if (debugMode) {
+            Log.d(TAG, String.format("REAL DATA EAR calculation - V1: %.3f, V2: %.3f, H: %.3f, EAR: %.3f", 
+                verticalDist1, verticalDist2, horizontalDist, ear));
+        }
         
         return ear;
     }
@@ -196,18 +251,33 @@ public class EyeBlinkDetector {
         // Current eye state
         boolean currentlyBlinking = strongEvidence;
         
+        if (debugMode) {
+            Log.d(TAG, String.format("Blink state - Currently: %s, IsBlinking: %s, FrameCount: %d", 
+                currentlyBlinking, isBlinking, blinkFrameCount));
+        }
+        
         if (!isBlinking && currentlyBlinking) {
             // Blink started
             isBlinking = true;
             blinkFrameCount = 1;
+            if (debugMode) {
+                Log.d(TAG, "Blink started");
+            }
         } else if (isBlinking && currentlyBlinking) {
             // Blink continuing
             blinkFrameCount++;
+            if (debugMode) {
+                Log.d(TAG, "Blink continuing. Frame count: " + blinkFrameCount);
+            }
         } else if (isBlinking && !currentlyBlinking) {
             // Blink ended - check if it was a valid blink
             if (blinkFrameCount >= BLINK_FRAME_THRESHOLD && blinkFrameCount <= MAX_BLINK_DURATION) {
                 totalBlinks++;
                 blinkDetected = true;
+                
+                if (debugMode) {
+                    Log.d(TAG, "Valid blink detected! Frame count: " + blinkFrameCount + ", Total blinks: " + totalBlinks);
+                }
                 
                 // Check for intentional blink pattern
                 long now = System.currentTimeMillis();
@@ -229,6 +299,11 @@ public class EyeBlinkDetector {
                 if (callback != null) {
                     callback.onBlink(leftEyeClosed, rightEyeClosed);
                 }
+            } else {
+                if (debugMode) {
+                    Log.d(TAG, "Invalid blink duration. Frame count: " + blinkFrameCount + 
+                          " (min: " + BLINK_FRAME_THRESHOLD + ", max: " + MAX_BLINK_DURATION + ")");
+                }
             }
             
             // Reset blink state
@@ -245,21 +320,7 @@ public class EyeBlinkDetector {
     public boolean isCalibrated() {
         return isCalibrated;
     }
-    
-    /**
-     * Get the current normal EAR value
-     */
-    public float getNormalEAR() {
-        return normalEAR;
-    }
-    
-    /**
-     * Get total number of detected blinks
-     */
-    public int getTotalBlinks() {
-        return totalBlinks;
-    }
-    
+
     /**
      * Reset the detector state
      */

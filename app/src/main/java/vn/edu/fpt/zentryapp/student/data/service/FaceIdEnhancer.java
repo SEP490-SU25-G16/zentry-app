@@ -16,7 +16,7 @@ import vn.edu.fpt.zentryapp.student.data.service.FaceIdServiceManager;
  * to prevent spoofing with photos or videos
  */
 public class FaceIdEnhancer implements 
-        FaceLandmarkExtractor.LandmarkExtractionCallback,
+        MediaPipeFaceLandmarkExtractor.LandmarkExtractionCallback,
         EyeBlinkDetector.BlinkDetectionCallback,
         GazeEstimator.GazeCallback {
     
@@ -37,7 +37,7 @@ public class FaceIdEnhancer implements
     private AuthState currentState = AuthState.WAITING;
     
     // Component instances
-    private final FaceLandmarkExtractor landmarkExtractor;
+    private final MediaPipeFaceLandmarkExtractor landmarkExtractor;
     private final EyeBlinkDetector blinkDetector;
     private final GazeEstimator gazeEstimator;
     
@@ -87,19 +87,30 @@ public class FaceIdEnhancer implements
     public FaceIdEnhancer(Context context, FaceIdEnhancerCallback callback) {
         this.callback = callback;
         
-        // Initialize components
-        landmarkExtractor = new FaceLandmarkExtractor(context);
+        // Initialize components - Use preloaded models from FaceIdService
+        FaceIdService faceIdService = FaceIdServiceManager.getInstance().getService();
+        
+        // Get preloaded MediaPipeFaceLandmarkExtractor from FaceIdService
+        if (faceIdService != null && faceIdService.getMediaPipeFaceLandmarkExtractor() != null) {
+            landmarkExtractor = faceIdService.getMediaPipeFaceLandmarkExtractor();
+            Log.d(TAG, "Using preloaded MediaPipeFaceLandmarkExtractor from FaceIdService");
+        } else {
+            // Fallback: create new instance if not available
+            landmarkExtractor = new MediaPipeFaceLandmarkExtractor(context);
+            Log.d(TAG, "Created new MediaPipeFaceLandmarkExtractor (fallback)");
+        }
+        
         blinkDetector = new EyeBlinkDetector(this);
         
         // Get GazeEstimator from FaceIdService if available, otherwise create new instance
-        FaceIdService faceIdService = FaceIdServiceManager.getInstance().getService();
         if (faceIdService != null && faceIdService.getGazeEstimator() != null) {
             gazeEstimator = faceIdService.getGazeEstimator();
             gazeEstimator.setCallback(this); // Set callback for the shared instance
             Log.d(TAG, "Using GazeEstimator from FaceIdService");
         } else {
+            // Fallback: create new instance if not available
             gazeEstimator = new GazeEstimator(context, this);
-            Log.d(TAG, "Created new GazeEstimator instance");
+            Log.d(TAG, "Created new GazeEstimator (fallback)");
         }
         
         Log.d(TAG, "Face ID enhancer initialized");
@@ -266,14 +277,23 @@ public class FaceIdEnhancer implements
         List<PointF> leftEyePoints = landmarkExtractor.getLeftEyeEARPoints();
         List<PointF> rightEyePoints = landmarkExtractor.getRightEyeEARPoints();
         
-        // Detect blinks
-        if (!blinkDetected && !leftEyePoints.isEmpty() && !rightEyePoints.isEmpty()) {
-            blinkDetector.detectBlink(
+        // Debug logging for eye points
+        Log.d(TAG, "Eye points - Left: " + leftEyePoints.size() + ", Right: " + rightEyePoints.size());
+        
+        // Detect blinks - REMOVED blinkDetected check to allow multiple detections
+        if (!leftEyePoints.isEmpty() && !rightEyePoints.isEmpty()) {
+            boolean blinkDetected = blinkDetector.detectBlink(
                     leftEyePoints, 
                     rightEyePoints,
                     landmarkExtractor.getLeftEyeOpenProbability(),
                     landmarkExtractor.getRightEyeOpenProbability()
             );
+            
+            if (blinkDetected) {
+                Log.d(TAG, "Blink detected in FaceIdEnhancer");
+            }
+        } else {
+            Log.w(TAG, "No eye points available for blink detection");
         }
         
         // Process for gaze estimation
@@ -282,7 +302,11 @@ public class FaceIdEnhancer implements
             Bitmap rightEyeRegion = landmarkExtractor.getRightEyeRegion();
             float[] headPose = landmarkExtractor.getHeadEulerAngles();
             
-            gazeEstimator.estimateGaze(leftEyeRegion, rightEyeRegion, headPose);
+            if (leftEyeRegion != null && rightEyeRegion != null) {
+                gazeEstimator.estimateGaze(leftEyeRegion, rightEyeRegion, headPose);
+            } else {
+                Log.w(TAG, "Eye regions not available for gaze estimation");
+            }
         }
         
         isProcessing.set(false);

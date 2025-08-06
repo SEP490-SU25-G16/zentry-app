@@ -29,6 +29,7 @@ import vn.edu.fpt.zentryapp.auth.client.ApiClient;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.student.data.api.FaceIdApi;
 import vn.edu.fpt.zentryapp.student.data.model.response.FaceIdResponse;
+import vn.edu.fpt.zentryapp.student.data.service.MediaPipeFaceLandmarkExtractor;
 
 public class FaceIdService {
     private static final String TAG = "FaceIdService";
@@ -53,6 +54,19 @@ public class FaceIdService {
     public GazeEstimator getGazeEstimator() {
         return gazeEstimator;
     }
+    
+    // 🔧 NEW: MediaPipe FaceLandmarkExtractor for real landmark detection
+    @Getter
+    private MediaPipeFaceLandmarkExtractor mediaPipeFaceLandmarkExtractor;
+    
+    /**
+     * Get the MediaPipeFaceLandmarkExtractor instance
+     * @return MediaPipeFaceLandmarkExtractor instance or null if not initialized
+     */
+    public MediaPipeFaceLandmarkExtractor getMediaPipeFaceLandmarkExtractor() {
+        return mediaPipeFaceLandmarkExtractor;
+    }
+    
     private final FaceIdApi faceIdApi;
     private final ExecutorService executor;
     private final Handler mainHandler;
@@ -67,7 +81,7 @@ public class FaceIdService {
     private final FaceIdMemoryManager memoryManager;
     private final FaceIdPerformanceManager performanceManager;
     
-    private final CountDownLatch modelLoadLatch = new CountDownLatch(4); // Update to 4 models
+    private final CountDownLatch modelLoadLatch = new CountDownLatch(5); // Update to 5 models (added MediaPipeFaceLandmarkExtractor)
     private volatile boolean isInitialized = false;
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
     
@@ -143,6 +157,19 @@ public class FaceIdService {
             } catch (ModelRetryManager.ModelRetryException e) {
                 Log.e(TAG, "Error initializing GazeEstimator", e);
                 errorHandler.handleModelInitializationError(e, "GazeEstimator");
+                modelLoadLatch.countDown();
+            }
+        });
+        
+        // 🔧 NEW: Initialize MediaPipeFaceLandmarkExtractor with retry
+        executor.execute(() -> {
+            try {
+                this.mediaPipeFaceLandmarkExtractor = retryManager.executeWithRetry(() -> new MediaPipeFaceLandmarkExtractor(context));
+                modelLoadLatch.countDown();
+                Log.d(TAG, "MediaPipeFaceLandmarkExtractor initialized with face_landmarker.task");
+            } catch (ModelRetryManager.ModelRetryException e) {
+                Log.e(TAG, "Error initializing MediaPipeFaceLandmarkExtractor", e);
+                errorHandler.handleModelInitializationError(e, "MediaPipeFaceLandmarkExtractor");
                 modelLoadLatch.countDown();
             }
         });

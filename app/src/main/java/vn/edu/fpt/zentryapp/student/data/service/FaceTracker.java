@@ -6,6 +6,8 @@ import android.util.Log;
 import java.util.LinkedList;
 import java.util.Queue;
 
+import lombok.Getter;
+
 /**
  * Utility class for tracking face stability across multiple frames
  */
@@ -20,6 +22,11 @@ public class FaceTracker {
     private final Queue<Rect> recentFaces;
     private final int requiredStableFrames;
     private int stableFrameCount = 0;
+    /**
+     * -- GETTER --
+     *  Get the last stable face
+     */
+    @Getter
     private Rect lastStableFace = null;
     
     /**
@@ -134,11 +141,5 @@ public class FaceTracker {
         stableFrameCount = 0;
         lastStableFace = null;
     }
-    
-    /**
-     * Get the last stable face
-     */
-    public Rect getLastStableFace() {
-        return lastStableFace;
-    }
+
 } 

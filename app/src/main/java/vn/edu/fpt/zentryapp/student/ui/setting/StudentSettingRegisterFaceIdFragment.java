@@ -38,6 +38,7 @@ import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentSettingRegisterFaceIdBinding;
 import vn.edu.fpt.zentryapp.student.data.service.FaceIdConfig;
+import vn.edu.fpt.zentryapp.student.data.service.FaceIdEnhancer;
 import vn.edu.fpt.zentryapp.student.data.service.FaceIdService;
 import vn.edu.fpt.zentryapp.student.data.service.FaceIdServiceManager;
 import vn.edu.fpt.zentryapp.student.data.service.FaceTracker;
@@ -49,7 +50,8 @@ import vn.edu.fpt.zentryapp.student.ui.setting.state.FaceRegistrationStateManage
 import vn.edu.fpt.zentryapp.student.ui.setting.success.FaceIdSuccessActivity;
 import vn.edu.fpt.zentryapp.student.ui.setting.ui.FaceRegistrationUIController;
 
-public class StudentSettingRegisterFaceIdFragment extends Fragment {
+public class StudentSettingRegisterFaceIdFragment extends Fragment 
+        implements FaceIdEnhancer.FaceIdEnhancerCallback {
     private static final String TAG = "RegisterFaceIdFragment";
     private static final int CAMERA_PERMISSION_REQUEST_CODE = 100;
     private static final int SUCCESS_ACTIVITY_REQUEST_CODE = 200;
@@ -61,6 +63,9 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
     private FaceRegistrationUIController uiController;
     private FaceTracker faceTracker;
     private FaceIdService faceIdService;
+    private FaceIdEnhancer faceIdEnhancer; // Add FaceIdEnhancer
+    private boolean faceIdEnhancerInitialized = false;
+    
     
     // 🔍 ERROR TRACKING
     private String lastDetailedErrorMessage = ""; // Store detailed error information
@@ -310,6 +315,9 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
                 if (faceOverlayView != null) {
                     faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.primary));
                 }
+                
+                // Initialize FaceIdEnhancer if not already done
+                initializeFaceIdEnhancer();
                 break;
                 
             case FACE_OUT_OF_BOUNDS:
@@ -524,6 +532,53 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
         if (faceIdService == null || !faceIdServiceInitialized) {
             Log.w(TAG, "FaceIdService not initialized yet, skipping frame processing");
             return;
+        }
+
+        // Special handling for LIVENESS_CHALLENGE state
+        if (stateManager.getCurrentState() == FaceRegistrationState.LIVENESS_CHALLENGE) {
+            // Process frame using FaceIdService first to get face rect
+            faceIdService.processContinuousFrame(bitmap, faceOverlayView.getOvalRect(),
+                    new FaceIdService.ContinuousProcessingCallback() {
+                @Override
+                public void onFaceDetected(Rect boundingBox, boolean isSpoof, float spoofScore) {
+                    currentFaceRect = boundingBox;
+                    
+                    // Update face position in overlay
+                    if (faceOverlayView != null) {
+                        boolean isGoodPosition = faceOverlayView.updateFacePosition(boundingBox);
+                        if (!isGoodPosition) {
+                            // If position is bad, don't process for liveness
+                            if (stateManager.getCurrentState() != FaceRegistrationState.FACE_OUT_OF_BOUNDS) {
+                                stateManager.transitionTo(FaceRegistrationState.FACE_OUT_OF_BOUNDS,
+                                        "Position your face properly in the oval");
+                            }
+                            return;
+                        }
+                    }
+                    
+                    // Process the frame for liveness challenges
+                    processFrameForLivenessChallenge(bitmap, boundingBox);
+                }
+
+                @Override
+                public void onNoFaceDetected() {
+                    currentFaceRect = null;
+                    stateManager.transitionTo(FaceRegistrationState.NO_FACE, "Look at the camera");
+                }
+
+                @Override
+                public void onMultipleFacesDetected() {
+                    // Handle multiple faces
+                    stateManager.transitionTo(FaceRegistrationState.MULTIPLE_FACES, "Only one person should be visible");
+                }
+
+                @Override
+                public void onError(String errorMessage) {
+                    Log.e(TAG, "Error processing frame: " + errorMessage);
+                }
+            });
+            
+            return; // Skip normal processing
         }
 
         if (isAnalyzing) {
@@ -1144,6 +1199,115 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
             faceTracker.reset();
         }
     }
+    
+    /**
+     * Initialize the FaceIdEnhancer for liveness challenges
+     */
+    private void initializeFaceIdEnhancer() {
+        if (faceIdEnhancerInitialized) {
+            // Already initialized, just reset it
+            if (faceIdEnhancer != null) {
+                faceIdEnhancer.reset();
+            }
+            return;
+        }
+        
+        if (getContext() == null) {
+            Log.e(TAG, "Cannot initialize FaceIdEnhancer: Context is null");
+            return;
+        }
+        
+        try {
+            // Initialize the FaceIdEnhancer
+            faceIdEnhancer = new FaceIdEnhancer(getContext(), this);
+            faceIdEnhancer.setChallengeType(FaceIdEnhancer.ChallengeType.BLINK_AND_GAZE);
+            faceIdEnhancerInitialized = true;
+            Log.d(TAG, "FaceIdEnhancer initialized successfully");
+        } catch (Exception e) {
+            Log.e(TAG, "Error initializing FaceIdEnhancer", e);
+        }
+    }
+    
+    /**
+     * Update the frame processing to use FaceIdEnhancer when in LIVENESS_CHALLENGE state
+     */
+    private void processFrameForLivenessChallenge(Bitmap bitmap, Rect faceRect) {
+        if (faceIdEnhancer != null && faceIdEnhancerInitialized) {
+            faceIdEnhancer.processFaceFrame(bitmap, faceRect);
+        } else {
+            Log.w(TAG, "Attempted to process liveness frame but FaceIdEnhancer not initialized");
+        }
+    }
+    
+    //------------------------------------------------------------------------------
+    // FaceIdEnhancer.FaceIdEnhancerCallback Implementation
+    //------------------------------------------------------------------------------
+    
+    @Override
+    public void onStateChanged(FaceIdEnhancer.AuthState newState) {
+        if (!isAdded()) return;
+        
+        Log.d(TAG, "FaceIdEnhancer state changed: " + newState);
+        
+        // Update UI based on FaceIdEnhancer state
+        if (newState == FaceIdEnhancer.AuthState.BLINK_VERIFIED) {
+            // User blinked successfully
+            if (binding != null && binding.tvStatusMessage != null) {
+                binding.tvStatusMessage.setText("Blink detected! Now look at different directions.");
+            }
+        } else if (newState == FaceIdEnhancer.AuthState.GAZE_VERIFIED) {
+            // User completed gaze challenge
+            if (binding != null && binding.tvStatusMessage != null) {
+                binding.tvStatusMessage.setText("Gaze verified! Completing verification...");
+            }
+        } else if (newState == FaceIdEnhancer.AuthState.VERIFIED) {
+            // All liveness challenges completed
+            Log.d(TAG, "Liveness verification complete!");
+            // Transition to the next state in registration
+            stateManager.transitionTo(FaceRegistrationState.FACE_REAL, "Liveness verified!");
+        }
+    }
+    
+    @Override
+    public void onBlinkDetected() {
+        if (!isAdded()) return;
+        
+        Log.d(TAG, "👁️ Blink detected!");
+        // Update UI to show blink was detected
+        if (binding != null && binding.tvStatusMessage != null) {
+            binding.tvStatusMessage.setText("Blink detected! Now follow gaze instructions.");
+        }
+    }
+    
+    @Override
+    public void onGazeDirectionChanged(float x, float y) {
+        if (!isAdded()) return;
+        
+        // Add visual indicator for gaze direction if needed
+        Log.d(TAG, "👀 Gaze direction: x=" + x + ", y=" + y);
+    }
+    
+    @Override
+    public void onLivenessVerified(boolean isLive) {
+        if (!isAdded()) return;
+        
+        Log.d(TAG, "🔐 Liveness verification result: " + (isLive ? "LIVE" : "NOT LIVE"));
+        if (isLive) {
+            // Proceed with face registration
+            stateManager.transitionTo(FaceRegistrationState.FACE_REAL, "Liveness verified!");
+        }
+    }
+    
+    @Override
+    public void onVerificationComplete(boolean success) {
+        if (!isAdded()) return;
+        
+        Log.d(TAG, "✅ Verification complete: " + (success ? "SUCCESS" : "FAILED"));
+        if (success) {
+            // Proceed with face registration
+            stateManager.transitionTo(FaceRegistrationState.FACE_REAL, "Verification complete!");
+        }
+    }
 
     /**
      * Reset all components
@@ -1226,6 +1390,12 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment {
 
         if (uiController != null) {
             uiController.cleanup();
+        }
+        
+        if (faceIdEnhancer != null) {
+            faceIdEnhancer.close();
+            faceIdEnhancer = null;
+            faceIdEnhancerInitialized = false;
         }
 
         mainHandler.removeCallbacksAndMessages(null);

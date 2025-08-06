@@ -5,6 +5,8 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Rect;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -25,19 +27,23 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.mlkit.vision.common.InputImage;
-import com.google.mlkit.vision.face.Face;
-import com.google.mlkit.vision.face.FaceDetection;
-import com.google.mlkit.vision.face.FaceDetector;
-import com.google.mlkit.vision.face.FaceDetectorOptions;
+import com.google.mediapipe.tasks.vision.facedetector.FaceDetectorResult;
+import com.google.mediapipe.tasks.vision.facedetector.FaceDetector.FaceDetectorOptions;
+import com.google.mediapipe.tasks.vision.core.RunningMode;
+import com.google.mediapipe.framework.image.BitmapImageBuilder;
+import com.google.mediapipe.framework.image.MPImage;
+import com.google.mediapipe.tasks.components.containers.Detection;
+import com.google.mediapipe.tasks.core.BaseOptions;
 
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.student.data.service.FaceIdEnhancer;
+import vn.edu.fpt.zentryapp.student.data.service.FaceDetector;
 
 public class FaceIdEnhancerActivity extends AppCompatActivity implements 
         FaceIdEnhancer.FaceIdEnhancerCallback {
@@ -73,11 +79,7 @@ public class FaceIdEnhancerActivity extends AppCompatActivity implements
         resetButton.setOnClickListener(v -> resetVerification());
         
         // Initialize face detector
-        FaceDetectorOptions options = new FaceDetectorOptions.Builder()
-                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
-                .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
-                .build();
-        faceDetector = FaceDetection.getClient(options);
+        faceDetector = new FaceDetector(this);
         
         // Initialize camera executor
         cameraExecutor = Executors.newSingleThreadExecutor();
@@ -145,43 +147,32 @@ public class FaceIdEnhancerActivity extends AppCompatActivity implements
      */
     @OptIn(markerClass = ExperimentalGetImage.class)
     private void analyzeFace(ImageProxy imageProxy) {
-        // Get image for face detection
-        InputImage image = InputImage.fromMediaImage(
-                imageProxy.getImage(), 
-                imageProxy.getImageInfo().getRotationDegrees()
-        );
+        // Convert ImageProxy to Bitmap
+        Bitmap bitmap = imageToBitmap(imageProxy);
+        if (bitmap == null) {
+            imageProxy.close();
+            return;
+        }
         
-        // Process the image with ML Kit face detector
-        faceDetector.process(image)
-                .addOnSuccessListener(faces -> processFaces(faces, imageProxy))
-                .addOnFailureListener(e -> Log.e(TAG, "Face detection failed", e))
-                .addOnCompleteListener(task -> imageProxy.close());
-    }
-    
-    /**
-     * Process detected faces
-     */
-    private void processFaces(List<Face> faces, ImageProxy imageProxy) {
-        if (faces.isEmpty()) {
+        // Process the image with MediaPipe face detector
+        List<FaceDetector.FaceDetectionResult> results = faceDetector.detectFaces(bitmap);
+        
+        if (results.isEmpty()) {
             // No face detected
             runOnUiThread(() -> updateStatus("No face detected"));
+            imageProxy.close();
             return;
         }
         
         // Get the first detected face
-        Face face = faces.get(0);
-        
-        // Convert ImageProxy to Bitmap
-        Bitmap faceBitmap = imageToBitmap(imageProxy);
-        if (faceBitmap == null) {
-            return;
-        }
-        
-        // Get face bounding box
-        Rect faceRect = face.getBoundingBox();
+        FaceDetector.FaceDetectionResult result = results.get(0);
+        Bitmap faceBitmap = result.getCroppedBitmap();
+        Rect faceRect = result.getBoundingBox();
         
         // Process with face ID enhancer
         faceIdEnhancer.processFaceFrame(faceBitmap, faceRect);
+        
+        imageProxy.close();
     }
     
     /**
@@ -193,21 +184,34 @@ public class FaceIdEnhancerActivity extends AppCompatActivity implements
             return null;
         }
         
-        // Use InputImage utility from ML Kit to convert image and get bitmap
         try {
-            InputImage inputImage = InputImage.fromMediaImage(
-                    image.getImage(), 
-                    image.getImageInfo().getRotationDegrees()
-            );
+            // Convert YUV to RGB
+            android.media.Image mediaImage = image.getImage();
+            int width = mediaImage.getWidth();
+            int height = mediaImage.getHeight();
             
-            // Get bitmap from InputImage
-            Bitmap bitmap = inputImage.getBitmapInternal();
-            if (bitmap != null) {
-                // Create a copy of the bitmap since the original may be recycled
-                return Bitmap.createBitmap(bitmap);
-            } else {
-                Log.e(TAG, "Failed to get bitmap from InputImage");
+            // Create a bitmap from the YUV image
+            Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            
+            // Convert YUV to RGB (simplified conversion)
+            // In a real implementation, you'd use a more sophisticated YUV to RGB conversion
+            android.media.Image.Plane[] planes = mediaImage.getPlanes();
+            if (planes.length >= 3) {
+                // Use the Y plane for grayscale conversion
+                android.media.Image.Plane yPlane = planes[0];
+                java.nio.ByteBuffer yBuffer = yPlane.getBuffer();
+                int[] pixels = new int[width * height];
+                
+                for (int i = 0; i < pixels.length; i++) {
+                    int y = yBuffer.get() & 0xFF;
+                    pixels[i] = (0xFF << 24) | (y << 16) | (y << 8) | y;
+                }
+                
+                bitmap.setPixels(pixels, 0, width, 0, 0, width, height);
             }
+            
+            return bitmap;
+            
         } catch (Exception e) {
             Log.e(TAG, "Error converting image to bitmap", e);
         }
@@ -337,7 +341,15 @@ public class FaceIdEnhancerActivity extends AppCompatActivity implements
     @Override
     public void onBlinkDetected() {
         Log.d(TAG, "Blink detected! EyeBlinkDetector callback received");
-        updateStatus("Blink detected! Now move your gaze around");
+        runOnUiThread(() -> {
+            updateStatus("Blink detected! Now move your gaze around");
+            // Add visual feedback
+            statusTextView.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
+            // Reset color after 2 seconds
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                statusTextView.setTextColor(getResources().getColor(android.R.color.black));
+            }, 2000);
+        });
     }
     
     @Override
