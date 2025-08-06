@@ -39,6 +39,9 @@
         <!-- Service -->
 
         <activity
+            android:name=".student.presentation.activity.FaceIdEnhancerActivity"
+            android:exported="false" />
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>

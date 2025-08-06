@@ -38,12 +38,10 @@ public class FaceSpoofDetector {
     private static final float SCALE_2 = 4.0f;
     private static final int INPUT_IMAGE_DIM = 80;
     private static final int OUTPUT_DIM = 3;
-    private static final int REAL_FACE_LABEL = 0;  // Index 0 should be real face as per comment
 
     // Updated confidence thresholds - much more lenient now
-    private static final float REAL_CONFIDENCE_THRESHOLD = 0.65f; // Reduced from 0.75f to allow more real faces
+
     private static final float SPOOF_CONFIDENCE_THRESHOLD = 0.85f; // Higher threshold for spoofing (was 0.80f)
-    private static final float REAL_SPOOF_RATIO_THRESHOLD = 1.5f;  // Real must be 1.5x higher than spoof (was 2.0f)
     private static final float SPOOF_REAL_RATIO_THRESHOLD = 2.0f;  // Spoof must be 2.0x higher than real (was 1.5f)
 
     // Temporal variance parameters - much more lenient now
@@ -53,8 +51,6 @@ public class FaceSpoofDetector {
     private static final float MAX_SIZE_VARIANCE = 0.04f;       // Was 0.02f - Allow more size variance
 
     // Face-oval ratio constants - much more lenient now
-    private static final float MIN_FACE_OVAL_RATIO = 0.40f;    // Face should be at least 40% of oval (was 50%)
-    private static final float MAX_FACE_OVAL_RATIO = 0.95f;    // Face should be at most 95% of oval (was 85%)
     private static final float MAX_FACE_OUTSIDE_RATIO = 1.0f/8.0f; // Max extension outside oval (was 1/15)
 
     // Frame history for temporal analysis

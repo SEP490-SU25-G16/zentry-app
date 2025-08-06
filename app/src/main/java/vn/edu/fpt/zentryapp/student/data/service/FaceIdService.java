@@ -44,6 +44,15 @@ public class FaceIdService {
      */
     @Getter
     private FaceSpoofDetector faceSpoofDetector;
+    private GazeEstimator gazeEstimator; // Add GazeEstimator field
+    
+    /**
+     * Get the GazeEstimator instance
+     * @return GazeEstimator instance or null if not initialized
+     */
+    public GazeEstimator getGazeEstimator() {
+        return gazeEstimator;
+    }
     private final FaceIdApi faceIdApi;
     private final ExecutorService executor;
     private final Handler mainHandler;
@@ -58,7 +67,7 @@ public class FaceIdService {
     private final FaceIdMemoryManager memoryManager;
     private final FaceIdPerformanceManager performanceManager;
     
-    private final CountDownLatch modelLoadLatch = new CountDownLatch(3); // Đếm ngược cho 3 model
+    private final CountDownLatch modelLoadLatch = new CountDownLatch(4); // Update to 4 models
     private volatile boolean isInitialized = false;
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
     
@@ -121,6 +130,19 @@ public class FaceIdService {
             } catch (ModelRetryManager.ModelRetryException e) {
                 Log.e(TAG, "Error initializing FaceSpoofDetector", e);
                 errorHandler.handleModelInitializationError(e, "FaceSpoofDetector");
+                modelLoadLatch.countDown();
+            }
+        });
+        
+        // 🔧 NEW: Initialize GazeEstimator with retry
+        executor.execute(() -> {
+            try {
+                this.gazeEstimator = retryManager.executeWithRetry(() -> new GazeEstimator(context, null));
+                modelLoadLatch.countDown();
+                Log.d(TAG, "GazeEstimator initialized");
+            } catch (ModelRetryManager.ModelRetryException e) {
+                Log.e(TAG, "Error initializing GazeEstimator", e);
+                errorHandler.handleModelInitializationError(e, "GazeEstimator");
                 modelLoadLatch.countDown();
             }
         });
