@@ -1,0 +1,6 @@
+<!-- res/drawable/bg_rounded_purple.xml -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#6367F1"/> <!-- Màu tím đậm, đổi mã này theo màu chủ đạo của bạn -->
+    <corners android:radius="16dp"/>
+</shape>

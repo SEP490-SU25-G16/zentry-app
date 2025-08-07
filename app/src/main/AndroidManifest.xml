@@ -11,19 +11,19 @@
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-
-    <!-- Thêm quyền camera -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" /> <!-- Thêm quyền camera -->
     <uses-permission android:name="android.permission.CAMERA" />
 
     <uses-feature android:name="android.hardware.camera" />
     <uses-feature android:name="android.hardware.camera.autofocus" />
 
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-
+    <!-- BLE Feature Required -->
+    <uses-feature
+        android:name="android.hardware.bluetooth_le"
+        android:required="true" />
     <application
         android:name=".ZentryApplication"
         android:allowBackup="true"
@@ -36,8 +36,8 @@
         android:theme="@style/Theme.Zentryapp"
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
-        <!-- Service -->
 
+        <!-- Service -->
         <activity
             android:name=".student.presentation.activity.FaceIdEnhancerActivity"
             android:exported="false" />

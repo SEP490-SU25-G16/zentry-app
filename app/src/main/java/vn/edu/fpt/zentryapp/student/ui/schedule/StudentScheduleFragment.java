@@ -20,18 +20,20 @@ import android.view.ViewGroup;
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentScheduleBinding;
+import vn.edu.fpt.zentryapp.student.adapter.StudentScheduleClassSectionAdapter;
+import vn.edu.fpt.zentryapp.student.data.model.response.StudentScheduleClassSection;
 import vn.edu.fpt.zentryapp.notification.sharedviewmodel.NotificationViewModel;
-import vn.edu.fpt.zentryapp.student.adapter.ScheduleAdapter;
-import vn.edu.fpt.zentryapp.student.data.model.response.StudentScheduleSession;
 
-public class StudentScheduleFragment extends Fragment implements ScheduleAdapter.OnScheduleClickListener {
+
+public class StudentScheduleFragment extends Fragment implements StudentScheduleClassSectionAdapter.OnSessionActionListener {
+
+    private static final String TAG = "StudentScheduleFragment";
 
     private FragmentStudentScheduleBinding binding;
     private StudentScheduleViewModel viewModel;
+    private StudentScheduleClassSectionAdapter scheduleAdapter;
     private NotificationViewModel notificationViewModel;
-    private ScheduleAdapter scheduleAdapter;
     private NavController navController;
-    private AuthManager authManager;
 
     @Nullable
     @Override
@@ -51,10 +53,10 @@ public class StudentScheduleFragment extends Fragment implements ScheduleAdapter
 
         // Initialize ViewModel
         viewModel = new ViewModelProvider(this).get(StudentScheduleViewModel.class);
+        AuthManager authManager = AuthManager.getInstance(requireContext());
         notificationViewModel = new ViewModelProvider(requireActivity()).get(NotificationViewModel.class);
-        authManager = AuthManager.getInstance(requireContext());
-        viewModel.init(authManager);
-        
+        viewModel.init(requireContext(), authManager);
+
         // Load notifications để có dữ liệu cho badge
         notificationViewModel.loadNotifications();
 
@@ -64,82 +66,68 @@ public class StudentScheduleFragment extends Fragment implements ScheduleAdapter
     }
 
     private void setupRecyclerView() {
-        scheduleAdapter = new ScheduleAdapter(authManager);
-        scheduleAdapter.setOnScheduleClickListener(this);
+        AuthManager authManager = AuthManager.getInstance(requireContext());
+        scheduleAdapter = new StudentScheduleClassSectionAdapter(authManager);
 
-        binding.rvSchedules.setLayoutManager(new LinearLayoutManager(requireContext()));
-        binding.rvSchedules.setAdapter(scheduleAdapter);
+        scheduleAdapter.setOnSessionActionListener(this);
+
+        binding.rvStudentSchedules.setLayoutManager(new LinearLayoutManager(requireContext()));
+        binding.rvStudentSchedules.setAdapter(scheduleAdapter);
     }
+
 
     private void setupClickListeners() {
         // Calendar click
-        binding.tvStudentScheduleCalendar.setOnClickListener(v ->
-                navController.navigate(R.id.action_studentSchedule_to_calendar)
-        );
-
-//        // See All click
-//        binding.tvStudentScheduleSeeAll.setOnClickListener(v -> {
-//            Toast.makeText(requireContext(), "See All clicked", Toast.LENGTH_SHORT).show();
-//            // TODO: Navigate to full schedule list
-//        });
+        binding.tvStudentScheduleCalendar.setOnClickListener(v -> {
+            Toast.makeText(requireContext(), "Calendar clicked", Toast.LENGTH_SHORT).show();
+            // TODO: Navigate to calendar
+        });
 
         // Notification click
-        // Notification click
+        binding.ivStudentNotification.setOnClickListener(v -> {
+            Toast.makeText(requireContext(), "Notification clicked", Toast.LENGTH_SHORT).show();
+            // TODO: Navigate to notifications
+        });
+
+        // Search functionality
+        binding.ivStudentSearch.setOnClickListener(v -> {
+            String query = binding.etStudentSearch.getText().toString().trim();
+            if (!query.isEmpty()) {
+                // TODO: Implement search
+                Toast.makeText(requireContext(), "Searching: " + query, Toast.LENGTH_SHORT).show();
+            }
         binding.btnStudentScheduleNotification.setOnClickListener(v -> {
             navController.navigate(R.id.action_studentSchedule_to_notification);
         });
-
-    }
+    }}
 
     private void observeViewModel() {
+        // Loading state
         viewModel.isLoading().observe(getViewLifecycleOwner(), isLoading -> {
             binding.progressLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
         });
 
-        viewModel.schedules().observe(getViewLifecycleOwner(), schedules -> {
-            if (schedules != null) {
-                scheduleAdapter.setSchedules(schedules);
+        // Sessions data
+        viewModel.sessions().observe(getViewLifecycleOwner(), sessions -> {
+            if (sessions != null) {
+                scheduleAdapter.setSessions(sessions);
 
-                boolean isEmpty = schedules.isEmpty();
-                binding.rvSchedules.setVisibility(isEmpty ? View.GONE : View.VISIBLE);
+                // Show/hide empty state
+                boolean isEmpty = sessions.isEmpty();
+                binding.rvStudentSchedules.setVisibility(isEmpty ? View.GONE : View.VISIBLE);
                 binding.layoutEmptyState.setVisibility(isEmpty ? View.VISIBLE : View.GONE);
+
+                Log.d(TAG, "Updated UI with " + sessions.size() + " sessions");
             }
         });
 
-        viewModel.greeting().observe(getViewLifecycleOwner(), greeting -> {
-            if (greeting != null) {
-                binding.tvStudentScheduleGreeting.setText(greeting);
-            }
-        });
-
-        viewModel.subGreeting().observe(getViewLifecycleOwner(), subGreeting -> {
-            if (subGreeting != null) {
-                binding.tvStudentScheduleSubGreeting.setText(subGreeting);
-            }
-        });
-
-        viewModel.userProfile().observe(getViewLifecycleOwner(), profile -> {
-            if (profile != null) {
-
-            }
-        });
-
-        viewModel.successMessage().observe(getViewLifecycleOwner(), message -> {
-            if (message != null) {
-                Log.d("StudentSchedule", message);
-            }
-        });
-
+        // Error handling
         viewModel.errorMessage().observe(getViewLifecycleOwner(), error -> {
             if (error != null) {
                 Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
-
-                if (error.contains("network") || error.contains("connection")) {
-                    showRetryDialog();
-                }
             }
         });
-        
+
         // Observe notification unseen count để hiển thị badge
         notificationViewModel.getUnseenCount().observe(getViewLifecycleOwner(), unseenCount -> {
             if (unseenCount != null && unseenCount > 0) {
@@ -151,21 +139,24 @@ public class StudentScheduleFragment extends Fragment implements ScheduleAdapter
         });
     }
 
-    private void showRetryDialog() {
-        new AlertDialog.Builder(requireContext())
-                .setTitle("Connection Error")
-                .setMessage("Unable to load schedules. Would you like to retry?")
-                .setPositiveButton("Retry", (dialog, which) -> {
-                    viewModel.loadSchedules();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+    // Implement OnSessionActionListener interface
+    @Override
+    public void onSessionClick(StudentScheduleClassSection session) {
+        // Navigate to class detail with session object
+        Bundle args = new Bundle();
+        args.putSerializable("session", session);
+
+        navController.navigate(R.id.action_studentSchedule_to_classDetail, args);
+
+        Log.d(TAG, "Navigating to class detail for session: " + session.getSessionId());
     }
 
     @Override
-    public void onScheduleClick(StudentScheduleSession studentScheduleSession) {
-        navController.navigate(R.id.action_studentSchedule_to_classDetail);
-        viewModel.onScheduleClicked(studentScheduleSession);
+    public void onJoinSession(StudentScheduleClassSection session) {
+        Log.d(TAG, "Student joined session: " + session.getSessionId());
+        //TODO: vào màn hình detail nếu thành công
+        // Refresh data after joining
+        viewModel.refreshSessions();
     }
 
     @Override

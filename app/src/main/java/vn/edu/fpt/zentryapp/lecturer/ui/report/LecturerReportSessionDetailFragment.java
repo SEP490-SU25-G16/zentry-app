@@ -18,14 +18,14 @@ import android.view.ViewGroup;
 
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentLecturerReportSessionDetailBinding;
-import vn.edu.fpt.zentryapp.lecturer.adapter.StudentAttendanceAdapter;
+import vn.edu.fpt.zentryapp.lecturer.adapter.LecturerReportListStudentOnSessionAdapter;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.Student;
 
-public class LecturerReportSessionDetailFragment extends Fragment implements StudentAttendanceAdapter.OnAttendanceEditListener {
+public class LecturerReportSessionDetailFragment extends Fragment implements LecturerReportListStudentOnSessionAdapter.OnAttendanceEditListener {
 
     private FragmentLecturerReportSessionDetailBinding binding;
     private LecturerReportSessionDetailViewModel viewModel;
-    private StudentAttendanceAdapter studentAdapter;
+    private LecturerReportListStudentOnSessionAdapter studentAdapter;
     private NavController navController;
 
     @Nullable
@@ -61,7 +61,7 @@ public class LecturerReportSessionDetailFragment extends Fragment implements Stu
     }
 
     private void setupRecyclerView() {
-        studentAdapter = new StudentAttendanceAdapter();
+        studentAdapter = new LecturerReportListStudentOnSessionAdapter();
         studentAdapter.setOnAttendanceEditListener(this);
 
         LinearLayoutManager layoutManager = new LinearLayoutManager(requireContext());
@@ -131,7 +131,6 @@ public class LecturerReportSessionDetailFragment extends Fragment implements Stu
 
     @Override
     public void onEditAttendance(Student student) {
-        // Toggle attendance status
         viewModel.toggleStudentAttendance(student);
     }
 

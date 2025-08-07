@@ -1,37 +1,42 @@
 package vn.edu.fpt.zentryapp.student.data.model.response;
 
+import java.io.Serializable;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public class StudentReport {
+public class StudentReport implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     private final String id;
     private final String courseName;
     private final String courseCode;
     private final String className;
-    private final String room;
     private final String lecturer;
-    private final String attendanceStatus; // "Present", "Absent", "Late"
-    private final int completedTasks;
-    private final int totalTasks;
-    private final String semester;
-    private final String academicYear;
+    private final int totalSessions;
+    private final int attendedSessions;
 
-    public int getProgressPercentage() {
-        if (totalTasks == 0) return 0;
-        return (int) ((float) completedTasks / totalTasks * 100);
+    // Helper methods
+    public String getCourseTitle() {
+        return courseName + " - " + className;
     }
 
-    public String getClassInfo() {
-        return className + " - " + room + " - " + lecturer;
+    public String getLecturerInfo() {
+        return "Lecturer: " + lecturer;
     }
 
-    public String getTaskProgressText() {
-        return "Task completed (" + completedTasks + "/" + totalTasks + ")";
+    public String getSessionsText() {
+        return attendedSessions + "/" + totalSessions + " Sessions";
     }
 
-    public boolean isPresent() {
-        return "Present".equalsIgnoreCase(attendanceStatus);
+    public int getAttendancePercentage() {
+        if (totalSessions == 0) return 0;
+        return (int) ((float) attendedSessions / totalSessions * 100);
+    }
+
+    public String getAttendancePercentageText() {
+        return getAttendancePercentage() + "%";
     }
 }

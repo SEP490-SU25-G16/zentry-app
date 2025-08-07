@@ -1,6 +1,7 @@
 package vn.edu.fpt.zentryapp.lecturer.ui.schedule;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -18,16 +19,18 @@ import android.view.ViewGroup;
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentLecturerScheduleBinding;
-import vn.edu.fpt.zentryapp.lecturer.adapter.ScheduleSessionAdapter;
-import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerScheduleSession;
+import vn.edu.fpt.zentryapp.lecturer.adapter.LecturerScheduleClassSectionAdapter;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerScheduleClassSection;
 
-public class LecturerScheduleFragment extends Fragment implements ScheduleSessionAdapter.OnSessionActionListener {
+public class LecturerScheduleFragment extends Fragment implements LecturerScheduleClassSectionAdapter.OnSessionActionListener {
+
+    private static final String TAG = "LecturerScheduleFragment";
 
     private FragmentLecturerScheduleBinding binding;
     private LecturerScheduleViewModel viewModel;
-    private ScheduleSessionAdapter sessionAdapter;
+    private LecturerScheduleClassSectionAdapter sessionAdapter;
     private NavController navController;
-    AuthManager authManager;
+    private AuthManager authManager;
 
     @Nullable
     @Override
@@ -43,11 +46,11 @@ public class LecturerScheduleFragment extends Fragment implements ScheduleSessio
         super.onViewCreated(view, savedInstanceState);
 
         navController = NavHostFragment.findNavController(this);
+        authManager = AuthManager.getInstance(requireContext());
 
         // Initialize ViewModel
         viewModel = new ViewModelProvider(this).get(LecturerScheduleViewModel.class);
-        authManager = AuthManager.getInstance(requireContext());
-        viewModel.init(authManager);
+        viewModel.init(requireContext(), authManager);
 
         setupRecyclerView();
         setupClickListeners();
@@ -55,7 +58,7 @@ public class LecturerScheduleFragment extends Fragment implements ScheduleSessio
     }
 
     private void setupRecyclerView() {
-        sessionAdapter = new ScheduleSessionAdapter(authManager);
+        sessionAdapter = new LecturerScheduleClassSectionAdapter(authManager);
         sessionAdapter.setOnSessionActionListener(this);
 
         binding.rvSessions.setLayoutManager(new LinearLayoutManager(requireContext()));
@@ -67,18 +70,6 @@ public class LecturerScheduleFragment extends Fragment implements ScheduleSessio
         binding.tvScheduleCalendar.setOnClickListener(v ->
                 navController.navigate(R.id.action_schedule_to_calendar)
         );
-
-        // See all classes
-//        binding.tvScheduleSeeAll.setOnClickListener(v -> {
-//            Toast.makeText(requireContext(), "See all classes feature", Toast.LENGTH_SHORT).show();
-//            // TODO: Navigate to full schedule view
-//        });
-
-        // Notification button
-//        binding.btnScheduleNotification.setOnClickListener(v -> {
-//            Toast.makeText(requireContext(), "Notifications", Toast.LENGTH_SHORT).show();
-//            // TODO: Navigate to notifications
-//        });
     }
 
     private void observeViewModel() {
@@ -91,28 +82,7 @@ public class LecturerScheduleFragment extends Fragment implements ScheduleSessio
         viewModel.todaySessions().observe(getViewLifecycleOwner(), sessions -> {
             if (sessions != null) {
                 sessionAdapter.setSessions(sessions);
-            }
-        });
-
-        // Observe greeting
-        viewModel.greeting().observe(getViewLifecycleOwner(), greeting -> {
-            if (greeting != null) {
-                binding.tvScheduleGreeting.setText(greeting);
-            }
-        });
-
-        // Observe current date
-        viewModel.currentDate().observe(getViewLifecycleOwner(), date -> {
-            if (date != null) {
-                // binding.tvCurrentDate.setText("Today, " + date);
-            }
-        });
-
-        // Observe user profile
-        viewModel.userProfile().observe(getViewLifecycleOwner(), profile -> {
-            if (profile != null) {
-                // Update avatar
-                // binding.ivScheduleAvatar.setImageResource(R.drawable.ic_launcher_foreground);
+                Log.d(TAG, "Updated sessions list: " + sessions.size() + " items");
             }
         });
 
@@ -125,20 +95,30 @@ public class LecturerScheduleFragment extends Fragment implements ScheduleSessio
     }
 
     @Override
-    public void onSessionClick(LecturerScheduleSession session) {
-        if (session.isCanViewDetail()) {
-            // Navigate to session detail
-            Bundle args = new Bundle();
-            args.putString("sessionId", session.getSessionId());
-            args.putString("courseCode", session.getCourseCode());
-            args.putString("courseName", session.getCourseName());
-            args.putString("className", session.getClassName());
-
-            // Navigate to existing session detail screen
-            navController.navigate(R.id.action_schedule_to_classDetail, args);
+    public void onSessionClick(LecturerScheduleClassSection session) {
+        // Navigate to session detail for Active (ongoing), Completed
+        String status = session.getSessionStatus();
+        if ("Active".equals(status) || "Completed".equals(status)) {
+            navigateToSessionDetail(session);
         } else {
-            Toast.makeText(requireContext(),
-                    "Session detail not available yet", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "Session details not available yet", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    public void onStartSession(LecturerScheduleClassSection session) {
+        // Call ViewModel to start session via API
+        viewModel.startSession(session);
+    }
+    private void navigateToSessionDetail(LecturerScheduleClassSection session) {
+        try {
+            Bundle args = new Bundle();
+            args.putSerializable("session", session);
+            navController.navigate(R.id.action_schedule_to_classDetail, args);
+            Log.d(TAG, "Navigating to session detail: " + session.getSessionId());
+        } catch (Exception e) {
+            Toast.makeText(requireContext(), "Cannot open session details", Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Navigation error", e);
         }
     }
 

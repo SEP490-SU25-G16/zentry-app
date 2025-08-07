@@ -19,14 +19,14 @@ import android.view.ViewGroup;
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentLecturerReportListSessionBinding;
-import vn.edu.fpt.zentryapp.lecturer.adapter.SessionDetailAdapter;
-import vn.edu.fpt.zentryapp.lecturer.data.model.response.SessionDetail;
+import vn.edu.fpt.zentryapp.lecturer.adapter.LecturerListSessionDetailAdapter;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.OverviewSession;
 
-public class LecturerReportListSessionFragment extends Fragment implements SessionDetailAdapter.OnSessionDetailClickListener {
+public class LecturerReportListSessionFragment extends Fragment implements LecturerListSessionDetailAdapter.OnSessionDetailClickListener {
 
     private FragmentLecturerReportListSessionBinding binding;
     private LecturerReportListSessionViewModel viewModel;
-    private SessionDetailAdapter sessionAdapter;
+    private LecturerListSessionDetailAdapter sessionAdapter;
     private NavController navController;
 
     @Nullable
@@ -60,7 +60,7 @@ public class LecturerReportListSessionFragment extends Fragment implements Sessi
     }
 
     private void setupRecyclerView() {
-        sessionAdapter = new SessionDetailAdapter();
+        sessionAdapter = new LecturerListSessionDetailAdapter();
         sessionAdapter.setOnSessionDetailClickListener(this);
 
         LinearLayoutManager layoutManager = new LinearLayoutManager(requireContext());
@@ -109,24 +109,15 @@ public class LecturerReportListSessionFragment extends Fragment implements Sessi
     }
 
     @Override
-    public void onSessionDetailClick(SessionDetail session) {
-        // Only navigate if session is completed or ongoing
-        if ("COMPLETED".equals(session.getStatus()) || "ONGOING".equals(session.getStatus())) {
-            Toast.makeText(requireContext(),
-                    "Opening " + session.getSessionTitle(), Toast.LENGTH_SHORT).show();
+    public void onSessionDetailClick(OverviewSession session) {
+        Toast.makeText(requireContext(),
+                "Opening " + session.getSessionTitle(), Toast.LENGTH_SHORT).show();
 
-            Bundle args = new Bundle();
-            args.putString("sessionId", session.getSessionId());
-            args.putString("courseCode", session.getCourseCode());
-            args.putString("courseName", session.getCourseName());
-            args.putString("className", session.getClassName());
-            args.putInt("sessionNumber", session.getSessionNumber());
+        Bundle args = new Bundle();
+        args.putString("sessionId", session.getSessionId());
+        args.putInt("sessionNumber", session.getSessionNumber());
 
-            navController.navigate(R.id.action_listSession_to_sessionDetail, args);
-        } else {
-            Toast.makeText(requireContext(),
-                    "Session not available yet", Toast.LENGTH_SHORT).show();
-        }
+        navController.navigate(R.id.action_listSession_to_sessionDetail, args);
     }
 
     @Override

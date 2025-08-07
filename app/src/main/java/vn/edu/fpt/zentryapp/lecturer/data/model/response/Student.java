@@ -11,19 +11,15 @@ public class Student {
     private String studentId;
     private String studentCode;
     private String fullName;
-    private String email;
-    private String avatarUrl;
     private boolean isPresent;
-    private String attendanceNote;
-    private long lastModifiedTime;
 
     // Helper methods
     public String getAttendanceStatus() {
-        return isPresent ? "Attended" : "Absent";
+        return isPresent ? "Attended" : "Absented";
     }
 
     public int getAttendanceStatusColor() {
-        return isPresent ? 0xFF388E3C : 0xFFE53935; // Green : Red
+        return isPresent ? 0xFF059669 : 0xFFE53935; // Green : Red
     }
 
     public String getDisplayName() {

@@ -5,6 +5,7 @@ import android.os.Bundle;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
 import androidx.navigation.fragment.NavHostFragment;
@@ -15,6 +16,7 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import vn.edu.fpt.zentryapp.R;
+import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentSettingBinding;
 
 public class StudentSettingFragment extends Fragment {
@@ -23,6 +25,7 @@ public class StudentSettingFragment extends Fragment {
     private NavController navController;
     private boolean hasDevice;
     private boolean hasFaceId;
+    private StudentSettingViewModel viewModel;
 
     @Nullable
     @Override
@@ -38,6 +41,11 @@ public class StudentSettingFragment extends Fragment {
     public void onViewCreated(@NonNull View view,
                               @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+
+        viewModel = new ViewModelProvider(this).get(StudentSettingViewModel.class);
+        AuthManager authManager = AuthManager.getInstance(requireContext());
+        viewModel.init(requireContext(), authManager);
+
         navController = NavHostFragment.findNavController(this);
 
         // Khởi tạo trạng thái đăng ký thiết bị và Face ID từ lưu trữ hoặc API
@@ -66,12 +74,12 @@ public class StudentSettingFragment extends Fragment {
         binding.llStudentSettingRowNotifications.setOnClickListener(v -> {
             try {
                 Log.d("StudentSettingFragment", "Navigating to StudentSettingNotificationFragment");
-                
+
                 // Tạo bundle để truyền source
                 Bundle args = new Bundle();
-                args.putString(StudentSettingNotificationFragment.ARG_SOURCE, 
+                args.putString(StudentSettingNotificationFragment.ARG_SOURCE,
                                StudentSettingNotificationFragment.SOURCE_SETTINGS);
-                
+
                 // Navigate với bundle
                 navController.navigate(R.id.action_studentSetting_to_notifications, args);
             } catch (Exception e) {
@@ -88,22 +96,17 @@ public class StudentSettingFragment extends Fragment {
         binding.llStudentSettingRowLogout.setOnClickListener(v -> {
             try {
                 Log.d("StudentSettingFragment", "Performing logout");
-                
-                // 1. Xóa token và thông tin người dùng
-                vn.edu.fpt.zentryapp.auth.client.AuthManager authManager = 
-                    vn.edu.fpt.zentryapp.auth.client.AuthManager.getInstance(requireContext());
                 authManager.clearTokens();
-                
                 // 2. Điều hướng về LoginFragment với popUpTo để xóa back stack
                 androidx.navigation.NavOptions navOptions = new androidx.navigation.NavOptions.Builder()
                     .setPopUpTo(R.id.nav_graph_root, true)
                     .build();
-                
+
                 // Sử dụng action global logout đã định nghĩa trong nav_graph_root.xml
                 NavController navController = androidx.navigation.Navigation.findNavController(
                     requireActivity(), R.id.nav_host_fragment);
                 navController.navigate(R.id.action_global_logout, null, navOptions);
-                
+
                 Log.d("StudentSettingFragment", "Logout navigation completed");
             } catch (Exception e) {
                 Log.e("StudentSettingFragment", "Error during logout: ", e);

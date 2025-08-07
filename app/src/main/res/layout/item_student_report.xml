@@ -3,95 +3,80 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="16dp"
     android:layout_marginBottom="12dp"
-    android:foreground="?android:attr/selectableItemBackground"
+    android:foreground="?attr/selectableItemBackground"
     app:cardBackgroundColor="#FFFFFF"
-    app:cardCornerRadius="12dp"
-    app:cardElevation="6dp"
     app:strokeWidth="0dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="20dp">
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="12dp">
 
-        <!-- Course Title -->
-        <TextView
-            android:id="@+id/tvCourseTitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:fontFamily="@font/circularstdmedium500"
-            android:maxLines="2"
-            android:text="Course Name"
-            android:textColor="#1A1D29"
-            android:textSize="20sp"
-            android:textStyle="bold" />
-
-        <!-- Course Info -->
-        <TextView
-            android:id="@+id/tvCourseInfo"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text="Lecturer Name"
-            android:textColor="#6B7280"
-            android:textSize="14sp" />
-
-        <!-- Attendance Status -->
-        <TextView
-            android:id="@+id/tvAttendanceStatus"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="Present"
-            android:textColor="#374151"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-
-        <!-- Task Progress Section -->
+        <!-- Nội dung chính -->
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:layout_weight="1"
+            android:orientation="vertical">
 
+            <!-- Course Title -->
             <TextView
-                android:id="@+id/tvTaskProgress"
-                android:layout_width="0dp"
+                android:id="@+id/tvCourseTitle"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Task completed (8/10)"
-                android:textColor="#374151"
-                android:textSize="13sp"
+                android:ellipsize="end"
+                android:fontFamily="@font/mulishextrabold"
+                android:maxLines="1"
+                android:text="Mathematics - G701"
+                android:textColor="#1A1D29"
+                android:textSize="18sp"
                 android:textStyle="bold" />
 
+            <!-- Lecturer Name -->
             <TextView
-                android:id="@+id/tvProgressPercentage"
+                android:id="@+id/tvLecturerName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:fontFamily="@font/jostsemibold"
+                android:text="Lecturer: Hasha"
+                android:textColor="#6B7280"
+                android:textSize="14sp" />
+
+            <!-- Sessions với background tím -->
+            <TextView
+                android:id="@+id/tvSessions"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="80%"
-                android:textColor="#0961F5"
-                android:textSize="12sp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/rounded_purple_background"
+                android:fontFamily="@font/jostsemibold"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="4dp"
+                android:text="15/20 Sessions"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
                 android:textStyle="bold" />
 
         </LinearLayout>
 
-        <!-- Progress Bar -->
-        <ProgressBar
-            android:id="@+id/pbProgress"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="match_parent"
-            android:layout_height="6dp"
-            android:layout_marginTop="8dp"
-            android:progress="80"
-            android:progressDrawable="@drawable/rounded_progressbar"
-            android:progressTint="#0961F5" />
+        <!-- Attendance percentage ở giữa -->
+        <TextView
+            android:id="@+id/tvAttendancePercentage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:background="@drawable/rounded_green_background"
+            android:fontFamily="@font/jostsemibold"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="4dp"
+            android:text="90%"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
 
     </LinearLayout>
 

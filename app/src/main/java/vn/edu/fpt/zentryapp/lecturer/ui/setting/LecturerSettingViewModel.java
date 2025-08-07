@@ -180,15 +180,6 @@ public class LecturerSettingViewModel extends ViewModel {
     }
 
     /**
-     * Get user statistics
-     */
-    public void loadUserStatistics() {
-        // TODO: Load user statistics like total classes, students, etc.
-    }
-
-    // Inner Classes
-
-    /**
      * User profile data
      */
     @Getter
@@ -234,15 +225,5 @@ public class LecturerSettingViewModel extends ViewModel {
         private boolean faceIdEnabled;
         private String appVersion;
         private String deviceInfo;
-    }
-
-    /**
-     * Navigation destinations
-     */
-    public enum SettingDestination {
-        PROFILE,
-        NOTIFICATIONS,
-        DEVICE,
-        LOGOUT
     }
 }

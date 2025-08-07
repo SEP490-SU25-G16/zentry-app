@@ -18,22 +18,20 @@ import android.view.ViewGroup;
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentLecturerReportBinding;
+import vn.edu.fpt.zentryapp.lecturer.adapter.LecturerReportClassSectionAdapter;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerReportClassSection;
 import vn.edu.fpt.zentryapp.lecturer.adapter.SessionAdapter;
-import vn.edu.fpt.zentryapp.lecturer.data.model.response.Session;
 import vn.edu.fpt.zentryapp.notification.sharedviewmodel.NotificationViewModel;
 
 /**
- * Màn hình này gần giống với màn hình Home nhưng cái này là nó hiện thị ra list report session hôm nay
- * ở dạng demo, không phải là chi tiết để khác biệt so với màn hình home là overview cho cả kỳ
- * <p>
- * Màn hình này khi ấn vào thì sẽ thấy được danh sách các cái session trong lớp đó chi tiết, có thể sắp xếp
- * theo chiều mới nhất (ấn cho nhanh)
+ * Màn hình này hiển thị list report các classroom/course với attendance percentage
+ * Khi click vào một classroom sẽ navigate đến danh sách sessions chi tiết của lớp đó
  */
-
-public class LecturerReportFragment extends Fragment implements SessionAdapter.OnSessionClickListener {
+public class LecturerReportFragment extends Fragment implements LecturerReportClassSectionAdapter.OnLecturerReportClassSectionClickListener {
 
     private FragmentLecturerReportBinding binding;
     private LecturerReportViewModel viewModel;
+    private LecturerReportClassSectionAdapter adapter;
     private NotificationViewModel notificationViewModel;
     private SessionAdapter sessionAdapter;
     private NavController navController;
@@ -58,7 +56,7 @@ public class LecturerReportFragment extends Fragment implements SessionAdapter.O
         notificationViewModel = new ViewModelProvider(requireActivity()).get(NotificationViewModel.class);
         AuthManager authManager = AuthManager.getInstance(requireContext());
         viewModel.init(authManager);
-        
+
         // Load notifications để có dữ liệu cho badge
         notificationViewModel.loadNotifications();
 
@@ -68,11 +66,11 @@ public class LecturerReportFragment extends Fragment implements SessionAdapter.O
     }
 
     private void setupRecyclerView() {
-        sessionAdapter = new SessionAdapter();
-        sessionAdapter.setOnSessionClickListener(this);
+        adapter = new LecturerReportClassSectionAdapter();
+        adapter.setOnClassroomClickListener(this);
 
         binding.rvSessions.setLayoutManager(new LinearLayoutManager(requireContext()));
-        binding.rvSessions.setAdapter(sessionAdapter);
+        binding.rvSessions.setAdapter(adapter);
     }
 
     private void setupClickListeners() {
@@ -93,34 +91,15 @@ public class LecturerReportFragment extends Fragment implements SessionAdapter.O
         // Observe loading state
         viewModel.isLoading().observe(getViewLifecycleOwner(), isLoading -> {
             binding.progressLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+
+            // Optional: Show/hide RecyclerView during loading
+            binding.rvSessions.setVisibility(isLoading ? View.GONE : View.VISIBLE);
         });
 
-        // Observe sessions
-        viewModel.todaySessions().observe(getViewLifecycleOwner(), sessions -> {
-            if (sessions != null) {
-                sessionAdapter.setSessions(sessions);
-            }
-        });
-
-        // Observe greeting
-        viewModel.greeting().observe(getViewLifecycleOwner(), greeting -> {
-            if (greeting != null) {
-                binding.tvHomeGreeting.setText(greeting);
-            }
-        });
-
-        // Observe current date
-        viewModel.currentDate().observe(getViewLifecycleOwner(), date -> {
-            if (date != null) {
-//                binding.tvCurrentDate.setText("Today, " + date);
-            }
-        });
-
-        // Observe user profile
-        viewModel.userProfile().observe(getViewLifecycleOwner(), profile -> {
-            if (profile != null) {
-                android.util.Log.d("LecturerReport",
-                        "User loaded: " + profile.getName() + " (" + profile.getRole() + ")");
+        // Observe classrooms data
+        viewModel.classrooms().observe(getViewLifecycleOwner(), classrooms -> {
+            if (classrooms != null) {
+                adapter.setClassrooms(classrooms);
             }
         });
 
@@ -130,7 +109,7 @@ public class LecturerReportFragment extends Fragment implements SessionAdapter.O
                 Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
             }
         });
-        
+
         // Observe notification unseen count để hiển thị badge
         notificationViewModel.getUnseenCount().observe(getViewLifecycleOwner(), unseenCount -> {
             if (unseenCount != null && unseenCount > 0) {
@@ -143,14 +122,18 @@ public class LecturerReportFragment extends Fragment implements SessionAdapter.O
     }
 
     @Override
-    public void onSessionClick(Session session) {
-        Toast.makeText(requireContext(), "Session clicked: " + session.getCourseName(), Toast.LENGTH_SHORT).show();
+    public void onClassroomClick(LecturerReportClassSection classroom) {
+        Toast.makeText(requireContext(),
+                "Classroom clicked: " + classroom.getCourseName(),
+                Toast.LENGTH_SHORT).show();
 
-        // Navigate to list all sessions of this course and class
+        // Navigate to sessions list of this classroom
         Bundle args = new Bundle();
-        args.putString("courseCode", session.getCourseCode());
-        args.putString("className", session.getClassName());
-        args.putString("courseName", session.getCourseName());
+        args.putString("courseName", classroom.getCourseName());
+        args.putString("classInfo", classroom.getClassInfo());
+        args.putInt("studentCount", classroom.getStudentCount());
+        args.putDouble("attendancePercentage", classroom.getAttendancePercentage());
+
         navController.navigate(R.id.action_report_to_listSession, args);
     }
 

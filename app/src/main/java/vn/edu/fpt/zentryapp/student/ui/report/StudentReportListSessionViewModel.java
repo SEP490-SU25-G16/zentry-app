@@ -11,18 +11,18 @@ import java.util.List;
 
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.student.data.model.response.CourseInfo;
-import vn.edu.fpt.zentryapp.student.data.model.response.Session;
+import vn.edu.fpt.zentryapp.student.data.model.response.StudentSession;
 
 public class StudentReportListSessionViewModel extends ViewModel {
 
     private final MutableLiveData<Boolean> _isLoading = new MutableLiveData<>(false);
-    private final MutableLiveData<List<Session>> _sessions = new MutableLiveData<>();
+    private final MutableLiveData<List<StudentSession>> _sessions = new MutableLiveData<>();
     private final MutableLiveData<CourseInfo> _courseInfo = new MutableLiveData<>();
     private final MutableLiveData<String> _errorMessage = new MutableLiveData<>();
     private final MutableLiveData<String> _successMessage = new MutableLiveData<>();
 
     public LiveData<Boolean> isLoading() { return _isLoading; }
-    public LiveData<List<Session>> sessions() { return _sessions; }
+    public LiveData<List<StudentSession>> sessions() { return _sessions; }
     public LiveData<CourseInfo> courseInfo() { return _courseInfo; }
     public LiveData<String> errorMessage() { return _errorMessage; }
     public LiveData<String> successMessage() { return _successMessage; }
@@ -45,8 +45,8 @@ public class StudentReportListSessionViewModel extends ViewModel {
 
         new Handler().postDelayed(() -> {
             try {
-                List<Session> mockSessions = generateMockSessions(courseId);
-                _sessions.setValue(mockSessions);
+                List<StudentSession> mockStudentSessions = generateMockSessions(courseId);
+                _sessions.setValue(mockStudentSessions);
                 _successMessage.setValue("Sessions loaded successfully");
             } catch (Exception e) {
                 _errorMessage.setValue("Failed to load sessions: " + e.getMessage());
@@ -68,11 +68,11 @@ public class StudentReportListSessionViewModel extends ViewModel {
         _courseInfo.setValue(mockCourseInfo);
     }
 
-    private List<Session> generateMockSessions(String courseId) {
-        List<Session> sessions = new ArrayList<>();
+    private List<StudentSession> generateMockSessions(String courseId) {
+        List<StudentSession> studentSessions = new ArrayList<>();
 
         // Week 1
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S001",
                 "Session - 1",
                 "01/01/2025",
@@ -82,7 +82,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Introduction to Algebra"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S002",
                 "Session - 2",
                 "02/01/2025",
@@ -92,7 +92,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Linear Equations"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S003",
                 "Session - 3",
                 "03/01/2025",
@@ -102,7 +102,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Quadratic Functions"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S004",
                 "Session - 4",
                 "04/01/2025",
@@ -112,7 +112,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Graphing Functions"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S005",
                 "Session - 5",
                 "05/01/2025",
@@ -123,7 +123,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
         ));
 
         // Week 2
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S006",
                 "Session - 6",
                 "08/01/2025",
@@ -133,7 +133,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Polynomial Functions"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S007",
                 "Session - 7",
                 "09/01/2025",
@@ -143,7 +143,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Factoring Polynomials"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S008",
                 "Session - 8",
                 "10/01/2025",
@@ -153,7 +153,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Rational Functions"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S009",
                 "Session - 9",
                 "11/01/2025",
@@ -163,7 +163,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Exponential Functions"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S010",
                 "Session - 10",
                 "12/01/2025",
@@ -174,7 +174,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
         ));
 
         // Week 3
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S011",
                 "Session - 11",
                 "15/01/2025",
@@ -184,7 +184,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Trigonometric Functions"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S012",
                 "Session - 12",
                 "16/01/2025",
@@ -194,7 +194,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Unit Circle and Angles"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S013",
                 "Session - 13",
                 "17/01/2025",
@@ -204,7 +204,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Trigonometric Identities"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S014",
                 "Session - 14",
                 "18/01/2025",
@@ -214,7 +214,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Inverse Trigonometric Functions"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S015",
                 "Session - 15",
                 "19/01/2025",
@@ -225,7 +225,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
         ));
 
         // Week 4
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S016",
                 "Session - 16",
                 "22/01/2025",
@@ -235,7 +235,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Arithmetic Sequences"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S017",
                 "Session - 17",
                 "23/01/2025",
@@ -245,7 +245,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Geometric Sequences"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S018",
                 "Session - 18",
                 "24/01/2025",
@@ -255,7 +255,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Limits and Continuity"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S019",
                 "Session - 19",
                 "25/01/2025",
@@ -265,7 +265,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Introduction to Derivatives"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S020",
                 "Session - 20",
                 "26/01/2025",
@@ -276,7 +276,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
         ));
 
         // Week 5
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S021",
                 "Session - 21",
                 "29/01/2025",
@@ -286,7 +286,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Chain Rule"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S022",
                 "Session - 22",
                 "30/01/2025",
@@ -296,7 +296,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Applications of Derivatives"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S023",
                 "Session - 23",
                 "31/01/2025",
@@ -306,7 +306,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Optimization Problems"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S024",
                 "Session - 24",
                 "01/02/2025",
@@ -316,7 +316,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Related Rates"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S025",
                 "Session - 25",
                 "02/02/2025",
@@ -327,7 +327,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
         ));
 
         // Week 6
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S026",
                 "Session - 26",
                 "05/02/2025",
@@ -337,7 +337,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Fundamental Theorem of Calculus"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S027",
                 "Session - 27",
                 "06/02/2025",
@@ -347,7 +347,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Integration Techniques"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S028",
                 "Session - 28",
                 "07/02/2025",
@@ -357,7 +357,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Applications of Integrals"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S029",
                 "Session - 29",
                 "08/02/2025",
@@ -367,7 +367,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Area and Volume Calculations"
         ));
 
-        sessions.add(new Session(
+        studentSessions.add(new StudentSession(
                 "S030",
                 "Session - 30",
                 "09/02/2025",
@@ -377,10 +377,10 @@ public class StudentReportListSessionViewModel extends ViewModel {
                 "Final Review and Assessment"
         ));
 
-        return sessions;
+        return studentSessions;
     }
 
-    public void onSessionClicked(Session session) {
+    public void onSessionClicked(StudentSession studentSession) {
         // TODO: Handle session click for navigation
     }
 }

@@ -40,8 +40,7 @@ public class StudentReportAdapter extends RecyclerView.Adapter<StudentReportAdap
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        StudentReport report = reports.get(position);
-        holder.bind(report);
+        holder.bind(reports.get(position));
     }
 
     @Override
@@ -65,21 +64,17 @@ public class StudentReportAdapter extends RecyclerView.Adapter<StudentReportAdap
         }
 
         public void bind(StudentReport report) {
-            binding.tvCourseTitle.setText(report.getCourseName());
-            binding.tvCourseInfo.setText(report.getLecturer());
-            binding.tvAttendanceStatus.setText(report.getAttendanceStatus());
-            binding.tvTaskProgress.setText(report.getTaskProgressText());
+            // Set course title (Mathematics - G701)
+            binding.tvCourseTitle.setText(report.getCourseTitle());
 
-            int progressPercentage = report.getProgressPercentage();
-            binding.pbProgress.setProgress(progressPercentage);
-            binding.tvProgressPercentage.setText(progressPercentage + "%");
+            // Set lecturer info (Lecturer: Hasha)
+            binding.tvLecturerName.setText(report.getLecturerInfo());
 
-            // Set attendance status color
-            if (report.isPresent()) {
-                binding.tvAttendanceStatus.setTextColor(binding.getRoot().getContext().getColor(android.R.color.holo_green_dark));
-            } else {
-                binding.tvAttendanceStatus.setTextColor(binding.getRoot().getContext().getColor(android.R.color.holo_red_dark));
-            }
+            // Set sessions with purple background (15/20 Sessions)
+            binding.tvSessions.setText(report.getSessionsText());
+
+            // Set attendance percentage with green background (90%)
+            binding.tvAttendancePercentage.setText(report.getAttendancePercentageText());
         }
     }
 }

@@ -36,26 +36,35 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <TextView
-                    android:id="@+id/tvReportGrade"
-                    android:fontFamily="@font/mulishbold"
-                    android:layout_width="wrap_content"
+                <!-- Header - Subject và Grade nằm ngang giãn 2 bên -->
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Grade 07"
-                    android:textColor="#F57C00"
-                    android:textSize="14sp"
-                    android:textStyle="bold"/>
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
 
-                <TextView
-                    android:id="@+id/tvReportSubject"
-                    android:fontFamily="@font/jostsemibold"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="Mathematics"
-                    android:textColor="#232B42"
-                    android:textSize="20sp"
-                    android:textStyle="bold"/>
+                    <TextView
+                        android:id="@+id/tvReportSubject"
+                        android:fontFamily="@font/jostsemibold"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Mathematics"
+                        android:textColor="#232B42"
+                        android:textSize="20sp"
+                        android:textStyle="bold"/>
+
+                    <TextView
+                        android:id="@+id/tvReportGrade"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="G701"
+                        android:textColor="#232B42"
+                        android:textSize="20sp"
+                        android:textStyle="bold"/>
+
+                </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/llReportStats"
@@ -96,7 +105,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:orientation="horizontal"
-                        android:gravity="center_vertical">
+                        android:gravity="center_vertical|end">
 
                         <TextView
                             android:id="@+id/tvReportSessionCount"
@@ -107,6 +116,7 @@
                             android:textSize="14sp"
                             android:textColor="#202244"/>
                     </LinearLayout>
+
                 </LinearLayout>
 
                 <TextView

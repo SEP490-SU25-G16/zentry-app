@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 public class TokenResponse {
     @SerializedName("Token")
     private String token;
+
     @SerializedName("UserInfo")
     private UserInfo userInfo;
 }

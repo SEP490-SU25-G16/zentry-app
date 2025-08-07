@@ -1,34 +1,37 @@
 package vn.edu.fpt.zentryapp.student.ui.schedule;
 
+import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
-import androidx.viewpager2.adapter.FragmentStateAdapter;
-import androidx.viewpager2.widget.ViewPager2;
+import androidx.navigation.NavController;
+import androidx.navigation.fragment.NavHostFragment;
 
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
-import com.google.android.material.tabs.TabLayoutMediator;
+import java.util.Date;
 
-import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentScheduleClassDetailBinding;
-import vn.edu.fpt.zentryapp.student.ui.schedule.tabs.ClassHistoryFragment;
-import vn.edu.fpt.zentryapp.student.ui.schedule.tabs.FinalAttendanceFragment;
+import vn.edu.fpt.zentryapp.student.data.model.response.ScheduleDetailDto;
+import vn.edu.fpt.zentryapp.student.data.model.response.StudentScheduleClassSection;
+import vn.edu.fpt.zentryapp.student.data.model.response.StudentFinalAttendanceDto;
 
 public class StudentScheduleClassDetailFragment extends Fragment {
 
+    private static final String TAG = "StudentClassDetail";
+
     private FragmentStudentScheduleClassDetailBinding binding;
     private StudentScheduleClassDetailViewModel viewModel;
-    private String classId;
+    private NavController navController;
+    private StudentScheduleClassSection session;
 
     @Nullable
     @Override
@@ -44,138 +47,238 @@ public class StudentScheduleClassDetailFragment extends Fragment {
                               @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Get classId from arguments or use default
-        classId = getArguments() != null ?
-                getArguments().getString("classId", "default_class") : "default_class";
+        navController = NavHostFragment.findNavController(this);
+
+        // Get session object from arguments
+        if (getArguments() != null) {
+            session = (StudentScheduleClassSection) getArguments().getSerializable("session");
+        }
 
         // Initialize ViewModel
         viewModel = new ViewModelProvider(this).get(StudentScheduleClassDetailViewModel.class);
         AuthManager authManager = AuthManager.getInstance(requireContext());
-        viewModel.init(authManager, classId);
+        viewModel.init(requireContext(), authManager, session);
 
-        setupToolbar();
-        setupViewPager();
+        setupUI();
         setupClickListeners();
         observeViewModel();
     }
 
-    private void setupToolbar() {
-        binding.ivStudentScheduleClassDetailBack.setOnClickListener(v ->
-                requireActivity().onBackPressed());
+    private void setupUI() {
+        // Set basic info from session object if available
+        if (session != null) {
+            // Course info
+            String courseDisplay = session.getCourseName() + " - " + session.getSectionCode();
+            binding.tvStudentScheduleClassDetailSubject.setText(courseDisplay);
+
+            // Class info - format time display
+            String timeDisplay = formatTimeDisplay(session);
+            binding.tvStudentScheduleClassDetailDuration.setText(timeDisplay);
+
+            // Room info
+            String roomDisplay = session.getBuildingRoomDisplay();
+            binding.tvStudentScheduleClassDetailRoom.setText(roomDisplay);
+
+            // Will be updated from API
+            binding.tvStudentScheduleClassDetailStudentCount.setText("Loading...");
+        }
     }
 
-    private void setupViewPager() {
-        String[] tabTitles = new String[]{"History", "Final Attendance"};
-
-        FragmentStateAdapter adapter = new FragmentStateAdapter(this) {
-            @NonNull
-            @Override
-            public Fragment createFragment(int position) {
-                switch (position) {
-                    case 0:
-                        return ClassHistoryFragment.newInstance(classId);
-                    case 1:
-                        return FinalAttendanceFragment.newInstance(classId);
-                    default:
-                        return new Fragment();
-                }
-            }
-
-            @Override
-            public int getItemCount() {
-                return tabTitles.length;
-            }
-        };
-
-        binding.viewPagerStudentScheduleClassDetail.setAdapter(adapter);
-
-        // Connect TabLayout with ViewPager2
-        new TabLayoutMediator(binding.tabLayoutStudentScheduleClassDetail,
-                binding.viewPagerStudentScheduleClassDetail,
-                (tab, pos) -> tab.setText(tabTitles[pos])
-        ).attach();
-
-        // Thêm listener để cập nhật chiều cao khi chuyển tab
-        binding.viewPagerStudentScheduleClassDetail.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
-            @Override
-            public void onPageSelected(int position) {
-                super.onPageSelected(position);
-                // Request layout lại để tính toán chiều cao mới
-                binding.viewPagerStudentScheduleClassDetail.requestLayout();
-            }
-        });
+    private String formatTimeDisplay(StudentScheduleClassSection session) {
+        try {
+            String dayTime = session.getDayOfWeek() + " " +
+                    session.getStartTime().substring(0, 5) + " - " +
+                    session.getEndTime().substring(0, 5);
+            return dayTime;
+        } catch (Exception e) {
+            return "Schedule not available";
+        }
     }
-
 
     private void setupClickListeners() {
+        // Back button
+        binding.ivStudentScheduleClassDetailBack.setOnClickListener(v ->
+                navController.navigateUp());
 
-        // Notification button click
+        // Notification button
         binding.btnStudentScheduleClassDetailNotification.setOnClickListener(v -> {
             Toast.makeText(requireContext(), "Notifications", Toast.LENGTH_SHORT).show();
-            viewModel.onNotificationClicked();
+        });
+
+        // Claim Request button
+        binding.btnStudentScheduleClassDetailClaimRequest.setOnClickListener(v -> {
+            // TODO: Implement claim request functionality
+            Toast.makeText(requireContext(), "Claim Request clicked", Toast.LENGTH_SHORT).show();
         });
     }
 
     private void observeViewModel() {
-        // Observe loading state
+        // Loading state
         viewModel.isLoading().observe(getViewLifecycleOwner(), isLoading -> {
-            // You can add a loading indicator if needed
-            // binding.progressLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+            Log.d(TAG, "Loading: " + isLoading);
         });
 
-        // Observe class detail
-        viewModel.classDetail().observe(getViewLifecycleOwner(), classDetail -> {
-            if (classDetail != null) {
-                binding.tvStudentScheduleClassDetailGrade.setText(classDetail.getGrade());
-                binding.tvStudentScheduleClassDetailSubject.setText(classDetail.getSubject());
-                binding.tvStudentScheduleClassDetailDurationLabel.setText(classDetail.getDuration());
-                Log.d("ClassDetail", "Class loaded: " + classDetail.getSubject() + " - " + classDetail.getGrade());
+        viewModel.classSectionDetail().observe(getViewLifecycleOwner(), scheduleDetail -> {
+            if (scheduleDetail != null) {
+                updateScheduleDetailUI(scheduleDetail);
             }
         });
 
-        // Observe success messages
-        viewModel.successMessage().observe(getViewLifecycleOwner(), message -> {
-            if (message != null) {
-                Log.d("ClassDetail", message);
+        // Student final attendance
+        viewModel.studentFinalAttendance().observe(getViewLifecycleOwner(), attendanceData -> {
+            if (attendanceData != null) {
+                updateStudentAttendanceUI(attendanceData);
             }
         });
 
-        // Observe error messages
+        // Error handling
         viewModel.errorMessage().observe(getViewLifecycleOwner(), error -> {
             if (error != null) {
                 Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
-
-                // Show retry dialog for network errors
-                if (error.contains("network") || error.contains("connection")) {
-                    showRetryDialog();
-                }
             }
         });
     }
 
-    private void showRetryDialog() {
-        new AlertDialog.Builder(requireContext())
-                .setTitle("Connection Error")
-                .setMessage("Unable to load class details. Would you like to retry?")
-                .setPositiveButton("Retry", (dialog, which) -> {
-                    viewModel.loadClassDetail(classId);
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+    // Method để update UI với schedule detail data
+    private void updateScheduleDetailUI(ScheduleDetailDto scheduleDetail) {
+        // Update course name với data từ API
+        String courseDisplay = scheduleDetail.getFormattedCourseDisplay();
+        binding.tvStudentScheduleClassDetailSubject.setText(courseDisplay);
+
+        // Update student count từ API
+        String studentCountDisplay = scheduleDetail.getFormattedStudentCount();
+        binding.tvStudentScheduleClassDetailStudentCount.setText(studentCountDisplay);
+
+        // Update duration từ API
+        String durationDisplay = scheduleDetail.getFormattedDuration();
+        binding.tvStudentScheduleClassDetailDuration.setText(durationDisplay);
+
+        // Update room display từ API
+        String roomDisplay = scheduleDetail.getFormattedRoomDisplay();
+        binding.tvStudentScheduleClassDetailRoom.setText(roomDisplay);
+    }
+
+    private void updateStudentAttendanceUI(StudentFinalAttendanceDto attendanceData) {
+        // ✅ Update student info section
+        binding.tvStudentName.setText(attendanceData.getFullName());
+        binding.tvStudentId.setText("ID: " + attendanceData.getStudentId().substring(0, 8).toUpperCase());
+
+        // ✅ Update attendance statistics
+        updateAttendanceStatistics(attendanceData);
+
+        // ✅ Update final status button
+        updateFinalStatusButton(attendanceData);
+
+        Log.d(TAG, "Updated UI - Student: " + attendanceData.getFullName() +
+                ", Status: " + attendanceData.getSessionStatus() +
+                ", Percentage: " + attendanceData.getFinalAttendancePercentage() + "%");
+    }
+
+    private void updateAttendanceStatistics(StudentFinalAttendanceDto attendanceData) {
+        // ✅ Update attended rounds
+        binding.tvAttendedRounds.setText(String.valueOf(attendanceData.getAttendedRoundsCount()));
+
+        // ✅ Update missed rounds
+        int missedRounds = attendanceData.getTotalRounds() - attendanceData.getAttendedRoundsCount();
+        binding.tvMissedRounds.setText(String.valueOf(missedRounds));
+
+        // ✅ Update attendance percentage (circular progress)
+        int percentage = (int) Math.round(attendanceData.getFinalAttendancePercentage());
+        binding.tvAttendancePercentage.setText(percentage + "%");
+
+        // ✅ Update total rounds display
+        String totalDisplay = String.format("Total: %d/%d",
+                attendanceData.getAttendedRoundsCount(),
+                attendanceData.getTotalRounds());
+        binding.tvTotalRounds.setText(totalDisplay);
+
+        // ✅ Update percentage circle color based on attendance
+        if (percentage >= 80) {
+            // Green for good attendance (80%+)
+            binding.tvAttendancePercentage.getParent(); // MaterialCardView parent will keep green background
+        } else if (percentage >= 50) {
+            // Could add orange/yellow for medium attendance if needed
+        } else {
+            // Could add red background for low attendance if needed
+        }
+    }
+
+    private void updateFinalStatusButton(StudentFinalAttendanceDto attendanceData) {
+        String status;
+        String backgroundColor;
+
+        String sessionStatus = attendanceData.getSessionStatus().toLowerCase();
+
+        // ✅ Check if Active session has ended
+        boolean isActiveSessionEnded = false;
+        if ("active".equals(sessionStatus) && session != null) {
+            Date currentTime = new Date();
+            Date endTime = session.getEndTimeAsDate();
+
+            if (endTime != null) {
+                isActiveSessionEnded = currentTime.after(endTime);
+                Log.d(TAG, String.format("Active session check: CurrentTime=%s, EndTime=%s, HasEnded=%s",
+                        currentTime, endTime, isActiveSessionEnded));
+            }
+        }
+
+        // ✅ Determine status and color
+        switch (sessionStatus) {
+            case "active":
+                if (isActiveSessionEnded) {
+                    // Active session has ended - check attendance
+                    if (attendanceData.getFinalAttendancePercentage() >= 80.0) {
+                        status = "Attended";
+                        backgroundColor = "#10B981"; // Green
+                    } else {
+                        status = "Absent";
+                        backgroundColor = "#EF4444"; // Red
+                    }
+                } else {
+                    // Active and still ongoing
+                    status = "Ongoing";
+                    backgroundColor = "#F59E0B"; // Orange
+                }
+                break;
+
+            case "completed":
+                // Session completed - check attendance percentage
+                if (attendanceData.getFinalAttendancePercentage() >= 80.0) {
+                    status = "Attended";
+                    backgroundColor = "#10B981"; // Green
+                } else {
+                    status = "Absent";
+                    backgroundColor = "#EF4444"; // Red
+                }
+                break;
+
+            case "missed":
+                // Session was missed
+                status = "Missed";
+                backgroundColor = "#EF4444"; // Red
+                break;
+
+            default:
+                // Fallback
+                status = "Unknown";
+                backgroundColor = "#64748B"; // Gray
+                break;
+        }
+
+        // ✅ Update final status button
+        binding.btnFinalAttendanceStatus.setText(status);
+        binding.btnFinalAttendanceStatus.setBackgroundTintList(
+                android.content.res.ColorStateList.valueOf(Color.parseColor(backgroundColor))
+        );
+
+        Log.d(TAG, String.format("Final status updated: %s (Session: %s, IsActiveEnded: %s, Percentage: %.1f%%)",
+                status, attendanceData.getSessionStatus(), isActiveSessionEnded,
+                attendanceData.getFinalAttendancePercentage()));
     }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
         binding = null;
-    }
-
-    // Static method to create fragment with arguments
-    public static StudentScheduleClassDetailFragment newInstance(String classId) {
-        StudentScheduleClassDetailFragment fragment = new StudentScheduleClassDetailFragment();
-        Bundle args = new Bundle();
-        args.putString("classId", classId);
-        fragment.setArguments(args);
-        return fragment;
     }
 }
