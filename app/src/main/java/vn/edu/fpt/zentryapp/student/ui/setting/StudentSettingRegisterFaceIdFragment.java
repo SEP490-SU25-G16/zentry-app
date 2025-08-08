@@ -1214,7 +1214,8 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
         try {
             // Initialize the FaceIdEnhancer
             faceIdEnhancer = new FaceIdEnhancer(getContext(), this);
-            faceIdEnhancer.setChallengeType(FaceIdEnhancer.ChallengeType.BLINK_AND_GAZE);
+            // Only require gaze (RIGHT -> LEFT) to match current UX and avoid blocking on blink
+            faceIdEnhancer.setChallengeType(FaceIdEnhancer.ChallengeType.GAZE_ONLY);
             faceIdEnhancerInitialized = true;
             Log.d(TAG, "FaceIdEnhancer initialized successfully");
         } catch (Exception e) {
@@ -1266,35 +1267,16 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
             // User completed gaze challenge
             if (binding != null) {
                 // Update status message
-                binding.tvStatusMessage.setText("Gaze verified!");
-                binding.tvInstructionMessage.setText("Completing verification...");
+                binding.tvStatusMessage.setText("Gaze verified! ✓");
+                binding.tvInstructionMessage.setText("Look straight at the camera");
                 
                 // Update progress indicators
                 binding.ivGazeIndicator.setColorFilter(
                     ContextCompat.getColor(requireContext(), R.color.success_green), 
                     android.graphics.PorterDuff.Mode.SRC_IN);
             }
-
-            // Treat successful gaze as sufficient to proceed to registration analysis
-            if (spoofDetectionManager != null) {
-                spoofDetectionManager.markLivenessSuccess();
-            }
-            if (binding != null && binding.llLivenessProgress != null) {
-                binding.llLivenessProgress.setVisibility(View.GONE);
-            }
-            if (faceOverlayView != null) {
-                faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.success_green));
-            }
-
-            // Move forward into analysis flow
-            if (currentFaceRect != null) {
-                stateManager.transitionTo(FaceRegistrationState.FACE_STABLE, "Perfect! Processing...");
-                if (!isAnalyzing) {
-                    startAnalysis();
-                }
-            } else {
-                stateManager.transitionTo(FaceRegistrationState.FACE_DETECTED, "Face detected");
-            }
+            // Kick off verification complete quickly to avoid getting stuck on this screen
+            // Let FaceIdEnhancer emit VERIFIED promptly after completing the sequence
         } else if (newState == FaceIdEnhancer.AuthState.VERIFIED) {
             // All liveness challenges completed
             Log.d(TAG, "Liveness verification complete!");
@@ -1374,45 +1356,58 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
                 });
         }
     }
+
+    @Override
+    public void onGazeStepVerified(FaceIdEnhancer.Direction direction, int stepIndex, int totalSteps) {
+        if (!isAdded()) return;
+
+        // Haptic feedback: vibrate briefly for confirmation
+        try {
+            android.os.Vibrator v = (android.os.Vibrator) requireContext().getSystemService(android.content.Context.VIBRATOR_SERVICE);
+            if (v != null) {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    v.vibrate(android.os.VibrationEffect.createOneShot(60, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
+                } else {
+                    v.vibrate(60);
+                }
+            }
+        } catch (Exception ignored) {}
+
+        // Update UI instruction to next step
+        if (binding != null) {
+            if (stepIndex + 1 < totalSteps) {
+                // Next direction required
+                FaceIdEnhancer.Direction next = (direction == FaceIdEnhancer.Direction.RIGHT) ? FaceIdEnhancer.Direction.LEFT : FaceIdEnhancer.Direction.RIGHT;
+                binding.tvStatusMessage.setText("Good! ✓");
+                binding.tvInstructionMessage.setText(next == FaceIdEnhancer.Direction.LEFT ? "Please look left" : "Please look right");
+            } else {
+                // Sequence completed; ask user to look straight for analysis
+                binding.tvStatusMessage.setText("Gaze verified! ✓");
+                binding.tvInstructionMessage.setText("Look straight at the camera");
+            }
+
+            // Mark the corresponding icon as green
+            if (direction == FaceIdEnhancer.Direction.RIGHT) {
+                binding.ivGazeIndicator.setColorFilter(
+                    ContextCompat.getColor(requireContext(), R.color.success_green),
+                    android.graphics.PorterDuff.Mode.SRC_IN);
+            }
+        }
+    }
+
+    @Override
+    public void onGazePrompt(FaceIdEnhancer.Direction required, int stepIndex, int totalSteps) {
+        if (!isAdded() || binding == null) return;
+        String prompt = required == FaceIdEnhancer.Direction.LEFT ? "Please look left" : "Please look right";
+        binding.tvInstructionMessage.setText(prompt);
+        binding.tvStatusMessage.setText("Step " + (stepIndex + 1) + "/" + totalSteps);
+    }
     
     @Override
     public void onGazeDirectionChanged(float x, float y) {
         if (!isAdded()) return;
-        
-        // Add visual indicator for gaze direction
-        Log.d(TAG, "👀 Gaze direction: x=" + x + ", y=" + y);
-        
-        if (binding != null) {
-            // Update instruction based on gaze direction
-            String direction = "";
-            if (x < -0.3f) {
-                direction = "Looking left ✓";
-                binding.tvInstructionMessage.setText("Now look right and up");
-            } else if (x > 0.3f) {
-                direction = "Looking right ✓";
-                binding.tvInstructionMessage.setText("Now look up");
-            } else if (y < -0.3f) {
-                direction = "Looking up ✓";
-                binding.tvInstructionMessage.setText("Great! Keep following directions");
-            } else if (y > 0.3f) {
-                direction = "Looking down ✓";
-            }
-            
-            // Only update if we detected a specific direction
-            if (!direction.isEmpty()) {
-                binding.tvStatusMessage.setText(direction);
-                
-                // Add subtle animation to gaze indicator
-                binding.ivGazeIndicator.animate()
-                    .alpha(0.7f)
-                    .setDuration(100)
-                    .withEndAction(() -> {
-                        binding.ivGazeIndicator.animate()
-                            .alpha(1.0f)
-                            .setDuration(100);
-                    });
-            }
-        }
+        // Keep lightweight; prompts are driven by onGazePrompt/onGazeStepVerified
+        Log.d(TAG, "👀 Gaze direction (adjusted): x=" + x + ", y=" + y);
     }
     
     @Override
@@ -1490,6 +1485,7 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == CAMERA_PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startCamera();

@@ -79,6 +79,10 @@ public class FaceIdEnhancer implements
         void onGazeDirectionChanged(float x, float y);
         void onLivenessVerified(boolean isLive);
         void onVerificationComplete(boolean success);
+        // New: notify when a gaze direction step is completed
+        void onGazeStepVerified(Direction direction, int stepIndex, int totalSteps);
+        // New: continually prompt required gaze direction to the UI
+        void onGazePrompt(Direction required, int stepIndex, int totalSteps);
     }
     
     private FaceIdEnhancerCallback callback;
@@ -124,9 +128,10 @@ public class FaceIdEnhancer implements
         
         Log.d(TAG, "Face ID enhancer initialized");
 
-        // Default gaze challenge pattern: look RIGHT once
+        // Default gaze challenge pattern: look RIGHT then LEFT
         this.requiredDirections.clear();
         this.requiredDirections.add(Direction.RIGHT);
+        this.requiredDirections.add(Direction.LEFT);
         this.currentDirectionIndex = 0;
         this.directionStableFrames = 0;
     }
@@ -385,6 +390,11 @@ public class FaceIdEnhancer implements
             return;
         }
 
+        // Prompt UI about current required direction on every update (idempotent)
+        if (callback != null) {
+            callback.onGazePrompt(currentRequired, currentDirectionIndex, requiredDirections.size());
+        }
+
         // Front camera preview is mirrored; adjust x so UI directions match what user sees
         float adjX = -x;
         float adjY = y; // vertical not mirrored in our preview transform
@@ -419,11 +429,8 @@ public class FaceIdEnhancer implements
 
         if (directionStableFrames >= DIRECTION_STABLE_FRAMES_REQUIRED) {
             // Mark this direction as completed and advance to next
-            if (currentRequired == Direction.LEFT) {
-                // legacy flags for compatibility
-                // no-op
-            } else if (currentRequired == Direction.RIGHT) {
-                // no-op
+            if (callback != null) {
+                callback.onGazeStepVerified(currentRequired, currentDirectionIndex, requiredDirections.size());
             }
             currentDirectionIndex++;
             directionStableFrames = 0;

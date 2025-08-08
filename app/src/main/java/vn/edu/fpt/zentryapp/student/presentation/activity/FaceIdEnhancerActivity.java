@@ -27,13 +27,6 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.mediapipe.tasks.vision.facedetector.FaceDetectorResult;
-import com.google.mediapipe.tasks.vision.facedetector.FaceDetector.FaceDetectorOptions;
-import com.google.mediapipe.tasks.vision.core.RunningMode;
-import com.google.mediapipe.framework.image.BitmapImageBuilder;
-import com.google.mediapipe.framework.image.MPImage;
-import com.google.mediapipe.tasks.components.containers.Detection;
-import com.google.mediapipe.tasks.core.BaseOptions;
 
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -87,8 +80,8 @@ public class FaceIdEnhancerActivity extends AppCompatActivity implements
         // Initialize face ID enhancer
         faceIdEnhancer = new FaceIdEnhancer(this, this);
         
-        // Set challenge type (can be customized)
-        faceIdEnhancer.setChallengeType(FaceIdEnhancer.ChallengeType.BLINK_AND_GAZE);
+        // Set challenge type: only gaze (RIGHT -> LEFT)
+        faceIdEnhancer.setChallengeType(FaceIdEnhancer.ChallengeType.GAZE_ONLY);
         
         // Check camera permission
         if (allPermissionsGranted()) {
@@ -280,8 +273,9 @@ public class FaceIdEnhancerActivity extends AppCompatActivity implements
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, 
                                           @NonNull int[] grantResults) {
+        // Call super to satisfy lint and keep behavior consistent
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        
+        // Handle permission result
         if (requestCode == REQUEST_CAMERA_PERMISSION) {
             if (allPermissionsGranted()) {
                 startCamera();
@@ -324,12 +318,17 @@ public class FaceIdEnhancerActivity extends AppCompatActivity implements
                 Log.d(TAG, "Blink verified, now need gaze verification");
                 break;
             case GAZE_VERIFIED:
-                updateStatus("Gaze verified");
+                updateStatus("Gaze verified. Look straight for analysis");
                 Log.d(TAG, "Gaze verified, completing verification");
                 break;
             case VERIFIED:
                 updateStatus("Verification successful!");
                 Log.d(TAG, "Liveness verification completed successfully");
+                // After full verification, proceed to next flow or finish
+                runOnUiThread(() -> {
+                    Toast.makeText(this, "Liveness verified. Proceeding...", Toast.LENGTH_SHORT).show();
+                    finish();
+                });
                 break;
             case FAILED:
                 updateStatus("Verification failed");
@@ -388,5 +387,39 @@ public class FaceIdEnhancerActivity extends AppCompatActivity implements
                 // Could show error message or retry option
             });
         }
+    }
+
+    @Override
+    public void onGazeStepVerified(FaceIdEnhancer.Direction direction, int stepIndex, int totalSteps) {
+        runOnUiThread(() -> {
+            try {
+                android.os.Vibrator v = (android.os.Vibrator) getSystemService(android.content.Context.VIBRATOR_SERVICE);
+                if (v != null) {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        v.vibrate(android.os.VibrationEffect.createOneShot(60, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
+                    } else {
+                        v.vibrate(60);
+                    }
+                }
+            } catch (Exception ignored) {}
+
+            // Update UI to show step success and next instruction
+            statusTextView.setText("Step " + (stepIndex + 1) + " ✓");
+            if (stepIndex + 1 < totalSteps) {
+                boolean nextLeft = (direction == FaceIdEnhancer.Direction.RIGHT);
+                instructionTextView.setText(nextLeft ? "Please look left" : "Please look right");
+            } else {
+                instructionTextView.setText("Look straight at the camera");
+            }
+        });
+    }
+
+    @Override
+    public void onGazePrompt(FaceIdEnhancer.Direction required, int stepIndex, int totalSteps) {
+        runOnUiThread(() -> {
+            String prompt = required == FaceIdEnhancer.Direction.LEFT ? "Please look left" : "Please look right";
+            instructionTextView.setText(prompt);
+            statusTextView.setText("Step " + (stepIndex + 1) + "/" + totalSteps);
+        });
     }
 }
