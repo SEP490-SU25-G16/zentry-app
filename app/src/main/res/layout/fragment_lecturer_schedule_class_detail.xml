@@ -224,6 +224,23 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
+        <!-- Notification Badge -->
+        <TextView
+            android:id="@+id/tvNotificationBadge"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginEnd="2dp"
+            android:background="@drawable/bg_notification_badge"
+            android:gravity="center"
+            android:text=""
+            android:textColor="@android:color/white"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="@+id/btnScheduleClassDetailNotification"
+            app:layout_constraintTop_toTopOf="@+id/btnScheduleClassDetailNotification" />
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 
 </FrameLayout>

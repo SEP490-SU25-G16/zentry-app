@@ -8,13 +8,6 @@ import java.util.List;
 
 import lombok.Getter;
 
-/**
- * Detector for eye blinks using the Eye Aspect Ratio (EAR) algorithm
- * Based on the paper: "Real-Time Eye Blink Detection using Facial Landmarks"
- * by Soukupová and Čech (2016)
- * 
- * OPTIMIZED FOR REAL DATA PERFORMANCE
- */
 public class EyeBlinkDetector {
     private static final String TAG = "EyeBlinkDetector";
     

@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * MediaPipe-based face landmark extractor for real-time facial landmark detection
@@ -49,6 +50,9 @@ public class MediaPipeFaceLandmarkExtractor {
     private final FaceLandmarker faceLandmarker;
     private final ExecutorService executor;
     private final Handler mainHandler;
+    
+    // Add volatile flag to track executor state
+    private volatile boolean isExecutorActive = true;
     
     // Landmark storage
     private List<PointF> leftEyePoints = new ArrayList<>();
@@ -126,6 +130,14 @@ public class MediaPipeFaceLandmarkExtractor {
         return faceLandmarker != null;
     }
 
+    /**
+     * Check if the extractor is still active and can be used
+     * @return true if the extractor is active, false otherwise
+     */
+    public boolean isActive() {
+        return isExecutorActive && !executor.isShutdown() && !executor.isTerminated();
+    }
+
 
     /**
      * Callback for face landmark extraction results
@@ -164,8 +176,24 @@ public class MediaPipeFaceLandmarkExtractor {
      * @param callback Callback for extraction results
      */
     public void extractLandmarks(Bitmap faceBitmap, Rect faceRect, LandmarkExtractionCallback callback) {
+        // Check if executor is still active before executing
+        if (!isExecutorActive || executor.isShutdown() || executor.isTerminated()) {
+            Log.w(TAG, "Executor is not active, skipping landmark extraction");
+            if (callback != null) {
+                runOnMainThread(() -> callback.onLandmarksExtracted(false));
+            }
+            return;
+        }
+        
         executor.execute(() -> {
             try {
+                // Double-check executor state inside the task
+                if (!isExecutorActive || executor.isShutdown() || executor.isTerminated()) {
+                    Log.w(TAG, "Executor became inactive during task execution");
+                    runOnMainThread(() -> callback.onLandmarksExtracted(false));
+                    return;
+                }
+                
                 // Check if faceLandmarker is available (real model loaded)
                 if (faceLandmarker == null) {
                     Log.e(TAG, "MediaPipe FaceLandmarker not available!");
@@ -558,12 +586,33 @@ public class MediaPipeFaceLandmarkExtractor {
      */
     public void close() {
         try {
+            // Set executor as inactive first
+            isExecutorActive = false;
+            
             if (faceLandmarker != null) {
                 faceLandmarker.close();
             }
-            if (executor != null) {
+            
+            if (executor != null && !executor.isShutdown()) {
+                // Shutdown the executor gracefully
                 executor.shutdown();
+                
+                // Wait for tasks to complete with timeout
+                try {
+                    if (!executor.awaitTermination(2, TimeUnit.SECONDS)) {
+                        // Force shutdown if tasks don't complete in time
+                        executor.shutdownNow();
+                        if (!executor.awaitTermination(1, TimeUnit.SECONDS)) {
+                            Log.w(TAG, "Executor did not terminate gracefully");
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    // Force shutdown on interruption
+                    executor.shutdownNow();
+                    Thread.currentThread().interrupt();
+                }
             }
+            
             Log.d(TAG, "MediaPipe face landmark extractor closed");
         } catch (Exception e) {
             Log.e(TAG, "Error closing MediaPipe face landmark extractor", e);

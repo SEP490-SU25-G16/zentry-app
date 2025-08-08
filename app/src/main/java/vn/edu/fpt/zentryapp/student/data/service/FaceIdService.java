@@ -37,36 +37,17 @@ public class FaceIdService {
     private final Context context;
     private FaceDetector faceDetector;
     private FaceEmbedding faceEmbedding;
-    /**
-     * -- GETTER --
-     *  Get FaceSpoofDetector instance for advanced spoof detection management
-     *
-     * @return FaceSpoofDetector instance or null if not initialized
-     */
+
     @Getter
     private FaceSpoofDetector faceSpoofDetector;
+
+    @Getter
     private GazeEstimator gazeEstimator; // Add GazeEstimator field
-    
-    /**
-     * Get the GazeEstimator instance
-     * @return GazeEstimator instance or null if not initialized
-     */
-    public GazeEstimator getGazeEstimator() {
-        return gazeEstimator;
-    }
-    
+
     // 🔧 NEW: MediaPipe FaceLandmarkExtractor for real landmark detection
     @Getter
     private MediaPipeFaceLandmarkExtractor mediaPipeFaceLandmarkExtractor;
-    
-    /**
-     * Get the MediaPipeFaceLandmarkExtractor instance
-     * @return MediaPipeFaceLandmarkExtractor instance or null if not initialized
-     */
-    public MediaPipeFaceLandmarkExtractor getMediaPipeFaceLandmarkExtractor() {
-        return mediaPipeFaceLandmarkExtractor;
-    }
-    
+
     private final FaceIdApi faceIdApi;
     private final ExecutorService executor;
     private final Handler mainHandler;
@@ -1058,5 +1039,57 @@ public class FaceIdService {
     
     private void runOnMainThread(Runnable runnable) {
         mainHandler.post(runnable);
+    }
+    
+    /**
+     * Close and release all resources
+     */
+    public void close() {
+        try {
+            Log.d(TAG, "Closing FaceIdService and releasing resources");
+            
+            // Close MediaPipeFaceLandmarkExtractor
+            if (mediaPipeFaceLandmarkExtractor != null) {
+                mediaPipeFaceLandmarkExtractor.close();
+                mediaPipeFaceLandmarkExtractor = null;
+            }
+            
+            // Close other components if they have close methods
+            if (faceDetector != null && faceDetector instanceof AutoCloseable) {
+                try {
+                    ((AutoCloseable) faceDetector).close();
+                } catch (Exception e) {
+                    Log.w(TAG, "Error closing faceDetector", e);
+                }
+            }
+            
+            if (faceEmbedding != null && faceEmbedding instanceof AutoCloseable) {
+                try {
+                    ((AutoCloseable) faceEmbedding).close();
+                } catch (Exception e) {
+                    Log.w(TAG, "Error closing faceEmbedding", e);
+                }
+            }
+            
+            if (faceSpoofDetector != null && faceSpoofDetector instanceof AutoCloseable) {
+                try {
+                    ((AutoCloseable) faceSpoofDetector).close();
+                } catch (Exception e) {
+                    Log.w(TAG, "Error closing faceSpoofDetector", e);
+                }
+            }
+            
+            if (gazeEstimator != null && gazeEstimator instanceof AutoCloseable) {
+                try {
+                    ((AutoCloseable) gazeEstimator).close();
+                } catch (Exception e) {
+                    Log.w(TAG, "Error closing gazeEstimator", e);
+                }
+            }
+            
+            Log.d(TAG, "FaceIdService closed successfully");
+        } catch (Exception e) {
+            Log.e(TAG, "Error closing FaceIdService", e);
+        }
     }
 } 

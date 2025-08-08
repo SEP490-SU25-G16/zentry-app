@@ -134,6 +134,13 @@ public class FaceIdEnhancer implements
             return;
         }
         
+        // Check if landmarkExtractor is still active
+        if (landmarkExtractor == null || !landmarkExtractor.isActive()) {
+            Log.w(TAG, "LandmarkExtractor is not active, skipping frame processing");
+            isProcessing.set(false);
+            return;
+        }
+        
         // Update state if needed
         if (currentState == AuthState.WAITING) {
             updateState(AuthState.FACE_DETECTED);

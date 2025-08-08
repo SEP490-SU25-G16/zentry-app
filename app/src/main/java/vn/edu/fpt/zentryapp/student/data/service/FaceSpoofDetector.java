@@ -39,19 +39,18 @@ public class FaceSpoofDetector {
     private static final int INPUT_IMAGE_DIM = 80;
     private static final int OUTPUT_DIM = 3;
 
-    // Updated confidence thresholds - much more lenient now
+    // Updated confidence thresholds - stricter to prevent false negatives
+    private static final float SPOOF_CONFIDENCE_THRESHOLD = 0.90f; // Higher threshold for spoofing (was 0.85f)
+    private static final float SPOOF_REAL_RATIO_THRESHOLD = 2.5f;  // Spoof must be 2.5x higher than real (was 2.0f)
 
-    private static final float SPOOF_CONFIDENCE_THRESHOLD = 0.85f; // Higher threshold for spoofing (was 0.80f)
-    private static final float SPOOF_REAL_RATIO_THRESHOLD = 2.0f;  // Spoof must be 2.0x higher than real (was 1.5f)
+    // Temporal variance parameters - stricter to detect replay attacks
+    private static final float MIN_POSITION_VARIANCE = 0.001f;  // Restored to original value for better movement detection
+    private static final float MAX_POSITION_VARIANCE = 0.04f;   // Slightly reduced from 0.05f
+    private static final float MIN_SIZE_VARIANCE = 0.0005f;     // Restored to original value for better variance detection
+    private static final float MAX_SIZE_VARIANCE = 0.03f;       // Restored to original value
 
-    // Temporal variance parameters - much more lenient now
-    private static final float MIN_POSITION_VARIANCE = 0.0005f; // Was 0.001f - Less minimum movement required
-    private static final float MAX_POSITION_VARIANCE = 0.05f;   // Was 0.03f - Allow more movement
-    private static final float MIN_SIZE_VARIANCE = 0.0001f;     // Was 0.0005f - Less minimum size variance required
-    private static final float MAX_SIZE_VARIANCE = 0.04f;       // Was 0.02f - Allow more size variance
-
-    // Face-oval ratio constants - much more lenient now
-    private static final float MAX_FACE_OUTSIDE_RATIO = 1.0f/8.0f; // Max extension outside oval (was 1/15)
+    // Face-oval ratio constants - stricter to ensure face is properly positioned
+    private static final float MAX_FACE_OUTSIDE_RATIO = 1.0f/12.0f; // Max extension outside oval (was 1/8)
 
     // Frame history for temporal analysis
     private static final int FRAME_HISTORY_SIZE = 8;
@@ -355,40 +354,45 @@ public class FaceSpoofDetector {
             float confidence;
 
             // Case 1: Strong ML model confidence for real face - prioritize model results
-            if (combined[0] > 0.65f && !modelIndicatesSpoof) { // Reduced from 0.70
+            if (combined[0] > 0.70f && !modelIndicatesSpoof) { // Increased from 0.65f for higher confidence
                 isSpoof = false;
                 confidence = combined[0];
                 Log.d(TAG, "🟢 HIGH CONFIDENCE REAL: Strong ML model confidence");
             }
-            // Case 2: Good ML confidence + at least valid position OR natural movement
-            else if (combined[0] > 0.60f && !modelIndicatesSpoof && (isWithinOvalBoundary || hasNaturalMovement)) {
+            // Case 2: Good ML confidence + both valid position AND natural movement
+            else if (combined[0] > 0.65f && !modelIndicatesSpoof && isWithinOvalBoundary && hasNaturalMovement) {
+                // Require both conditions now, not just one
                 isSpoof = false;
                 confidence = combined[0];
-                Log.d(TAG, "🟢 GOOD CONFIDENCE REAL: ML model + partial validation");
+                Log.d(TAG, "🟢 GOOD CONFIDENCE REAL: ML model + full validation");
             }
-            // Case 3: Decent ML confidence - we trust the model more now
-            else if (combined[0] > 0.58f && !modelIndicatesSpoof) {
+            // Case 3: Decent ML confidence - only if no uniform texture detected
+            else if (combined[0] > 0.62f && !modelIndicatesSpoof && !hasUniformTexture) {
+                // Added !hasUniformTexture check and increased threshold from 0.58f
                 isSpoof = false;
                 confidence = combined[0];
                 Log.d(TAG, "🟢 ACCEPTABLE REAL: ML model result trusted");
             }
-            // Case 4: Strong spoof indicators - multiple red flags
+            // Case 4: Strong spoof indicators - multiple red flags (strengthened)
             else if ((modelIndicatesSpoof && hasUniformTexture) || 
-                     (modelIndicatesSpoof && !hasNaturalMovement && !isWithinOvalBoundary)) {
+                     (modelIndicatesSpoof && (!hasNaturalMovement || !isWithinOvalBoundary)) ||
+                     (hasUniformTexture && !hasNaturalMovement)) {
+                // Added new condition: uniform texture + no natural movement
                 isSpoof = true;
-                confidence = Math.max(0.80f, combined[2]);
+                confidence = Math.max(0.85f, combined[2]); // Increased from 0.80f
                 Log.d(TAG, "🔴 HIGH CONFIDENCE SPOOF: Multiple strong indicators");
             }
-            // Case 5: More lenient on unclear cases - default to real unless strong spoof
-            else if (combined[0] > 0.40f && combined[2] < 0.60f) {
+            // Case 5: Stricter on unclear cases - default to spoof for security
+            else if (combined[0] > 0.50f && combined[2] < 0.50f && hasNaturalMovement) {
+                // Added hasNaturalMovement requirement and narrowed thresholds
                 isSpoof = false;
-                confidence = Math.max(0.58f, combined[0]);
-                Log.d(TAG, "� LIKELY REAL: Benefit of the doubt");
+                confidence = Math.max(0.60f, combined[0]); // Increased from 0.58f
+                Log.d(TAG, "🟡 LIKELY REAL: Passed movement check");
             }
             // Case 6: Default to spoof for very unclear cases
             else {
                 isSpoof = true;
-                confidence = Math.max(0.65f, combined[2]);
+                confidence = Math.max(0.70f, combined[2]); // Increased from 0.65f
                 Log.d(TAG, "🟠 LIKELY SPOOF: Failed validation checks");
             }
             
@@ -405,18 +409,13 @@ public class FaceSpoofDetector {
         } catch (Throwable e) {
             Log.e(TAG, "Error in spoof detection: " + e.getMessage(), e);
 
-            // IMPROVED ERROR HANDLING:
+            // ENHANCED ERROR HANDLING - stricter for security:
             Log.w(TAG, "⚠️ Processing error in spoof detection. Error type: " + e.getClass().getSimpleName());
 
-            boolean shouldDefaultToSpoof = e instanceof OutOfMemoryError || e instanceof IllegalArgumentException;
-
-            if (shouldDefaultToSpoof) {
-                Log.w(TAG, "⚠️ Critical error detected - defaulting to spoof with warning");
-                return new SpoofResult(true, 0.75f, System.currentTimeMillis() - startTime);
-            } else {
-                Log.w(TAG, "⚠️ Non-critical error - still defaulting to spoof with lower confidence");
-                return new SpoofResult(true, 0.65f, System.currentTimeMillis() - startTime);
-            }
+            // Always default to spoof on error for maximum security
+            // This prevents bypass through intentional errors or manipulations
+            Log.w(TAG, "⚠️ Error detected - defaulting to spoof for security");
+            return new SpoofResult(true, 0.85f, System.currentTimeMillis() - startTime);
         }
     }
 
@@ -456,11 +455,20 @@ public class FaceSpoofDetector {
     }
 
     /**
-     * Evaluate model results with weighted combining
+     * Evaluate model results with weighted combining - improved to reduce false negatives
      */
     private boolean evaluateModelResults(float[] combined) {
-        return (combined[2] > SPOOF_CONFIDENCE_THRESHOLD && combined[2] > combined[0] * SPOOF_REAL_RATIO_THRESHOLD) ||
-               (combined[2] > 0.70f && combined[2] > combined[0]);
+        // First condition: Strong spoof confidence AND significantly higher than real score
+        boolean strongSpoofEvidence = combined[2] > SPOOF_CONFIDENCE_THRESHOLD && 
+                                     combined[2] > combined[0] * SPOOF_REAL_RATIO_THRESHOLD;
+        
+        // Second condition: Very high spoof confidence regardless of real score
+        boolean verySpoofyScore = combined[2] > 0.80f && combined[2] > combined[0] * 1.5f;
+        
+        // Third condition (new): Check for suspicious pattern where both real and spoof scores are high
+        boolean suspiciousPattern = combined[2] > 0.65f && combined[0] > 0.65f && combined[1] < 0.15f;
+        
+        return strongSpoofEvidence || verySpoofyScore || suspiciousPattern;
     }
 
     /**
@@ -713,51 +721,61 @@ public class FaceSpoofDetector {
     /**
      * Enhanced texture analysis for detecting 2D patterns in spoofing attacks
      * This method analyzes texture patterns to identify characteristics of printed photos,
-     * screen displays, and other 2D replay attacks
+     * screen displays, and other 2D replay attacks - improved for better replay attack detection
      */
     private boolean checkUniformTexture(float[] softmax1, float[] softmax2) {
-        // 1. Higher thresholds for unusual texture detection
+        // 1. Stricter thresholds for unusual texture detection
         boolean unusualTextureIndicator =
-                (softmax1[1] > 0.55f && softmax2[1] > 0.45f); // Both models must show unusual texture
+                (softmax1[1] > 0.50f && softmax2[1] > 0.40f); // Lowered thresholds to catch more replay attacks
         
-        // 2. Check for inconsistency between models
+        // 2. Check for inconsistency between models - improved to detect more subtle inconsistencies
         boolean modelInconsistency =
-                Math.abs(softmax1[0] - softmax2[0]) > 0.70f &&
-                Math.abs(softmax1[2] - softmax2[2]) > 0.60f; 
+                Math.abs(softmax1[0] - softmax2[0]) > 0.60f || // Reduced from 0.70f
+                Math.abs(softmax1[2] - softmax2[2]) > 0.50f;   // Reduced from 0.60f
         
-        // 3. Check for ambiguous classification
+        // 3. Check for ambiguous classification - typical of replay attacks
         boolean ambiguousClassification =
-                (softmax1[0] > 0.50f && softmax1[2] > 0.50f &&
-                 softmax2[0] > 0.45f && softmax2[2] > 0.45f);
+                (softmax1[0] > 0.45f && softmax1[2] > 0.45f && // Reduced from 0.50f
+                 softmax2[0] > 0.40f && softmax2[2] > 0.40f);  // Reduced from 0.45f
         
-        // 4. NEW: Check for abnormal classification pattern across frames
+        // 4. Check for abnormal classification pattern across frames - improved detection
         boolean abnormalPattern = checkAbnormalPatternAcrossFrames();
         
-        // 5. NEW: Analyze texture variance in recent frames
-        boolean lowTextureVariance = calculateConfidenceVariance() < 0.0015f;
+        // 5. Analyze texture variance in recent frames - stricter for replay detection
+        boolean lowTextureVariance = calculateConfidenceVariance() < 0.002f; // Increased from 0.0015f
+        
+        // 6. NEW: Check for suspiciously stable predictions across different scales
+        boolean suspiciouslyStablePredictions = 
+                Math.abs(softmax1[0] - softmax2[0]) < 0.05f && 
+                Math.abs(softmax1[2] - softmax2[2]) < 0.05f;
         
         // Log detailed information for debugging
         if (unusualTextureIndicator || modelInconsistency || ambiguousClassification || 
-            abnormalPattern || lowTextureVariance) {
+            abnormalPattern || lowTextureVariance || suspiciouslyStablePredictions) {
             Log.d(TAG, "🔍 TEXTURE ANALYSIS: " +
                     "unusualTexture=" + unusualTextureIndicator +
                     ", modelInconsistency=" + modelInconsistency +
                     ", ambiguousClassification=" + ambiguousClassification +
                     ", abnormalPattern=" + abnormalPattern +
-                    ", lowTextureVariance=" + lowTextureVariance);
+                    ", lowTextureVariance=" + lowTextureVariance +
+                    ", suspiciouslyStable=" + suspiciouslyStablePredictions);
         }
         
         // Return true if multiple strong indicators suggest a 2D spoofing attempt
         boolean strongEvidence =
-                (softmax1[1] > 0.70f && softmax2[1] > 0.70f) || // Very strong unusual texture
-                (Math.abs(softmax1[0] - softmax2[0]) > 0.85f);  // Very strong inconsistency
+                (softmax1[1] > 0.65f && softmax2[1] > 0.65f) || // Reduced from 0.70f
+                (Math.abs(softmax1[0] - softmax2[0]) > 0.80f) || // Reduced from 0.85f
+                suspiciouslyStablePredictions; // New strong evidence
         
-        // Multiple weaker indicators
+        // Multiple weaker indicators - enhanced combinations
         boolean multipleIndicators =
                 (unusualTextureIndicator && (modelInconsistency || ambiguousClassification)) ||
                 (modelInconsistency && ambiguousClassification) ||
                 (abnormalPattern && (unusualTextureIndicator || lowTextureVariance)) ||
-                (lowTextureVariance && (unusualTextureIndicator || modelInconsistency));
+                (lowTextureVariance && (unusualTextureIndicator || modelInconsistency)) ||
+                // New combinations for better detection
+                (suspiciouslyStablePredictions && (lowTextureVariance || abnormalPattern)) ||
+                (unusualTextureIndicator && lowTextureVariance && frameHistory.size() > 5);
         
         return strongEvidence || multipleIndicators;
     }

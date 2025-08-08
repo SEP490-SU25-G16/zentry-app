@@ -96,10 +96,14 @@ public class StudentScheduleFragment extends Fragment implements StudentSchedule
                 // TODO: Implement search
                 Toast.makeText(requireContext(), "Searching: " + query, Toast.LENGTH_SHORT).show();
             }
+        });
+
+        // Navigate to notification screen
         binding.btnStudentScheduleNotification.setOnClickListener(v -> {
             navController.navigate(R.id.action_studentSchedule_to_notification);
         });
-    }}
+    }
+
 
     private void observeViewModel() {
         // Loading state

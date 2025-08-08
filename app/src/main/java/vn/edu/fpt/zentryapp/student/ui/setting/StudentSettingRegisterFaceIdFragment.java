@@ -2,9 +2,6 @@ package vn.edu.fpt.zentryapp.student.ui.setting;
 
 import android.Manifest;
 import android.animation.ValueAnimator;
-import android.content.ClipData;
-import android.content.ClipboardManager;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -986,17 +983,15 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
     }
 
     /**
-     * Handle network errors specifically with mock success option
+     * Handle network errors with retry option
      */
     private void handleNetworkError(String errorMessage) {
         if (!isAdded()) return;
 
-        // Create alert dialog with options
+        // Create alert dialog with retry option
         new AlertDialog.Builder(requireContext())
                 .setTitle("Network Connection Issue")
-                .setMessage("Cannot connect to the server. Would you like to:\n" +
-                        "1. Try again\n" +
-                        "2. Continue with offline mode (demo only)")
+                .setMessage("Cannot connect to the server. Please check your internet connection and try again.")
                 .setPositiveButton("Try Again", (dialog, which) -> {
                     // Check if fragment is still attached before proceeding
                     if (!isAdded()) {
@@ -1007,23 +1002,6 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
                     // Reset and try again
                     resetComponents();
                     startFaceRegistration();
-                })
-                .setNeutralButton("Offline Mode", (dialog, which) -> {
-                    // Check if fragment is still attached before proceeding
-                    if (!isAdded()) {
-                        Log.w(TAG, "Fragment not attached, cannot use offline mode");
-                        return;
-                    }
-
-                    // Proceed with mock success (for demo/testing purposes)
-                    Log.d(TAG, "⚠️ Using offline mode - simulating successful registration");
-                    Toast.makeText(requireContext(),
-                            "Using offline mode (DEMO ONLY)",
-                            Toast.LENGTH_LONG).show();
-
-                    // Simulate success state
-                    stateManager.transitionTo(FaceRegistrationState.SUCCESS,
-                            "Face ID registered in offline mode (DEMO)");
                 })
                 .setNegativeButton("Cancel", (dialog, which) -> {
                     // Check if fragment is still attached before proceeding
@@ -1052,19 +1030,20 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
             return;
         }
 
-        // If there's a specific network error, use specialized handler
-        if (state == FaceRegistrationState.FAILED_NETWORK) {
-            String errorMessage = state.getDefaultMessage();
-            handleNetworkError(errorMessage);
-            return;
-        }
+        // Handle all errors in a unified way - no longer using separate handler for network errors
         
-        // Custom message for spoof detection failures
-        String message = state.getDefaultMessage();
-        if (state == FaceRegistrationState.FAILED_SPOOF) {
+        // Prepare error message based on state
+        String title = "Registration Failed";
+        String message;
+        
+        // Set appropriate message based on error type
+        if (state == FaceRegistrationState.FAILED_NETWORK) {
+            title = "Network Connection Issue";
+            message = "Cannot connect to the server. Please check your internet connection and try again.";
+        } else if (state == FaceRegistrationState.FAILED_SPOOF) {
             message = "Spoof detection triggered. Please ensure you're using a real face and not a photo or video.\n\nWould you like to try again?";
         } else {
-            message = message + "\n\nWould you like to try again?";
+            message = state.getDefaultMessage() + "\n\nWould you like to try again?";
         }
         
         // Add detailed error information if available
@@ -1076,7 +1055,7 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
 
         // For other errors, show regular retry dialog with detailed information
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext())
-                .setTitle("Registration Failed")
+                .setTitle(title)
                 .setMessage(detailedMessage)
                 .setPositiveButton("Retry", (dialog, which) -> {
                     // Check if fragment is still attached before proceeding
@@ -1102,16 +1081,7 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
                         startFaceRegistration();
                     }, 500);
                 })
-                .setNeutralButton("Copy Error Info", (dialog, which) -> {
-                    // Copy error details to clipboard
-                    ClipboardManager clipboard = (ClipboardManager) requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
-                    ClipData clip = ClipData.newPlainText("Face Registration Error", detailedMessage);
-                    clipboard.setPrimaryClip(clip);
-                    Toast.makeText(requireContext(), "Error details copied to clipboard", Toast.LENGTH_SHORT).show();
-                    
-                    // Show dialog again
-                    handleErrorState(state);
-                })
+                // No neutral button - removed offline mode and copy error options
                 .setNegativeButton("Cancel", (dialog, which) -> {
                     // Check if fragment is still attached before proceeding
                     if (!isAdded()) {
@@ -1249,16 +1219,36 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
         
         Log.d(TAG, "FaceIdEnhancer state changed: " + newState);
         
+        // Show liveness progress indicators when face is detected
+        if (newState == FaceIdEnhancer.AuthState.FACE_DETECTED || 
+            newState == FaceIdEnhancer.AuthState.ANALYZING) {
+            showLivenessProgressIndicators();
+        }
+        
         // Update UI based on FaceIdEnhancer state
         if (newState == FaceIdEnhancer.AuthState.BLINK_VERIFIED) {
             // User blinked successfully
-            if (binding != null && binding.tvStatusMessage != null) {
-                binding.tvStatusMessage.setText("Blink detected! Now look at different directions.");
+            if (binding != null) {
+                // Update status message
+                binding.tvStatusMessage.setText("Blink detected!");
+                binding.tvInstructionMessage.setText("Now look at different directions");
+                
+                // Update progress indicators
+                binding.ivBlinkIndicator.setColorFilter(
+                    ContextCompat.getColor(requireContext(), R.color.success_green), 
+                    android.graphics.PorterDuff.Mode.SRC_IN);
             }
         } else if (newState == FaceIdEnhancer.AuthState.GAZE_VERIFIED) {
             // User completed gaze challenge
-            if (binding != null && binding.tvStatusMessage != null) {
-                binding.tvStatusMessage.setText("Gaze verified! Completing verification...");
+            if (binding != null) {
+                // Update status message
+                binding.tvStatusMessage.setText("Gaze verified!");
+                binding.tvInstructionMessage.setText("Completing verification...");
+                
+                // Update progress indicators
+                binding.ivGazeIndicator.setColorFilter(
+                    ContextCompat.getColor(requireContext(), R.color.success_green), 
+                    android.graphics.PorterDuff.Mode.SRC_IN);
             }
         } else if (newState == FaceIdEnhancer.AuthState.VERIFIED) {
             // All liveness challenges completed
@@ -1268,14 +1258,51 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
         }
     }
     
+    /**
+     * Show liveness challenge progress indicators
+     */
+    private void showLivenessProgressIndicators() {
+        if (binding != null && binding.llLivenessProgress != null && 
+            binding.llLivenessProgress.getVisibility() != View.VISIBLE) {
+            
+            // Show progress indicators
+            binding.llLivenessProgress.setVisibility(View.VISIBLE);
+            // Ensure the liveness progress overlay is above camera and face overlay
+            binding.llLivenessProgress.bringToFront();
+            binding.llLivenessProgress.requestLayout();
+            binding.llLivenessProgress.invalidate();
+            
+            // Update instruction text
+            binding.tvStatusMessage.setText("Liveness Challenge");
+            binding.tvInstructionMessage.setText("Please blink your eyes");
+        }
+    }
+    
     @Override
     public void onBlinkDetected() {
         if (!isAdded()) return;
         
         Log.d(TAG, "👁️ Blink detected!");
-        // Update UI to show blink was detected
-        if (binding != null && binding.tvStatusMessage != null) {
-            binding.tvStatusMessage.setText("Blink detected! Now follow gaze instructions.");
+        // Update UI to show blink was detected with visual feedback
+        if (binding != null) {
+            // Update status message with clear instructions
+            binding.tvStatusMessage.setText("Blink detected! ✓");
+            binding.tvInstructionMessage.setText("Now look left, right, and up");
+            
+            // Update progress indicator
+            binding.ivBlinkIndicator.setColorFilter(
+                ContextCompat.getColor(requireContext(), R.color.success_green), 
+                android.graphics.PorterDuff.Mode.SRC_IN);
+            
+            // Add animation for visual feedback
+            binding.ivBlinkIndicator.animate()
+                .scaleX(1.2f).scaleY(1.2f)
+                .setDuration(200)
+                .withEndAction(() -> {
+                    binding.ivBlinkIndicator.animate()
+                        .scaleX(1.0f).scaleY(1.0f)
+                        .setDuration(200);
+                });
         }
     }
     
@@ -1283,8 +1310,40 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
     public void onGazeDirectionChanged(float x, float y) {
         if (!isAdded()) return;
         
-        // Add visual indicator for gaze direction if needed
+        // Add visual indicator for gaze direction
         Log.d(TAG, "👀 Gaze direction: x=" + x + ", y=" + y);
+        
+        if (binding != null) {
+            // Update instruction based on gaze direction
+            String direction = "";
+            if (x < -0.3f) {
+                direction = "Looking left ✓";
+                binding.tvInstructionMessage.setText("Now look right and up");
+            } else if (x > 0.3f) {
+                direction = "Looking right ✓";
+                binding.tvInstructionMessage.setText("Now look up");
+            } else if (y < -0.3f) {
+                direction = "Looking up ✓";
+                binding.tvInstructionMessage.setText("Great! Keep following directions");
+            } else if (y > 0.3f) {
+                direction = "Looking down ✓";
+            }
+            
+            // Only update if we detected a specific direction
+            if (!direction.isEmpty()) {
+                binding.tvStatusMessage.setText(direction);
+                
+                // Add subtle animation to gaze indicator
+                binding.ivGazeIndicator.animate()
+                    .alpha(0.7f)
+                    .setDuration(100)
+                    .withEndAction(() -> {
+                        binding.ivGazeIndicator.animate()
+                            .alpha(1.0f)
+                            .setDuration(100);
+                    });
+            }
+        }
     }
     
     @Override
@@ -1396,6 +1455,12 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
             faceIdEnhancer.close();
             faceIdEnhancer = null;
             faceIdEnhancerInitialized = false;
+        }
+        
+        // Close FaceIdService to properly release MediaPipeFaceLandmarkExtractor
+        if (faceIdService != null) {
+            faceIdService.close();
+            faceIdService = null;
         }
 
         mainHandler.removeCallbacksAndMessages(null);
