@@ -23,7 +23,7 @@ public class SpoofDetectionManager {
     // Liveness Challenge
     private boolean livenessChallengeActive = false;
     private int framesSinceChallengeStarted = 0;
-    private static final int LIVENESS_CHALLENGE_DURATION = 60; // 60 frames (approx. 2 seconds)
+    private static final int LIVENESS_CHALLENGE_DURATION = 120; // ~4 seconds for more user-friendly challenge
     private boolean blinkDetectedInChallenge = false;
 
     // Frame history for temporal analysis
@@ -141,7 +141,7 @@ public class SpoofDetectionManager {
             livenessChallengeActive = false;
             return new SpoofDetectionResult(true, rawConfidence, level, "Liveness check failed.", false, false);
         }
-        return new SpoofDetectionResult(false, rawConfidence, level, "Blink your eyes.", false, true);
+            return new SpoofDetectionResult(false, rawConfidence, level, "Blink your eyes.", false, true);
     }
 
     private void updateSuspicionScore(boolean rawIsSpoof, float rawConfidence) {
@@ -200,6 +200,25 @@ public class SpoofDetectionManager {
         suspicionScore = 0;
         livenessChallengeActive = false;
         frameHistory.clear();
+    }
+
+    /**
+     * Reset only the liveness challenge related state, keeping historical frames if needed
+     */
+    public void resetLivenessState() {
+        livenessChallengeActive = false;
+        framesSinceChallengeStarted = 0;
+        blinkDetectedInChallenge = false;
+    }
+
+    /**
+     * Mark liveness challenge as successful and clear suspicion
+     */
+    public void markLivenessSuccess() {
+        livenessChallengeActive = false;
+        framesSinceChallengeStarted = 0;
+        blinkDetectedInChallenge = false;
+        suspicionScore = 0;
     }
 
     private void startLivenessChallenge() {

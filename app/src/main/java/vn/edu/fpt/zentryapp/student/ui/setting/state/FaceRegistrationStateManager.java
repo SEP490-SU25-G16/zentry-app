@@ -47,7 +47,9 @@ public class FaceRegistrationStateManager {
         
         // For critical states, transition immediately
         if (newState.isErrorState() || newState == FaceRegistrationState.SUCCESS || 
-            newState == FaceRegistrationState.INITIALIZING || newState == FaceRegistrationState.LIVENESS_CHALLENGE) {
+            newState == FaceRegistrationState.INITIALIZING || newState == FaceRegistrationState.LIVENESS_CHALLENGE ||
+            // Ensure swift exit from liveness to normal flow without requiring confirmation
+            newState == FaceRegistrationState.FACE_REAL) {
             confirmTransition(newState, customMessage);
             return;
         }

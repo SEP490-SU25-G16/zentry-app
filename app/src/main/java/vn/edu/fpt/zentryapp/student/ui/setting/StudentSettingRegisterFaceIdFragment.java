@@ -315,6 +315,17 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
                 
                 // Initialize FaceIdEnhancer if not already done
                 initializeFaceIdEnhancer();
+
+                // Reset liveness state in spoof manager to start a fresh challenge
+                if (spoofDetectionManager != null) {
+                    spoofDetectionManager.resetLivenessState();
+                }
+
+                // Ensure liveness overlay is visible and above camera
+                if (binding != null && binding.llLivenessProgress != null) {
+                    binding.llLivenessProgress.setVisibility(View.VISIBLE);
+                    binding.llLivenessProgress.bringToFront();
+                }
                 break;
                 
             case FACE_OUT_OF_BOUNDS:
@@ -544,12 +555,20 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
                     if (faceOverlayView != null) {
                         boolean isGoodPosition = faceOverlayView.updateFacePosition(boundingBox);
                         if (!isGoodPosition) {
-                            // If position is bad, don't process for liveness
-                            if (stateManager.getCurrentState() != FaceRegistrationState.FACE_OUT_OF_BOUNDS) {
-                                stateManager.transitionTo(FaceRegistrationState.FACE_OUT_OF_BOUNDS,
-                                        "Position your face properly in the oval");
+                            // While in liveness challenge, do NOT change global state.
+                            // Only provide UI guidance and keep challenge active.
+                            if (binding != null && binding.tvInstructionMessage != null) {
+                                binding.tvInstructionMessage.setText("Position your face properly in the oval");
                             }
-                            return;
+                            if (faceOverlayView != null) {
+                                faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.error_red));
+                            }
+                            return; // Skip processing until position good
+                        } else {
+                            // Restore liveness color to indicate ready to proceed
+                            if (faceOverlayView != null) {
+                                faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.primary));
+                            }
                         }
                     }
                     
@@ -700,6 +719,11 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
      * Enhanced spoof result handling with better real face detection
      */
     private void handleEnhancedSpoofResult(SpoofDetectionManager.SpoofDetectionResult result, Rect boundingBox) {
+        // If we are in a liveness challenge, ignore spoof-driven transitions from any in-flight callbacks
+        if (stateManager.getCurrentState() == FaceRegistrationState.LIVENESS_CHALLENGE) {
+            Log.d(TAG, "Ignoring spoof result during active liveness challenge");
+            return;
+        }
         if (!isAdded() || stateManager.getCurrentState().isFinalState()) {
             return;
         }
@@ -1250,11 +1274,56 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
                     ContextCompat.getColor(requireContext(), R.color.success_green), 
                     android.graphics.PorterDuff.Mode.SRC_IN);
             }
+
+            // Treat successful gaze as sufficient to proceed to registration analysis
+            if (spoofDetectionManager != null) {
+                spoofDetectionManager.markLivenessSuccess();
+            }
+            if (binding != null && binding.llLivenessProgress != null) {
+                binding.llLivenessProgress.setVisibility(View.GONE);
+            }
+            if (faceOverlayView != null) {
+                faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.success_green));
+            }
+
+            // Move forward into analysis flow
+            if (currentFaceRect != null) {
+                stateManager.transitionTo(FaceRegistrationState.FACE_STABLE, "Perfect! Processing...");
+                if (!isAnalyzing) {
+                    startAnalysis();
+                }
+            } else {
+                stateManager.transitionTo(FaceRegistrationState.FACE_DETECTED, "Face detected");
+            }
         } else if (newState == FaceIdEnhancer.AuthState.VERIFIED) {
             // All liveness challenges completed
             Log.d(TAG, "Liveness verification complete!");
             // Transition to the next state in registration
             stateManager.transitionTo(FaceRegistrationState.FACE_REAL, "Liveness verified!");
+            // Mark success and hide liveness overlay
+            if (spoofDetectionManager != null) {
+                spoofDetectionManager.markLivenessSuccess();
+            }
+            if (binding != null && binding.llLivenessProgress != null) {
+                binding.llLivenessProgress.setVisibility(View.GONE);
+            }
+
+            // Immediately show success color and kick off stability → analysis flow
+            if (faceOverlayView != null) {
+                faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.success_green));
+            }
+
+            // Move quickly to FACE_STABLE if we already have a current face rect
+            if (currentFaceRect != null) {
+                stateManager.transitionTo(FaceRegistrationState.FACE_STABLE, "Perfect! Processing...");
+                // Start the 5-second analysis immediately
+                if (!isAnalyzing) {
+                    startAnalysis();
+                }
+            } else {
+                // If no rect (rare), fall back to FACE_DETECTED to continue normal processing
+                stateManager.transitionTo(FaceRegistrationState.FACE_DETECTED, "Face detected");
+            }
         }
     }
     
@@ -1403,6 +1472,11 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
         // Ẩn overlay phân tích nếu đang hiển thị
         if (analysisOverlay != null) {
             analysisOverlay.setVisibility(View.GONE);
+        }
+
+        // Hide liveness overlay if visible
+        if (binding != null && binding.llLivenessProgress != null) {
+            binding.llLivenessProgress.setVisibility(View.GONE);
         }
 
         // Clear any pending handlers/callbacks

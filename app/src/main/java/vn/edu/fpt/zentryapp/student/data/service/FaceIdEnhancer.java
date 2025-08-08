@@ -40,17 +40,22 @@ public class FaceIdEnhancer implements
     private final MediaPipeFaceLandmarkExtractor landmarkExtractor;
     private final EyeBlinkDetector blinkDetector;
     private final GazeEstimator gazeEstimator;
+    // Ownership flags to prevent double-close when instances are shared from FaceIdService
+    private final boolean ownsLandmarkExtractor;
+    private final boolean ownsGazeEstimator;
     
     // State flags
     private boolean blinkDetected = false;
     private boolean gazeVerified = false;
     private boolean livenessVerified = false;
     
-    // For checking if the user looked at different directions
-    private boolean lookedLeft = false;
-    private boolean lookedRight = false;
-    private boolean lookedUp = false;
-    private boolean lookedDown = false;
+    // Robust, prompt-driven gaze challenge
+    public enum Direction { LEFT, RIGHT, UP, DOWN }
+    private java.util.List<Direction> requiredDirections = new java.util.ArrayList<>();
+    private int currentDirectionIndex = 0;
+    private int directionStableFrames = 0;
+    private static final int DIRECTION_STABLE_FRAMES_REQUIRED = 10; // frames of stable gaze to accept a direction
+    private static final float GAZE_THRESHOLD = 0.45f; // stricter threshold
     
     // Processing flags
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
@@ -93,10 +98,12 @@ public class FaceIdEnhancer implements
         // Get preloaded MediaPipeFaceLandmarkExtractor from FaceIdService
         if (faceIdService != null && faceIdService.getMediaPipeFaceLandmarkExtractor() != null) {
             landmarkExtractor = faceIdService.getMediaPipeFaceLandmarkExtractor();
+            ownsLandmarkExtractor = false;
             Log.d(TAG, "Using preloaded MediaPipeFaceLandmarkExtractor from FaceIdService");
         } else {
             // Fallback: create new instance if not available
             landmarkExtractor = new MediaPipeFaceLandmarkExtractor(context);
+            ownsLandmarkExtractor = true;
             Log.d(TAG, "Created new MediaPipeFaceLandmarkExtractor (fallback)");
         }
         
@@ -106,14 +113,22 @@ public class FaceIdEnhancer implements
         if (faceIdService != null && faceIdService.getGazeEstimator() != null) {
             gazeEstimator = faceIdService.getGazeEstimator();
             gazeEstimator.setCallback(this); // Set callback for the shared instance
+            ownsGazeEstimator = false;
             Log.d(TAG, "Using GazeEstimator from FaceIdService");
         } else {
             // Fallback: create new instance if not available
             gazeEstimator = new GazeEstimator(context, this);
+            ownsGazeEstimator = true;
             Log.d(TAG, "Created new GazeEstimator (fallback)");
         }
         
         Log.d(TAG, "Face ID enhancer initialized");
+
+        // Default gaze challenge pattern: look RIGHT once
+        this.requiredDirections.clear();
+        this.requiredDirections.add(Direction.RIGHT);
+        this.currentDirectionIndex = 0;
+        this.directionStableFrames = 0;
     }
     
     /**
@@ -165,10 +180,9 @@ public class FaceIdEnhancer implements
         blinkDetected = false;
         gazeVerified = false;
         livenessVerified = false;
-        lookedLeft = false;
-        lookedRight = false;
-        lookedUp = false;
-        lookedDown = false;
+        // Reset gaze sequence state
+        currentDirectionIndex = 0;
+        directionStableFrames = 0;
         
         currentState = AuthState.WAITING;
         
@@ -251,17 +265,27 @@ public class FaceIdEnhancer implements
      * Check if the user has looked in all required directions
      */
     private void checkGazeVerification() {
-        boolean allDirectionsChecked = lookedLeft && lookedRight && 
-                                      (lookedUp || lookedDown); // Only require one of up/down
-        
-        if (allDirectionsChecked && !gazeVerified) {
+        if (gazeVerified) return;
+        if (currentDirectionIndex >= requiredDirections.size()) {
             gazeVerified = true;
             updateState(AuthState.GAZE_VERIFIED);
-            Log.d(TAG, "Gaze verification complete");
-            
-            // Check if all verifications are complete
+            Log.d(TAG, "Gaze verification complete (sequence)");
             checkVerificationComplete();
         }
+    }
+
+    /**
+     * Get the currently required gaze direction in the challenge sequence.
+     * Returns null if the sequence is complete or not configured.
+     */
+    private Direction getCurrentRequiredDirection() {
+        if (requiredDirections == null || requiredDirections.isEmpty()) {
+            return null;
+        }
+        if (currentDirectionIndex < 0 || currentDirectionIndex >= requiredDirections.size()) {
+            return null;
+        }
+        return requiredDirections.get(currentDirectionIndex);
     }
 
     //------------------------------------------------------------------------------
@@ -352,19 +376,60 @@ public class FaceIdEnhancer implements
     
     @Override
     public void onGazeUpdate(float x, float y, boolean isLookingAtScreen) {
-        // Notify about gaze direction change
-        if (callback != null) {
-            callback.onGazeDirectionChanged(x, y);
+        // Determine current required direction
+        Direction currentRequired = getCurrentRequiredDirection();
+
+        // If no current required (sequence done), just finalize
+        if (currentRequired == null) {
+            checkGazeVerification();
+            return;
         }
-        
-        // Update gaze direction flags
-        if (x < -0.3f) lookedLeft = true;
-        if (x > 0.3f) lookedRight = true;
-        if (y < -0.3f) lookedUp = true;
-        if (y > 0.3f) lookedDown = true;
-        
-        // Check if gaze verification is complete
-        checkGazeVerification();
+
+        // Front camera preview is mirrored; adjust x so UI directions match what user sees
+        float adjX = -x;
+        float adjY = y; // vertical not mirrored in our preview transform
+
+        // Emit adjusted gaze update (for UI indicator), but verification will be gated by currentRequired
+        if (callback != null) {
+            callback.onGazeDirectionChanged(adjX, adjY);
+        }
+
+        boolean meetsDirection = false;
+        switch (currentRequired) {
+            case LEFT:
+                meetsDirection = (adjX < -GAZE_THRESHOLD);
+                break;
+            case RIGHT:
+                meetsDirection = (adjX > GAZE_THRESHOLD);
+                break;
+            case UP:
+                meetsDirection = (adjY < -GAZE_THRESHOLD);
+                break;
+            case DOWN:
+                meetsDirection = (adjY > GAZE_THRESHOLD);
+                break;
+        }
+
+        if (meetsDirection) {
+            directionStableFrames++;
+        } else {
+            // Reset stability counter if user deviates from required direction
+            directionStableFrames = 0;
+        }
+
+        if (directionStableFrames >= DIRECTION_STABLE_FRAMES_REQUIRED) {
+            // Mark this direction as completed and advance to next
+            if (currentRequired == Direction.LEFT) {
+                // legacy flags for compatibility
+                // no-op
+            } else if (currentRequired == Direction.RIGHT) {
+                // no-op
+            }
+            currentDirectionIndex++;
+            directionStableFrames = 0;
+            Log.d(TAG, "Gaze direction completed: " + currentRequired);
+            checkGazeVerification();
+        }
     }
     
     @Override
@@ -379,7 +444,19 @@ public class FaceIdEnhancer implements
      * Release resources
      */
     public void close() {
-        landmarkExtractor.close();
-        gazeEstimator.close();
+        try {
+            if (ownsLandmarkExtractor && landmarkExtractor != null) {
+                landmarkExtractor.close();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Error closing landmark extractor", e);
+        }
+        try {
+            if (ownsGazeEstimator && gazeEstimator != null) {
+                gazeEstimator.close();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Error closing gaze estimator", e);
+        }
     }
 }
