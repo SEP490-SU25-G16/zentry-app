@@ -3,6 +3,7 @@ package vn.edu.fpt.zentryapp.faceid.ui.components;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.media.Image;
 import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.YuvImage;
@@ -36,6 +37,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import vn.edu.fpt.zentryapp.faceid.utils.YuvToRgbConverter;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -50,8 +52,11 @@ public class CameraView extends FrameLayout {
     private ProcessCameraProvider cameraProvider;
     private ImageCapture imageCapture;
     private ImageAnalysis imageAnalysis;
+    private Preview previewUseCase;
     private final Executor executor = Executors.newSingleThreadExecutor();
     private final ExecutorService mlWorker = Executors.newSingleThreadExecutor();
+    private final YuvToRgbConverter yuvConverter = new YuvToRgbConverter();
+    private Bitmap reusableRgbBitmap;
     private final AtomicReference<Bitmap> latestFrame = new AtomicReference<>(null);
     private final AtomicBoolean workerActive = new AtomicBoolean(false);
     private volatile int analysisStride = 1; // soft FPS cap: analyze every N frames
@@ -124,8 +129,22 @@ public class CameraView extends FrameLayout {
     /**
      * Bind camera use cases
      */
+    @OptIn(markerClass = ExperimentalGetImage.class)
     private void bindCameraUseCases(LifecycleOwner lifecycleOwner, @Nullable FrameAnalysisCallback frameCallback) {
         Log.d(TAG, "Binding camera use cases, frameCallback: " + (frameCallback != null));
+        
+        // Cleanup previous bindings BEFORE creating new use cases to avoid clearing new analyzer
+        try {
+            if (imageAnalysis != null) {
+                imageAnalysis.clearAnalyzer();
+            }
+            if (previewUseCase != null) {
+                previewUseCase.setSurfaceProvider(null);
+            }
+            if (cameraProvider != null) {
+                cameraProvider.unbindAll();
+            }
+        } catch (Exception ignore) {}
         
         // Get screen metrics
         int rotation = previewView.getDisplay().getRotation();
@@ -136,7 +155,7 @@ public class CameraView extends FrameLayout {
                 .build();
         
         // Preview use case
-        Preview preview = new Preview.Builder()
+        previewUseCase = new Preview.Builder()
                 .setTargetRotation(rotation)
                 .build();
         
@@ -155,7 +174,8 @@ public class CameraView extends FrameLayout {
             imageAnalysis = new ImageAnalysis.Builder()
                     .setTargetRotation(rotation)
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .setTargetResolution(new Size(640, 480)) // Độ phân giải phù hợp cho face detection
+                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
+                    .setTargetResolution(new Size(640, 480)) // match model-friendly size
                     .build();
             
             // Store callback for worker delivery
@@ -169,8 +189,8 @@ public class CameraView extends FrameLayout {
                             ", size: " + image.getWidth() + "x" + image.getHeight());
                 }
                 
-                // Soft FPS cap: process only every Nth frame
-                if (analysisStride > 1 && (frameCount % analysisStride) != 0) {
+                // Adaptive frame skipping: if worker is busy, skip; also apply stride
+                if (workerActive.get() || (analysisStride > 1 && (frameCount % analysisStride) != 0)) {
                     image.close();
                     return;
                 }
@@ -186,14 +206,14 @@ public class CameraView extends FrameLayout {
                     try {
                         Log.d(TAG, "Converting frame #" + frameCount + " to bitmap");
                         
-                        // Avoid JPEG path; if the downstream needs Bitmap, consider faster YUV->RGB. Here pass through MPImage via callback if supported.
-                        Bitmap bitmap = imageToBitmap(image);
-                        
-                        if (bitmap == null) {
-                            Log.e(TAG, "Failed to convert frame #" + frameCount + " to bitmap - bitmap is null");
-
-                            return;
+                        // Fast YUV->RGB using reusable buffer
+                        Image mediaImage = image.getImage();
+                        if (mediaImage == null) { image.close(); return; }
+                        if (reusableRgbBitmap == null || reusableRgbBitmap.getWidth() != image.getWidth() || reusableRgbBitmap.getHeight() != image.getHeight()) {
+                            reusableRgbBitmap = Bitmap.createBitmap(image.getWidth(), image.getHeight(), Bitmap.Config.ARGB_8888);
                         }
+                        yuvConverter.yuvToRgb(mediaImage, reusableRgbBitmap);
+                        Bitmap bitmap = reusableRgbBitmap;
                         
                         Log.d(TAG, "Successfully converted frame #" + frameCount + " to bitmap: " + 
                                 bitmap.getWidth() + "x" + bitmap.getHeight());
@@ -243,8 +263,7 @@ public class CameraView extends FrameLayout {
             Log.d(TAG, "No frame callback provided - ImageAnalysis not set up");
         }
         
-        // Unbind previous use cases
-        cameraProvider.unbindAll();
+        // Previous unbound above
         
         try {
             // Bind use cases to camera
@@ -253,7 +272,7 @@ public class CameraView extends FrameLayout {
                 camera = cameraProvider.bindToLifecycle(
                         lifecycleOwner,
                         cameraSelector,
-                        preview,
+                        previewUseCase,
                         imageCapture,
                         imageAnalysis);
             } else {
@@ -261,12 +280,14 @@ public class CameraView extends FrameLayout {
                 camera = cameraProvider.bindToLifecycle(
                         lifecycleOwner,
                         cameraSelector,
-                        preview,
+                        previewUseCase,
                         imageCapture);
             }
             
             // Connect preview to previewView
-            preview.setSurfaceProvider(previewView.getSurfaceProvider());
+            if (previewUseCase != null) {
+                previewUseCase.setSurfaceProvider(previewView.getSurfaceProvider());
+            }
             Log.d(TAG, "Camera binding successful");
         } catch (Exception e) {
             Log.e(TAG, "Use case binding failed", e);
@@ -305,6 +326,29 @@ public class CameraView extends FrameLayout {
     }
 
     /**
+     * Stop camera and release analysis/preview surfaces
+     */
+    public void stopCamera() {
+        try {
+            if (imageAnalysis != null) {
+                imageAnalysis.clearAnalyzer();
+            }
+            if (previewUseCase != null) {
+                previewUseCase.setSurfaceProvider(null);
+            }
+            if (cameraProvider != null) {
+                cameraProvider.unbindAll();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "stopCamera cleanup error", e);
+        } finally {
+            camera = null;
+            imageAnalysis = null;
+            imageCapture = null;
+        }
+    }
+
+    /**
      * Capture a photo
      */
     public void capturePhoto(CaptureCallback callback) {
@@ -315,11 +359,18 @@ public class CameraView extends FrameLayout {
         
         // Create image capture listener
         ImageCapture.OnImageCapturedCallback imageCapturedCallback = new ImageCapture.OnImageCapturedCallback() {
+            @OptIn(markerClass = ExperimentalGetImage.class)
             @Override
             public void onCaptureSuccess(@NonNull ImageProxy imageProxy) {
                 try {
-                    // Convert ImageProxy to Bitmap
-                    Bitmap bitmap = imageToBitmap(imageProxy);
+                    // Convert ImageProxy to Bitmap via reusable YUV converter
+                    Image media = imageProxy.getImage();
+                    if (media == null) { imageProxy.close(); post(() -> callback.onError("Image null")); return; }
+                    if (reusableRgbBitmap == null || reusableRgbBitmap.getWidth() != imageProxy.getWidth() || reusableRgbBitmap.getHeight() != imageProxy.getHeight()) {
+                        reusableRgbBitmap = Bitmap.createBitmap(imageProxy.getWidth(), imageProxy.getHeight(), Bitmap.Config.ARGB_8888);
+                    }
+                    yuvConverter.yuvToRgb(media, reusableRgbBitmap);
+                    Bitmap bitmap = reusableRgbBitmap;
                     
                     // Apply rotation if needed
                     int rotationDegrees = imageProxy.getImageInfo().getRotationDegrees();
@@ -766,13 +817,5 @@ public class CameraView extends FrameLayout {
             return null;
         }
     }
-    
-    /**
-     * Stop camera and release resources
-     */
-    public void stopCamera() {
-        if (cameraProvider != null) {
-            cameraProvider.unbindAll();
-        }
-    }
+
 } 
