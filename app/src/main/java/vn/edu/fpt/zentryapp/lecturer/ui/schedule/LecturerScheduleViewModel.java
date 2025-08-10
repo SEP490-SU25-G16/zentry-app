@@ -18,7 +18,7 @@ import retrofit2.Callback;
 import retrofit2.Response;
 import vn.edu.fpt.zentryapp.auth.client.ApiClient;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
-import vn.edu.fpt.zentryapp.lecturer.data.api.LecturerScheduleClassSectionService;
+import vn.edu.fpt.zentryapp.lecturer.data.api.LecturerApiService;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerScheduleClassSection;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerDailyScheduleClassSectionResponse;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.StartSessionRequest;
@@ -33,7 +33,7 @@ public class LecturerScheduleViewModel extends ViewModel {
     private final MutableLiveData<String> _errorMessage = new MutableLiveData<>();
 
     // API Service
-    private LecturerScheduleClassSectionService apiService;
+    private LecturerApiService apiService;
     private AuthManager authManager;
     private Context context;
 
@@ -45,7 +45,7 @@ public class LecturerScheduleViewModel extends ViewModel {
     public void init(Context context, AuthManager authManager) {
         this.context = context;
         this.authManager = authManager;
-        this.apiService = ApiClient.getClient(context).create(LecturerScheduleClassSectionService.class);
+        this.apiService = ApiClient.getClient(context).create(LecturerApiService.class);
         loadTodayClassSections();
     }
 

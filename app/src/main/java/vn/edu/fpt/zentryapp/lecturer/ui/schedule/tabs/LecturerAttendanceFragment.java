@@ -89,9 +89,8 @@ public class LecturerAttendanceFragment extends Fragment implements LecturerAtte
     // ✅ Method cho final attendance (từ main fragment)
     public void updateAttendanceData(List<Attendance> attendanceList) {
         if (attendanceAdapter != null) {
-            attendanceAdapter.setFinalAttendance(attendanceList);
+            attendanceAdapter.setAttendanceList(attendanceList);
 
-            // ✅ Update header cho final attendance
             isShowingFinalAttendance = true;
             currentRoundNumber = -1;
             updateHeaderText(attendanceList);
@@ -101,7 +100,7 @@ public class LecturerAttendanceFragment extends Fragment implements LecturerAtte
     // ✅ Method cho round-specific attendance (từ round click)
     public void updateRoundAttendanceData(List<Attendance> attendanceList, int roundNumber) {
         if (attendanceAdapter != null) {
-            attendanceAdapter.setFinalAttendance(attendanceList);
+            attendanceAdapter.setAttendanceList(attendanceList);
 
             // ✅ Update header cho round attendance
             isShowingFinalAttendance = false;

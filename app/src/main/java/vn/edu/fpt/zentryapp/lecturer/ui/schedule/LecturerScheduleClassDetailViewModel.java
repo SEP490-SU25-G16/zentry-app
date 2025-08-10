@@ -23,6 +23,8 @@ import retrofit2.Callback;
 import retrofit2.Response;
 import vn.edu.fpt.zentryapp.auth.client.ApiClient;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.EndSessionRequest;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.EndSessionResponse;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.Round;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.RoundDetail;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.RoundResultDto;
@@ -36,14 +38,11 @@ import vn.edu.fpt.zentryapp.lecturer.data.model.response.SessionDetailInfoRound;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.StudentAttendanceDto;
 import vn.edu.fpt.zentryapp.service.AttendanceApiService;
 import vn.edu.fpt.zentryapp.service.BLEAttendanceService;
-import vn.edu.fpt.zentryapp.student.data.model.response.ClassSectionDetailDto;
-import vn.edu.fpt.zentryapp.student.data.model.response.ClassSectionDetailResponse;
 import vn.edu.fpt.zentryapp.student.data.model.response.ScheduleDetailDto;
 import vn.edu.fpt.zentryapp.student.data.model.response.ScheduleDetailResponse;
 
 public class LecturerScheduleClassDetailViewModel extends ViewModel {
     private static final String TAG = "ClassDetailViewModel";
-
     private BroadcastReceiver attendanceCalculatedReceiver;
     private final MutableLiveData<SessionDetailInfoRound> _sessionInfo = new MutableLiveData<>();
     private final MutableLiveData<List<Round>> _listHistoryRounds = new MutableLiveData<>();
@@ -54,7 +53,11 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
     private final MutableLiveData<Boolean> _canAddFaceId = new MutableLiveData<>(true);
     private final MutableLiveData<List<Attendance>> _listRoundAttendance = new MutableLiveData<>();
     private final MutableLiveData<Integer> _currentRoundNumber = new MutableLiveData<>();
+    private final MutableLiveData<Boolean> _isEndingSession = new MutableLiveData<>(false);
+    private final MutableLiveData<EndSessionResponse> _endSessionResult = new MutableLiveData<>();
 
+    public LiveData<Boolean> isEndingSession() { return _isEndingSession; }
+    public LiveData<EndSessionResponse> endSessionResult() { return _endSessionResult; }
     // API Service
     private AttendanceApiService apiService;
     private AuthManager authManager;
@@ -64,7 +67,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
     // Public getters
     public LiveData<SessionDetailInfoRound> sessionInfo() { return _sessionInfo; }
     public LiveData<List<Round>> listHistoryRounds() { return _listHistoryRounds; }
-    public LiveData<List<Attendance>> listAttendance() { return _listAttendance; }
+    public LiveData<List<Attendance>> listFinalAttendance() { return _listAttendance; }
 
     public LiveData<String> errorMessage() { return _errorMessage; }
     public LiveData<Boolean> canAddFaceId() { return _canAddFaceId; }
@@ -88,7 +91,6 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
         this.context = context;
         this.authManager = authManager;
         this.session = session;
-
         Log.d(TAG, "🔧 Creating API service...");
         try {
             this.apiService = ApiClient.getClient(context).create(AttendanceApiService.class);
@@ -131,7 +133,6 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
 
         Log.d(TAG, "========== ViewModel init() completed ==========");
     }
-
 
     private String getSessionId() {
         return session != null ? session.getSessionId() : "UNKNOWN_SESSION";
@@ -295,6 +296,63 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
     }
 
     /**
+     * Filter rounds by current time - only show rounds that should be visible
+     */
+    private List<Round> filterRoundsByCurrentTime(List<Round> allRounds) {
+        if (allRounds == null || allRounds.isEmpty()) return new ArrayList<>();
+
+        long currentTime = System.currentTimeMillis();
+        List<Round> visibleRounds = new ArrayList<>();
+
+        // Tìm round hiện tại đang active
+        Round currentActiveRound = null;
+        for (Round round : allRounds) {
+            if (round.getStartDateTime() != null && round.getEndDateTime() != null &&
+                    round.getStartDateTime().getTime() <= currentTime &&
+                    currentTime <= round.getEndDateTime().getTime()) {
+                currentActiveRound = round;
+                break;
+            }
+        }
+
+        if (currentActiveRound != null) {
+            // Nếu có round đang active, hiển thị tất cả rounds từ round 1 đến round hiện tại
+            int currentRoundNumber = currentActiveRound.getRoundNumber();
+            for (Round round : allRounds) {
+                if (round.getRoundNumber() <= currentRoundNumber) {
+                    visibleRounds.add(round);
+                }
+            }
+        } else {
+            // Nếu không có round nào đang active, kiểm tra xem có round nào đã kết thúc chưa
+            Round lastCompletedRound = null;
+            for (Round round : allRounds) {
+                if (round.getEndDateTime() != null && round.getEndDateTime().getTime() < currentTime) {
+                    if (lastCompletedRound == null || round.getRoundNumber() > lastCompletedRound.getRoundNumber()) {
+                        lastCompletedRound = round;
+                    }
+                }
+            }
+
+            if (lastCompletedRound != null) {
+                // Hiển thị tất cả rounds từ 1 đến round cuối đã hoàn thành
+                int lastRoundNumber = lastCompletedRound.getRoundNumber();
+                for (Round round : allRounds) {
+                    if (round.getRoundNumber() <= lastRoundNumber) {
+                        visibleRounds.add(round);
+                    }
+                }
+            }
+            // Nếu chưa có round nào bắt đầu thì không hiển thị gì
+        }
+
+        // Sort by round number để đảm bảo thứ tự đúng
+        visibleRounds.sort((r1, r2) -> Integer.compare(r1.getRoundNumber(), r2.getRoundNumber()));
+
+        return visibleRounds;
+    }
+
+    /**
      * Load attendance rounds from API
      */
     private void loadListRounds() {
@@ -306,85 +364,31 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
         _errorMessage.setValue(null);
 
         String sessionId = getSessionId();
-        Log.d(TAG, "========== loadListRounds() started ==========");
         Log.d(TAG, "📤 Loading rounds for sessionId: " + sessionId);
 
         apiService.getListRounds(sessionId)
                 .enqueue(new Callback<RoundsDataResponse>() {
                     @Override
                     public void onResponse(Call<RoundsDataResponse> call, Response<RoundsDataResponse> response) {
-                        Log.d(TAG, "📥 API Response received");
-                        Log.d(TAG, "  • Response code: " + response.code());
-                        Log.d(TAG, "  • Response successful: " + response.isSuccessful());
-                        Log.d(TAG, "  • Response body null: " + (response.body() == null));
-
                         if (response.isSuccessful() && response.body() != null) {
                             RoundsDataResponse apiResponse = response.body();
-                            Log.d(TAG, "  • API Success: " + apiResponse.isSuccess());
-                            Log.d(TAG, "  • API Error: " + apiResponse.getError());
-                            Log.d(TAG, "  • API Message: " + apiResponse.getMessage());
 
                             if (apiResponse.isSuccess()) {
-                                Log.d(TAG, "🔄 Processing API data...");
-
-                                // Log raw API data
-                                if (apiResponse.getData() != null) {
-                                    Log.d(TAG, "📋 Raw API data count: " + apiResponse.getData().size());
-                                    for (int i = 0; i < apiResponse.getData().size(); i++) {
-                                        var roundDetail = apiResponse.getData().get(i);
-                                        Log.d(TAG, String.format("  Raw Round %d: ID=%s, Number=%d, Status=%s, Attended=%d/%d, StartTime=%s",
-                                                (i + 1),
-                                                roundDetail.getRoundId(),
-                                                roundDetail.getRoundNumber(),
-                                                roundDetail.getStatus(),
-                                                roundDetail.getAttendedCount(),
-                                                roundDetail.getTotalStudents(),
-                                                roundDetail.getStartTime()));
-                                    }
-                                } else {
-                                    Log.w(TAG, "⚠️ API data is null");
-                                }
-
                                 // Map data
-                                Log.d(TAG, "🔄 Mapping API data to Round objects...");
                                 List<Round> allRounds = mapApiDataToAttendanceRounds(apiResponse.getData());
-                                Log.d(TAG, "📊 Mapped rounds count: " + allRounds.size());
-
-                                // Log mapped rounds
-                                for (int i = 0; i < allRounds.size(); i++) {
-                                    Round round = allRounds.get(i);
-                                    Log.d(TAG, String.format("  Mapped Round %d: ID=%s, Number=%d, Status=%s, Attended=%d/%d",
-                                            (i + 1),
-                                            round.getRoundId(),
-                                            round.getRoundNumber(),
-                                            round.getStatus(),
-                                            round.getAttendedCount(),
-                                            round.getTotalStudents()));
-                                }
 
                                 // Filter completed rounds
-                                Log.d(TAG, "🔍 Filtering completed rounds...");
                                 List<Round> completedRounds = filterCompletedRounds(allRounds);
-                                Log.d(TAG, "📊 Completed rounds count: " + completedRounds.size());
 
-                                // Log filtered rounds
-                                for (int i = 0; i < completedRounds.size(); i++) {
-                                    Round round = completedRounds.get(i);
-                                    Log.d(TAG, String.format("  Completed Round %d: ID=%s, Number=%d, Status=%s, Attended=%d/%d",
-                                            (i + 1),
-                                            round.getRoundId(),
-                                            round.getRoundNumber(),
-                                            round.getStatus(),
-                                            round.getAttendedCount(),
-                                            round.getTotalStudents()));
-                                }
+                                // Filter by current time before setting to LiveData
+                                List<Round> visibleRounds = filterRoundsByCurrentTime(completedRounds);
 
-                                // Set value to LiveData
-                                Log.d(TAG, "📡 Setting " + completedRounds.size() + " rounds to LiveData...");
-                                _listHistoryRounds.setValue(completedRounds);
+                                // Set filtered value to LiveData
+                                _listHistoryRounds.setValue(visibleRounds);
 
                                 Log.d(TAG, "✅ Successfully loaded " + allRounds.size() + " total rounds, " +
-                                        completedRounds.size() + " completed rounds displayed");
+                                        completedRounds.size() + " completed rounds, " +
+                                        visibleRounds.size() + " visible rounds displayed");
 
                             } else {
                                 String error = apiResponse.getError() != null ? apiResponse.getError() : "Unknown API error";
@@ -393,19 +397,9 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                             }
                         } else {
                             String error = "HTTP Error: " + response.code();
-                            if (response.errorBody() != null) {
-                                try {
-                                    String errorBody = response.errorBody().string();
-                                    Log.e(TAG, "❌ Error body: " + errorBody);
-                                    error += " - " + errorBody;
-                                } catch (Exception e) {
-                                    Log.e(TAG, "Failed to read error body", e);
-                                }
-                            }
                             _errorMessage.setValue(error);
                             Log.e(TAG, "❌ " + error);
                         }
-                        Log.d(TAG, "========== loadListRounds() completed ==========");
                     }
 
                     @Override
@@ -413,8 +407,6 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                         String error = "Network Error: " + t.getMessage();
                         _errorMessage.setValue(error);
                         Log.e(TAG, "❌ Network Error: " + error, t);
-                        Log.e(TAG, "❌ Call URL: " + call.request().url());
-                        Log.d(TAG, "========== loadListRounds() failed ==========");
                     }
                 });
     }
@@ -837,6 +829,82 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                     .unregisterReceiver(attendanceCalculatedReceiver);
 
             Log.d(TAG, "Attendance calculated receiver unregistered");
+        }
+    }
+
+    public void endSession() {
+        String sessionId = getSessionId();
+        String userId = authManager.getCurrentUserId();
+
+        if (sessionId == null) {
+            _errorMessage.setValue("Session ID not available");
+            return;
+        }
+
+        if (userId == null) {
+            _errorMessage.setValue("User ID not available");
+            return;
+        }
+
+        _isEndingSession.setValue(true);
+        _errorMessage.setValue(null);
+
+        Log.d(TAG, "Ending session: " + sessionId + " for user: " + userId);
+
+        // Tạo request body
+        EndSessionRequest requestBody = new EndSessionRequest(userId);
+
+        apiService.endSession(sessionId, requestBody)
+                .enqueue(new Callback<EndSessionResponse>() {
+                    @Override
+                    public void onResponse(Call<EndSessionResponse> call, Response<EndSessionResponse> response) {
+                        _isEndingSession.setValue(false);
+
+                        if (response.isSuccessful() && response.body() != null) {
+                            EndSessionResponse apiResponse = response.body();
+                            Log.d(TAG, "🔍 API Response Debug:");
+                            Log.d(TAG, "  • apiResponse.isSuccess(): " + apiResponse.isSuccess());
+                            Log.d(TAG, "  • apiResponse.getData(): " + (apiResponse.getData() != null));
+                            Log.d(TAG, "  • apiResponse.getError(): " + apiResponse.getError());
+                            Log.d(TAG, "  • apiResponse.getMessage(): " + apiResponse.getMessage());
+                            if (apiResponse.isSuccess()) {
+                                _endSessionResult.setValue(apiResponse);
+                                Log.d(TAG, "✅ Session ended successfully: " + apiResponse.getMessage());
+
+                                // Stop BLE Service
+                                stopBLEAttendanceService();
+
+                            } else {
+                                String error = apiResponse.getError() != null ? apiResponse.getError() : "Failed to end session";
+                                _errorMessage.setValue("End Session: " + error);
+                                Log.e(TAG, "❌ End Session API Error: " + error);
+                            }
+                        } else {
+                            String error = "HTTP Error: " + response.code();
+                            _errorMessage.setValue("End Session: " + error);
+                            Log.e(TAG, "❌ End Session " + error);
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<EndSessionResponse> call, Throwable t) {
+                        _isEndingSession.setValue(false);
+                        String error = "Network Error: " + t.getMessage();
+                        _errorMessage.setValue("End Session: " + error);
+                        Log.e(TAG, "❌ End Session Network Error", t);
+                    }
+                });
+    }
+
+    // Method để stop BLE Service
+    private void stopBLEAttendanceService() {
+        try {
+            Intent serviceIntent = new Intent(context, BLEAttendanceService.class);
+            serviceIntent.setAction("STOP_ATTENDANCE");
+            context.stopService(serviceIntent);
+            Log.d(TAG, "✅ BLE Attendance Service stopped");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to stop BLE service", e);
         }
     }
 }

@@ -6,6 +6,8 @@ import retrofit2.http.GET;
 import retrofit2.http.POST;
 import retrofit2.http.Path;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.CalculateAttendanceResponse;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.EndSessionRequest;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.EndSessionResponse;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.RoundResultResponse;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.RoundsDataResponse;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.AttendanceResponse;
@@ -42,4 +44,11 @@ public interface AttendanceApiService {
 
     @POST("api/devices/register")
     Call<DeviceRegistrationResponse> registerDevice(@Body DeviceRegistrationRequest request);
+
+    @POST("api/attendance/sessions/{sessionId}/end")
+    Call<EndSessionResponse> endSession(
+            @Path("sessionId") String sessionId,
+            @Body EndSessionRequest body
+    );
+
 }

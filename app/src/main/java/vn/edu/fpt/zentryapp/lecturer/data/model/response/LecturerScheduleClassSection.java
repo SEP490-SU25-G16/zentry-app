@@ -97,11 +97,12 @@ public class LecturerScheduleClassSection implements Serializable {
             if (timeParts.length >= 2) {
                 int hour = Integer.parseInt(timeParts[0]);
                 int minute = Integer.parseInt(timeParts[1]);
+                int second = timeParts.length >= 3 ? Integer.parseInt(timeParts[2]) : 0; // ✅ ADDED: Parse seconds
 
                 Calendar calendar = Calendar.getInstance();
                 calendar.set(Calendar.HOUR_OF_DAY, hour);
                 calendar.set(Calendar.MINUTE, minute);
-                calendar.set(Calendar.SECOND, 0);
+                calendar.set(Calendar.SECOND, second); // ✅ CHANGED: Set seconds instead of 0
                 calendar.set(Calendar.MILLISECOND, 0);
 
                 return calendar.getTime();
@@ -111,34 +112,20 @@ public class LecturerScheduleClassSection implements Serializable {
         }
         return null;
     }
-
-    // Parse DateInfo to Date object
-    public Date getDateInfoAsDate() {
-        try {
-            if (dateInfo == null) return null;
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-            return sdf.parse(dateInfo);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
-
     // Thêm method này vào class LecturerScheduleClassSection
     public String getTimeDisplay() {
         return formatTime(startTime) + " - " + formatTime(endTime);
     }
+    public String getTimeDisplayWithSeconds() {
+        return startTime + " - " +endTime;
+    }
 
     public String getWeekdayTimeDisplay() {
-        return weekday + " " + getTimeDisplay();
+        return weekday + " " + getTimeDisplayWithSeconds();
     }
 
     public String getBuildingRoomDisplay() {
         return building + " - " + roomName;
-    }
-
-    public String getFullScheduleDisplay() {
-        return weekday + ", " + dateInfo + " " + getTimeDisplay();
     }
 
     // Alias for compatibility with adapter

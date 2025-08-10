@@ -62,7 +62,7 @@ public class StudentSettingDeviceRegisterViewModel extends ViewModel {
 
         Log.d(TAG, "Registration request created:");
         Log.d(TAG, "  User ID: " + request.getUserId());
-        Log.d(TAG, "  MAC Address: " + request.getAndroidId());
+        Log.d(TAG, "  Android Id: " + request.getAndroidId());
         Log.d(TAG, "  Device Name: " + request.getDeviceName());
         Log.d(TAG, "  Platform: " + request.getPlatform());
 

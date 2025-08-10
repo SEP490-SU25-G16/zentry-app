@@ -10,6 +10,8 @@
         android:id="@+id/simple_header"
         android:layout_width="273dp"
         android:layout_height="127dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginStart="10dp"
         android:background="@drawable/bg_expanded_header"
         android:elevation="4dp"
         android:orientation="vertical"
@@ -106,7 +108,7 @@
 
                     <TextView
                         android:fontFamily="@font/mulishextrabold"
-                        android:text="Next studentSession"
+                        android:text="Next Session"
                         android:textSize="15sp"
                         android:textStyle="bold"
                         android:layout_width="0dp"

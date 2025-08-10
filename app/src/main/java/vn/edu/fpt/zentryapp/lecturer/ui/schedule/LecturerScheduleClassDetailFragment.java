@@ -1,7 +1,12 @@
 package vn.edu.fpt.zentryapp.lecturer.ui.schedule;
 
 import android.annotation.SuppressLint;
+import android.app.Dialog;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
+import android.view.Window;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -18,10 +23,12 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.tabs.TabLayoutMediator;
 
 import java.util.Objects;
 
+import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentLecturerScheduleClassDetailBinding;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerScheduleClassSection;
@@ -126,8 +133,7 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
         binding.btnScheduleClassDetailRequestFaceId.setOnClickListener(v ->
                 Toast.makeText(requireContext(), "Create face id", Toast.LENGTH_SHORT).show());
 
-        binding.btnScheduleClassDetailEndSession.setOnClickListener(v ->
-                Toast.makeText(requireContext(), "End time", Toast.LENGTH_SHORT).show());
+        binding.btnScheduleClassDetailEndSession.setOnClickListener(v -> showEndSessionConfirmation());
 
         binding.btnScheduleClassDetailNotification.setOnClickListener(v ->
                 Toast.makeText(requireContext(), "Notifications", Toast.LENGTH_SHORT).show());
@@ -158,7 +164,7 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
         });
 
         // Observer for attendance data (both final and round-specific)
-        viewModel.listAttendance().observe(getViewLifecycleOwner(), attendanceList -> {
+        viewModel.listFinalAttendance().observe(getViewLifecycleOwner(), attendanceList -> {
             if (attendanceList != null && attendanceFragment != null) {
                 attendanceFragment.updateAttendanceData(attendanceList);
             }
@@ -180,7 +186,55 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
                 Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
             }
         });
+
+        viewModel.isEndingSession().observe(getViewLifecycleOwner(), isEnding -> {
+            binding.btnScheduleClassDetailEndSession.setEnabled(!isEnding);
+            binding.btnScheduleClassDetailEndSession.setText(isEnding ? "Ending..." : "End Time");
+        });
+
+        viewModel.endSessionResult().observe(getViewLifecycleOwner(), result -> {
+            if (result != null && result.isSuccess()) {
+                // Show success message
+                Toast.makeText(requireContext(),
+                        result.getMessage() != null ? result.getMessage() : "Session ended successfully",
+                        Toast.LENGTH_LONG).show();
+                // Navigate back to schedule
+                navController.navigateUp();
+            }
+        });
     }
+
+    private void showEndSessionConfirmation() {
+        Dialog dialog = new Dialog(requireContext());
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_end_session_confirmation);
+
+        dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+
+        TextView tvMessage = dialog.findViewById(R.id.tv_message);
+        MaterialButton btnCancel = dialog.findViewById(R.id.btn_cancel);
+        MaterialButton btnConfirm = dialog.findViewById(R.id.btn_confirm);
+
+        // Set message with session info
+        String message = String.format(
+                "Are you sure you want to end the session?\n\n" +
+                        "Course: %s\n" +
+                        "This will stop the attendance service and finalize all completed rounds.",
+                session != null ? session.getCourseName() + " - " + session.getSectionCode() : "Current Session"
+        );
+        tvMessage.setText(message);
+
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+        btnConfirm.setOnClickListener(v -> {
+            dialog.dismiss();
+            viewModel.endSession();
+        });
+
+        dialog.setCancelable(true);
+        dialog.show();
+    }
+
 
     @Override
     public void onRoundClick(Round round) {

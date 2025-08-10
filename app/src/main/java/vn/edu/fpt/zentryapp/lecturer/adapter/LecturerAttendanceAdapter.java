@@ -20,7 +20,7 @@ public class LecturerAttendanceAdapter extends RecyclerView.Adapter<LecturerAtte
         void onStudentClick(Attendance student);
     }
 
-    public void setFinalAttendance(List<Attendance> finalAttendance) {
+    public void setAttendanceList(List<Attendance> finalAttendance) {
         this.finalAttendance = finalAttendance != null ? finalAttendance : new ArrayList<>();
         notifyDataSetChanged();
     }

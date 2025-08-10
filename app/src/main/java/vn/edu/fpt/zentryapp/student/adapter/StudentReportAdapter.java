@@ -14,7 +14,8 @@ import vn.edu.fpt.zentryapp.student.data.model.response.StudentReport;
 
 public class StudentReportAdapter extends RecyclerView.Adapter<StudentReportAdapter.ViewHolder> {
 
-    private List<StudentReport> reports = new ArrayList<>();
+    private List<StudentReport> reports = new ArrayList<>();       // Hiển thị
+    private List<StudentReport> allReports = new ArrayList<>();    // Gốc
     private OnReportClickListener onReportClickListener;
 
     public interface OnReportClickListener {
@@ -26,7 +27,26 @@ public class StudentReportAdapter extends RecyclerView.Adapter<StudentReportAdap
     }
 
     public void setReports(List<StudentReport> reports) {
-        this.reports = reports != null ? reports : new ArrayList<>();
+        this.allReports = reports != null ? new ArrayList<>(reports) : new ArrayList<>();
+        this.reports = new ArrayList<>(allReports);
+        notifyDataSetChanged();
+    }
+
+    public void filter(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            reports = new ArrayList<>(allReports);
+        } else {
+            String lowerQuery = query.toLowerCase();
+            List<StudentReport> filtered = new ArrayList<>();
+            for (StudentReport item : allReports) {
+                // Lọc theo courseTitle và lecturer (bạn có thể add field khác)
+                if (item.getCourseTitle().toLowerCase().contains(lowerQuery) ||
+                        item.getLecturerInfo().toLowerCase().contains(lowerQuery)) {
+                    filtered.add(item);
+                }
+            }
+            reports = filtered;
+        }
         notifyDataSetChanged();
     }
 
@@ -64,16 +84,9 @@ public class StudentReportAdapter extends RecyclerView.Adapter<StudentReportAdap
         }
 
         public void bind(StudentReport report) {
-            // Set course title (Mathematics - G701)
             binding.tvCourseTitle.setText(report.getCourseTitle());
-
-            // Set lecturer info (Lecturer: Hasha)
             binding.tvLecturerName.setText(report.getLecturerInfo());
-
-            // Set sessions with purple background (15/20 Sessions)
             binding.tvSessions.setText(report.getSessionsText());
-
-            // Set attendance percentage with green background (90%)
             binding.tvAttendancePercentage.setText(report.getAttendancePercentageText());
         }
     }

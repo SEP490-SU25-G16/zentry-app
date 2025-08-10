@@ -33,7 +33,6 @@ public class AttendanceRoundScheduler {
     public interface RoundCalculateCallback {
         void onRoundCalculate(AttendanceModels.AttendanceRound round);
     }
-
     public AttendanceRoundScheduler(List<AttendanceModels.AttendanceRound> rounds,
                                     RoundExecutionCallback executionCallback,
                                     RoundCalculateCallback calculateCallback,
@@ -259,12 +258,14 @@ public class AttendanceRoundScheduler {
 
         scheduler.schedule(() -> {
             mainHandler.post(() -> {
-                Log.d(TAG, "Executing completion callback");
+                Log.d(TAG, "All rounds completed, triggering auto-end session");
+
+                // Execute original completion callback
                 if (completionCallback != null) {
                     completionCallback.run();
                 }
             });
-        }, Math.max(1000, delay), TimeUnit.MILLISECONDS);
+        }, Math.max(2000, delay), TimeUnit.MILLISECONDS);
     }
 
     private void executeRound(AttendanceModels.AttendanceRound round) {
@@ -308,7 +309,6 @@ public class AttendanceRoundScheduler {
                 Thread.currentThread().interrupt();
             }
         }
-
         isRunning = false;
         Log.d(TAG, "✅ Scheduler stopped");
     }

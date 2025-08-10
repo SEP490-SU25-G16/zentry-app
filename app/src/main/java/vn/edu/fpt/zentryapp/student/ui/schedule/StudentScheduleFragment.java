@@ -56,7 +56,31 @@ public class StudentScheduleFragment extends Fragment implements StudentSchedule
         setupRecyclerView();
         setupClickListeners();
         observeViewModel();
+        setupSearchBar();
     }
+
+    private void setupSearchBar() {
+        // Realtime search khi gõ
+        binding.etStudentSearch.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                scheduleAdapter.filter(s.toString());
+            }
+
+            @Override
+            public void afterTextChanged(android.text.Editable s) {}
+        });
+
+        // Click icon search
+        binding.ivStudentSearch.setOnClickListener(v -> {
+            String query = binding.etStudentSearch.getText().toString().trim();
+            scheduleAdapter.filter(query);
+        });
+    }
+
 
     private void setupRecyclerView() {
         AuthManager authManager = AuthManager.getInstance(requireContext());
