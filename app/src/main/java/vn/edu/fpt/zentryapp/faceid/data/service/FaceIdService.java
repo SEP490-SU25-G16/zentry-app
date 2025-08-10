@@ -12,7 +12,6 @@ import androidx.annotation.NonNull;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -26,10 +25,9 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import vn.edu.fpt.zentryapp.auth.client.ApiClient;
-import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.faceid.data.api.FaceIdApi;
 import vn.edu.fpt.zentryapp.faceid.data.model.response.FaceIdResponse;
-import vn.edu.fpt.zentryapp.faceid.data.service.MediaPipeFaceLandmarkExtractor;
+
 
 public class FaceIdService {
     private static final String TAG = "FaceIdService";
@@ -54,6 +52,11 @@ public class FaceIdService {
     
     // 🔧 NEW: Improved components
     private final FaceDecisionEngine decisionEngine;
+    private final LivenessContext livenessContext = new LivenessContext();
+
+    public LivenessContext getLivenessContext() {
+        return livenessContext;
+    }
     private final ModelRetryManager retryManager;
     private final FaceProcessingErrorHandler errorHandler;
     
@@ -62,7 +65,7 @@ public class FaceIdService {
     private final FaceIdMemoryManager memoryManager;
     private final FaceIdPerformanceManager performanceManager;
     
-    private final CountDownLatch modelLoadLatch = new CountDownLatch(5); // Update to 5 models (added MediaPipeFaceLandmarkExtractor)
+    private final CountDownLatch modelLoadLatch = new CountDownLatch(5); // consider timeouts to avoid deadlock
     private volatile boolean isInitialized = false;
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
     
@@ -315,22 +318,25 @@ public class FaceIdService {
                 spoofResult.isSpoof(), spoofResult.getConfidence(), spoofResult.getScore()
             );
             
-            FaceDecisionEngine.FaceDecisionResult decision = decisionEngine.evaluate(
-                detectionResult, spoofDetectionResult, ovalValidation
+            FaceDecisionInput in = new FaceDecisionInput(
+                detectionResult,
+                spoofDetectionResult,
+                ovalValidation,
+                livenessContext.livenessVerifiedRecently(),
+                livenessContext.straightGaze(),
+                configManager.getConfig().scenario
             );
-            
-            Log.d(TAG, "processFaceWithOvalBoundary: Decision result: " + decision);
-            
-            // 🔧 NEW: Handle decision result
-            if (decision.isAccepted()) {
-                Log.d(TAG, "processFaceWithOvalBoundary: SUCCESS - " + decision.getMessage());
+            FaceDecisionEngine.FaceDecision ctxDecision = decisionEngine.evaluate(in);
+            Log.d(TAG, "processFaceWithOvalBoundary: CtxDecision result: " + ctxDecision.type + ", reason=" + ctxDecision.reason);
+            if (ctxDecision.type == FaceDecisionEngine.FaceDecision.Type.ACCEPT) {
+                Log.d(TAG, "processFaceWithOvalBoundary: SUCCESS - " + ctxDecision.reason);
                 runOnMainThread(() -> callback.onFaceDetected(faceBitmap, boundingBox));
-            } else if (decision.isRejected()) {
-                Log.e(TAG, "processFaceWithOvalBoundary: FAILED - " + decision.getMessage());
-                runOnMainThread(() -> callback.onError(decision.getMessage()));
-            } else if (decision.needsGuidance()) {
-                Log.w(TAG, "processFaceWithOvalBoundary: GUIDANCE - " + decision.getMessage());
-                runOnMainThread(() -> callback.onError(decision.getMessage()));
+            } else if (ctxDecision.type == FaceDecisionEngine.FaceDecision.Type.REJECT) {
+                Log.e(TAG, "processFaceWithOvalBoundary: FAILED - " + ctxDecision.reason);
+                runOnMainThread(() -> callback.onError(ctxDecision.reason));
+            } else { // REVIEW / GUIDANCE
+                Log.w(TAG, "processFaceWithOvalBoundary: GUIDANCE - " + ctxDecision.reason);
+                runOnMainThread(() -> callback.onError(ctxDecision.reason));
             }
             
             // 🔧 NEW: Memory management - release pooled objects
@@ -541,11 +547,16 @@ public class FaceIdService {
                         spoofResult.isSpoof(), spoofResult.getConfidence(), spoofResult.getScore()
                     );
                     
-                    FaceDecisionEngine.FaceDecisionResult decision = decisionEngine.evaluate(
-                        detectionResult, spoofDetectionResult, ovalValidation
+                    FaceDecisionInput in = new FaceDecisionInput(
+                        detectionResult,
+                        spoofDetectionResult,
+                        ovalValidation,
+                        livenessContext.livenessVerifiedRecently(),
+                        livenessContext.straightGaze(),
+                        configManager.getConfig().scenario
                     );
-                    
-                    Log.d(TAG, "processContinuousFrame: Decision result: " + decision);
+                    FaceDecisionEngine.FaceDecision ctxDecision = decisionEngine.evaluate(in);
+                    Log.d(TAG, "processContinuousFrame: CtxDecision result: " + ctxDecision.type + ", reason=" + ctxDecision.reason);
                     
                     runOnMainThread(() -> {
                         Log.d(TAG, "processContinuousFrame: Calling callback with isSpoof: " + 

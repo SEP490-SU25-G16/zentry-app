@@ -1,0 +1,7 @@
+Title: Global guardrails — No cross-module edits
+
+Do not modify files outside explicitly permitted module scopes in task-specific rules.
+
+No auto-apply diffs; always show minimal diffs with reasoning.
+
+Keep commits small; attach tests and Semgrep results summary.

@@ -1213,7 +1213,7 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
         
         try {
             // Initialize the FaceIdEnhancer
-            faceIdEnhancer = new FaceIdEnhancer(getContext(), this);
+            faceIdEnhancer = new FaceIdEnhancer(getContext(), this); // enhancer updates liveness context internally
             // Only require gaze (RIGHT -> LEFT) to match current UX and avoid blocking on blink
             faceIdEnhancer.setChallengeType(FaceIdEnhancer.ChallengeType.GAZE_ONLY);
             faceIdEnhancerInitialized = true;

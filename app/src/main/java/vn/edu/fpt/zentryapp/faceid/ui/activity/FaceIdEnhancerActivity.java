@@ -78,7 +78,7 @@ public class FaceIdEnhancerActivity extends AppCompatActivity implements
         cameraExecutor = Executors.newSingleThreadExecutor();
         
         // Initialize face ID enhancer
-        faceIdEnhancer = new FaceIdEnhancer(this, this);
+        faceIdEnhancer = new FaceIdEnhancer(this, this); // liveness signals are internal to enhancer
         
         // Set challenge type: only gaze (RIGHT -> LEFT)
         faceIdEnhancer.setChallengeType(FaceIdEnhancer.ChallengeType.GAZE_ONLY);

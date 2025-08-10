@@ -16,6 +16,7 @@ import org.tensorflow.lite.gpu.GpuDelegate;
 import org.tensorflow.lite.support.common.FileUtil;
 import org.tensorflow.lite.support.common.ops.CastOp;
 import org.tensorflow.lite.support.image.ImageProcessor;
+import org.tensorflow.lite.support.image.ops.ResizeOp;
 import org.tensorflow.lite.support.image.TensorImage;
 
 import java.io.IOException;
@@ -66,6 +67,7 @@ public class FaceSpoofDetector {
     private Interpreter secondModelInterpreter;
     private ImageProcessor imageTensorProcessor;
     private boolean useMockDetection = false;
+    private final Object interpreterLock = new Object();
     private final Executor executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Context context;
@@ -125,7 +127,7 @@ public class FaceSpoofDetector {
                     Log.d(TAG, "Loading model files...");
 
                     // Initialize TFLiteInterpreter
-                    Interpreter.Options interpreterOptions = TFLiteGpuDelegateManager.getInstance().getInterpreterOptions();
+                    Interpreter.Options interpreterOptions = vn.edu.fpt.zentryapp.faceid.utils.InterpreterOptionsFactory.createBestOptions(context);
 
                     // Load models from assets
                     MappedByteBuffer model1Buffer = FileUtil.loadMappedFile(context, MODEL_FILE_1);
@@ -137,9 +139,27 @@ public class FaceSpoofDetector {
                     // Create interpreters
                     firstModelInterpreter = new Interpreter(model1Buffer, interpreterOptions);
                     secondModelInterpreter = new Interpreter(model2Buffer, interpreterOptions);
+                    try {
+                        // Ensure expected input shape [1,80,80,3]
+                        firstModelInterpreter.resizeInput(0, new int[]{1, INPUT_IMAGE_DIM, INPUT_IMAGE_DIM, 3});
+                        secondModelInterpreter.resizeInput(0, new int[]{1, INPUT_IMAGE_DIM, INPUT_IMAGE_DIM, 3});
+                    } catch (Throwable ignore) {}
+                    try { firstModelInterpreter.allocateTensors(); } catch (Throwable ignore) {}
+                    try { secondModelInterpreter.allocateTensors(); } catch (Throwable ignore) {}
+                    // Warmup both models with NHWC 4D input shape
+                    try {
+                        float[][][][] dummy = new float[1][INPUT_IMAGE_DIM][INPUT_IMAGE_DIM][3];
+                        float[][] out1 = new float[1][OUTPUT_DIM];
+                        float[][] out2 = new float[1][OUTPUT_DIM];
+                        firstModelInterpreter.run(dummy, out1);
+                        secondModelInterpreter.run(dummy, out2);
+                    } catch (Throwable warm) {
+                        Log.e(TAG, "Warmup ignored: " + warm.getMessage(), warm);
+                    }
 
                     // Create image processor for preprocessing
                     imageTensorProcessor = new ImageProcessor.Builder()
+                            .add(new ResizeOp(INPUT_IMAGE_DIM, INPUT_IMAGE_DIM, ResizeOp.ResizeMethod.BILINEAR))
                             .add(new CastOp(DataType.FLOAT32))
                             .build();
 
@@ -253,6 +273,10 @@ public class FaceSpoofDetector {
      * @param ovalRect   Oval guide boundaries (optional, can be null)
      * @return Spoof detection result
      */
+    private static void ensureAllocatedSafe(Interpreter i) {
+        try { if (i != null) i.allocateTensors(); } catch (Throwable ignore) {}
+    }
+
     public SpoofResult detectSpoof(Bitmap frameImage, Rect faceRect, android.graphics.RectF ovalRect) {
         long startTime = System.currentTimeMillis();
 
@@ -264,6 +288,12 @@ public class FaceSpoofDetector {
 
         try {
             Log.d(TAG, "Starting spoof detection with bounding box: " + faceRect.toString());
+
+            // Validate face rect
+            if (faceRect.width() <= 0 || faceRect.height() <= 0) {
+                Log.e(TAG, "Invalid face rect size: " + faceRect);
+                return new SpoofResult(false, 0.5f, System.currentTimeMillis() - startTime);
+            }
 
             // Crop and scale face image with the two given constants
             Bitmap croppedImage1 = crop(
@@ -306,14 +336,43 @@ public class FaceSpoofDetector {
             // Get buffers from TensorImages
             ByteBuffer input1 = tensorImage1.getBuffer();
             ByteBuffer input2 = tensorImage2.getBuffer();
+            // Ensure direct buffers with native order
+            if (input1 != null) {
+                input1.order(java.nio.ByteOrder.nativeOrder());
+                if (!input1.isDirect()) {
+                    ByteBuffer direct = ByteBuffer.allocateDirect(input1.capacity()).order(java.nio.ByteOrder.nativeOrder());
+                    input1.rewind(); direct.put(input1); input1 = direct;
+                }
+            }
+            if (input2 != null) {
+                input2.order(java.nio.ByteOrder.nativeOrder());
+                if (!input2.isDirect()) {
+                    ByteBuffer direct2 = ByteBuffer.allocateDirect(input2.capacity()).order(java.nio.ByteOrder.nativeOrder());
+                    input2.rewind(); direct2.put(input2); input2 = direct2;
+                }
+            }
 
             // Prepare output buffers
             float[][] output1 = new float[1][OUTPUT_DIM];
             float[][] output2 = new float[1][OUTPUT_DIM];
 
-            // Run inference
-            firstModelInterpreter.run(input1, output1);
-            secondModelInterpreter.run(input2, output2);
+            // Run inference guarded and retry allocate once on failure
+            try { input1.rewind(); } catch (Throwable ignore) {}
+            try { input2.rewind(); } catch (Throwable ignore) {}
+            synchronized (interpreterLock) {
+                ensureAllocatedSafe(firstModelInterpreter);
+                ensureAllocatedSafe(secondModelInterpreter);
+                try {
+                    firstModelInterpreter.run(input1, output1);
+                    secondModelInterpreter.run(input2, output2);
+                } catch (IllegalArgumentException allocErr) {
+                    Log.w(TAG, "Re-allocating tensors due to allocation error", allocErr);
+                    ensureAllocatedSafe(firstModelInterpreter);
+                    ensureAllocatedSafe(secondModelInterpreter);
+                    firstModelInterpreter.run(input1, output1);
+                    secondModelInterpreter.run(input2, output2);
+                }
+            }
 
             Log.d(TAG, "Ran inference");
             Log.d(TAG, "Output model 1: [" + output1[0][0] + ", " + output1[0][1] + ", " + output1[0][2] + "]");

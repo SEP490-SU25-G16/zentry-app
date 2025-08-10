@@ -48,6 +48,7 @@ public class FaceIdEnhancer implements
     private boolean blinkDetected = false;
     private boolean gazeVerified = false;
     private boolean livenessVerified = false;
+    private final LivenessContext livenessContext = new LivenessContext();
     
     // Robust, prompt-driven gaze challenge
     public enum Direction { LEFT, RIGHT, UP, DOWN }
@@ -273,6 +274,7 @@ public class FaceIdEnhancer implements
         if (gazeVerified) return;
         if (currentDirectionIndex >= requiredDirections.size()) {
             gazeVerified = true;
+            livenessContext.setGazeCentered(true);
             updateState(AuthState.GAZE_VERIFIED);
             Log.d(TAG, "Gaze verification complete (sequence)");
             checkVerificationComplete();
@@ -356,6 +358,7 @@ public class FaceIdEnhancer implements
     public void onBlink(boolean isLeftEye, boolean isRightEye) {
         if (!blinkDetected) {
             blinkDetected = true;
+            livenessContext.markLivenessNow();
             updateState(AuthState.BLINK_VERIFIED);
             
             if (callback != null) {

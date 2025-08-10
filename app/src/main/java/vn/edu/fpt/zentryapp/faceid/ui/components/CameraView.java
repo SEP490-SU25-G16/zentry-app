@@ -9,7 +9,6 @@ import android.graphics.YuvImage;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.Size;
-import android.view.Surface;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
@@ -35,8 +34,10 @@ import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Custom camera view for face capture with continuous frame analysis
@@ -50,7 +51,10 @@ public class CameraView extends FrameLayout {
     private ImageCapture imageCapture;
     private ImageAnalysis imageAnalysis;
     private final Executor executor = Executors.newSingleThreadExecutor();
-    private AtomicBoolean processingFrame = new AtomicBoolean(false);
+    private final ExecutorService mlWorker = Executors.newSingleThreadExecutor();
+    private final AtomicReference<Bitmap> latestFrame = new AtomicReference<>(null);
+    private final AtomicBoolean workerActive = new AtomicBoolean(false);
+    private volatile int analysisStride = 1; // soft FPS cap: analyze every N frames
     
     // Biến để log info chỉ một lần
     private boolean hasLoggedImageInfo = false;
@@ -154,6 +158,8 @@ public class CameraView extends FrameLayout {
                     .setTargetResolution(new Size(640, 480)) // Độ phân giải phù hợp cho face detection
                     .build();
             
+            // Store callback for worker delivery
+            final FrameAnalysisCallback analysisCallback = frameCallback;
             imageAnalysis.setAnalyzer(executor, image -> {
                 frameCount++;
                 
@@ -163,17 +169,13 @@ public class CameraView extends FrameLayout {
                             ", size: " + image.getWidth() + "x" + image.getHeight());
                 }
                 
-                // Skip if we're still processing a previous frame
-                if (processingFrame.get()) {
-                    if (frameCount % 30 == 0) {
-                        Log.d(TAG, "Skipping frame #" + frameCount + " - still processing previous frame");
-                    }
+                // Soft FPS cap: process only every Nth frame
+                if (analysisStride > 1 && (frameCount % analysisStride) != 0) {
                     image.close();
                     return;
                 }
                 
                 try {
-                    processingFrame.set(true);
                     
                     // Log thông tin về định dạng ảnh (chỉ log lần đầu tiên)
                     if (!hasLoggedImageInfo) {
@@ -184,12 +186,12 @@ public class CameraView extends FrameLayout {
                     try {
                         Log.d(TAG, "Converting frame #" + frameCount + " to bitmap");
                         
-                        // Convert to bitmap
+                        // Avoid JPEG path; if the downstream needs Bitmap, consider faster YUV->RGB. Here pass through MPImage via callback if supported.
                         Bitmap bitmap = imageToBitmap(image);
                         
                         if (bitmap == null) {
                             Log.e(TAG, "Failed to convert frame #" + frameCount + " to bitmap - bitmap is null");
-                            processingFrame.set(false);
+
                             return;
                         }
                         
@@ -215,24 +217,28 @@ public class CameraView extends FrameLayout {
                         Log.d(TAG, "Final bitmap for frame #" + frameCount + ": " + 
                                 bitmap.getWidth() + "x" + bitmap.getHeight());
                         
-                        // Return bitmap via callback
-                        final Bitmap finalBitmap = bitmap;
-                        post(() -> {
-                            Log.d(TAG, "Calling frameCallback for frame #" + frameCount);
-                            frameCallback.onFrameAnalyzed(finalBitmap);
-                            processingFrame.set(false);
-                        });
+                        // Coalesce frames for worker to keep freshest
+                        Bitmap previous = latestFrame.getAndSet(bitmap);
+                        if (previous != null && previous != bitmap && !previous.isRecycled()) {
+                            try { previous.recycle(); } catch (Exception ignore) {}
+                        }
+                        if (workerActive.compareAndSet(false, true)) {
+                            mlWorker.execute(() -> drainWorkerQueue(analysisCallback));
+                        }
                     } catch (Exception e) {
                         Log.e(TAG, "Error processing frame #" + frameCount, e);
-                        processingFrame.set(false);
+
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "Error analyzing frame #" + frameCount, e);
-                    processingFrame.set(false);
+
                 } finally {
                     image.close();
                 }
             });
+
+            // Warm default stride based on device load could be updated elsewhere
+            setAnalysisStride(1);
         } else {
             Log.d(TAG, "No frame callback provided - ImageAnalysis not set up");
         }
@@ -267,6 +273,37 @@ public class CameraView extends FrameLayout {
         }
     }
     
+    private void drainWorkerQueue(@Nullable FrameAnalysisCallback analysisCallback) {
+        try {
+            while (true) {
+                Bitmap toProcess = latestFrame.getAndSet(null);
+                if (toProcess == null) break;
+                final Bitmap deliver = toProcess;
+                post(() -> {
+                    try {
+                        // Deliver on UI thread; heavy ML should be in worker callbacks downstream
+                        if (analysisCallback != null) analysisCallback.onFrameAnalyzed(deliver);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error delivering frame to callback", e);
+                    }
+                });
+            }
+        } finally {
+            workerActive.set(false);
+            if (latestFrame.get() != null && workerActive.compareAndSet(false, true)) {
+                mlWorker.execute(() -> drainWorkerQueue(null));
+            }
+        }
+    }
+
+    /**
+     * Adjust analysis stride (process every Nth frame). Use >1 to reduce load.
+     */
+    public void setAnalysisStride(int stride) {
+        if (stride < 1) stride = 1;
+        this.analysisStride = stride;
+    }
+
     /**
      * Capture a photo
      */
