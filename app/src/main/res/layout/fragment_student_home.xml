@@ -179,33 +179,6 @@
                         android:textSize="12sp"/>
                 </LinearLayout>
 
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center_horizontal">
-                    <FrameLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content">
-                        <ImageView
-                            android:src="@drawable/ic_claim"
-                            android:layout_width="36dp"
-                            android:layout_height="36dp"/>
-                        <!-- Red dot notification -->
-                        <View
-                            android:layout_width="10dp"
-                            android:layout_height="10dp"
-                            android:background="@drawable/bg_red_dot"
-                            android:layout_gravity="end|top"/>
-                    </FrameLayout>
-                    <TextView
-                        android:fontFamily="@font/mulishbold"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Claim"
-                        android:textColor="@color/bodyText"
-                        android:textSize="12sp"/>
-                </LinearLayout>
             </LinearLayout>
 
             <!-- Weekly Overview Slider Section -->
