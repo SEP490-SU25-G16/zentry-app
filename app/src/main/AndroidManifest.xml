@@ -40,7 +40,7 @@
 
         <!-- Service -->
         <activity
-            android:name=".student.presentation.activity.FaceIdEnhancerActivity"
+            android:name=".faceid.ui.activity.FaceIdEnhancerActivity"
             android:exported="false" />
         <activity
             android:name=".MainActivity"

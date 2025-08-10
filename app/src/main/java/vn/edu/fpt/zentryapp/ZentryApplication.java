@@ -3,8 +3,8 @@ package vn.edu.fpt.zentryapp;
 import android.app.Application;
 import android.util.Log;
 
-import vn.edu.fpt.zentryapp.student.data.service.FaceIdService;
-import vn.edu.fpt.zentryapp.student.data.service.FaceIdServiceManager;
+import vn.edu.fpt.zentryapp.faceid.data.service.FaceIdService;
+import vn.edu.fpt.zentryapp.faceid.data.service.FaceIdServiceManager;
 
 public class ZentryApplication extends Application {
     private static final String TAG = "ZentryApplication";
