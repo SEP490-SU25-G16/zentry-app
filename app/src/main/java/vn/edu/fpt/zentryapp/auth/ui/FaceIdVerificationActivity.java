@@ -1,4 +1,4 @@
-package com.example.zentry_app.ui.faceid;
+package vn.edu.fpt.zentryapp.auth.ui;
 
 import android.os.Bundle;
 import android.widget.Button;
