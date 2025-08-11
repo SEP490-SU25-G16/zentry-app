@@ -82,6 +82,8 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
     private boolean isAnalyzing = false;
     private static final int ANALYSIS_DURATION_MS = 5000;
     private static final float MIN_AVERAGE_SCORE_FOR_REGISTRATION = 0.75f;
+    // After liveness is verified, we trust the face is live and should not filter out frames as spoof
+    private boolean livenessVerified = false;
 
     // 🔄 HANDLERS
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -601,7 +603,8 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
             faceIdService.processContinuousFrame(bitmap, faceOverlayView.getOvalRect(), new FaceIdService.ContinuousProcessingCallback() {
                 @Override
                 public void onFaceDetected(Rect boundingBox, boolean isSpoof, float spoofScore) {
-                    if (!isSpoof) {
+                    // During analysis, if liveness has been verified, accept frames regardless of spoof flag
+                    if (!isSpoof || livenessVerified) {
                         frameScores.add(spoofScore);
                     }
                 }
@@ -1280,6 +1283,8 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
         } else if (newState == FaceIdEnhancer.AuthState.VERIFIED) {
             // All liveness challenges completed
             Log.d(TAG, "Liveness verification complete!");
+            // Mark local liveness flag to relax spoof gating during analysis
+            livenessVerified = true;
             // Transition to the next state in registration
             stateManager.transitionTo(FaceRegistrationState.FACE_REAL, "Liveness verified!");
             // Mark success and hide liveness overlay
@@ -1459,6 +1464,7 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
         // Clear data
         currentFrameBitmap = null;
         currentFaceRect = null;
+        livenessVerified = false;
         
         // Đặt lại biến phân tích
         isAnalyzing = false;
@@ -1650,7 +1656,9 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
                 return;
             }
             
-            if (frameScores.size() < 10) {
+            // Reduce the minimum required frames after liveness to avoid false negatives
+            int minRequiredFrames = livenessVerified ? 6 : 10;
+            if (frameScores.size() < minRequiredFrames) {
                 stateManager.transitionTo(FaceRegistrationState.FAILED_OTHER, 
                         "Không đủ dữ liệu chất lượng. Cần cải thiện ánh sáng và giữ vị trí ổn định.");
                 return;
