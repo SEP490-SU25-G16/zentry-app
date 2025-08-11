@@ -1,4 +1,4 @@
-package vn.edu.fpt.zentryapp.faceid.ui.setting.ui;
+package vn.edu.fpt.zentryapp.faceid.ui;
 
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
