@@ -16,6 +16,7 @@ import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.HomeDataDto;
 import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.MonthlyCalendarDataDto;
 import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.SemesterCoursesDataDto;
 import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.SessionAttendanceDataDto;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.UserDto;
 
 public interface LecturerApiService {
     @GET("api/schedules/lecturer/daily-schedule")
@@ -42,4 +43,6 @@ public interface LecturerApiService {
             @Query("month") int month,
             @Query("year") int year
     );
+    @GET("/api/user/{user_id}")
+    Call<ApiResponseDto<UserDto>> getUserProfile(@Path("user_id") String userId);
 }

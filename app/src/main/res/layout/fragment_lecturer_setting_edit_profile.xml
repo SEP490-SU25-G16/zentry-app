@@ -32,49 +32,6 @@
                 android:gravity="center_vertical"
                 android:layout_marginTop="48dp"
                 android:layout_marginBottom="24dp">
-
-                <Space
-                    android:id="@+id/spEditProfileLeftSpace"
-                    android:layout_width="0dp"
-                    android:layout_height="1dp"
-                    android:layout_weight="1" />
-
-                <FrameLayout
-                    android:id="@+id/flEditProfileAvatarContainer"
-                    android:layout_width="120dp"
-                    android:layout_height="120dp">
-
-                    <View
-                        android:id="@+id/viewEditProfileAvatarBackground"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent" />
-
-                    <ImageView
-                        android:id="@+id/ivEditProfileAvatar"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:src="@drawable/ic_notification"
-                        android:scaleType="centerCrop"
-                        android:clipToOutline="true" />
-
-                    <!-- Edit overlay nhỏ ở góc -->
-                    <ImageView
-                        android:id="@+id/ivEditProfileAvatarOverlay"
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:layout_gravity="bottom|end"
-                        android:background="@drawable/ic_edit_image"
-                        android:src="@drawable/ic_edit_image"
-                        android:scaleType="centerInside"
-                        android:padding="8dp"
-                        android:elevation="2dp" />
-                </FrameLayout>
-
-                <Space
-                    android:id="@+id/spEditProfileRightSpace"
-                    android:layout_width="0dp"
-                    android:layout_height="1dp"
-                    android:layout_weight="1" />
             </LinearLayout>
 
             <!-- Full name: chỉ hiển thị -->

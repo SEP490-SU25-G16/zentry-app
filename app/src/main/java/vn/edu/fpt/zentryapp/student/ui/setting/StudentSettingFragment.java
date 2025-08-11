@@ -112,6 +112,9 @@ public class StudentSettingFragment extends Fragment {
                 Log.e("StudentSettingFragment", "Error during logout: ", e);
             }
         });
+
+        binding.tvStudentSettingName.setText(authManager.getCurrentUserName());
+        binding.tvStudentSettingEmail.setText(authManager.getCurrentUserEmail());
     }
 
     private boolean checkIfDeviceRegistered() {
