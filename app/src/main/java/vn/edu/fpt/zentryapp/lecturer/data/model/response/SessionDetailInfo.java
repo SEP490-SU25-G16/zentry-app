@@ -13,6 +13,8 @@ public class SessionDetailInfo {
     private String courseCode;
     private String courseName;
     private String className;
+    private String sessionTitle;
+    private String roomInfo;
     private String room;
     private String grade;
     private int sessionNumber;
@@ -31,10 +33,6 @@ public class SessionDetailInfo {
 
     public String getSessionTitle() {
         return "Session - " + sessionNumber;
-    }
-
-    public String getGradeDisplay() {
-        return "Grade " + grade;
     }
 
     public boolean canEditAttendance() {

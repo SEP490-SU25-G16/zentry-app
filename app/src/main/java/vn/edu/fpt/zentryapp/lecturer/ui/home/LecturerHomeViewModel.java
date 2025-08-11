@@ -1,8 +1,16 @@
 package vn.edu.fpt.zentryapp.lecturer.ui.home;
 
 import androidx.lifecycle.*;
+
+import android.annotation.SuppressLint;
 import android.content.Context;
+import android.util.Log;
+
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
+
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -10,14 +18,16 @@ import retrofit2.Response;
 import vn.edu.fpt.zentryapp.auth.client.ApiClient;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.lecturer.data.api.LecturerApiService;
-import vn.edu.fpt.zentryapp.lecturer.data.model.response.ClassSectionData;
-import vn.edu.fpt.zentryapp.lecturer.data.model.response.ClassSectionResponse;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.ExamModel;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.SessionModel;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.WeeklyModel;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.ApiResponseDto;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.HomeDataDto;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.NextSessionDto;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.WeeklyOverviewDto;
 
 public class LecturerHomeViewModel extends ViewModel {
-
+    private final String TAG = "LecturerHomeViewModel";
     private final MutableLiveData<List<ExamModel>> _exams = new MutableLiveData<>();
     private final MutableLiveData<List<SessionModel>> _sessions = new MutableLiveData<>();
     private final MutableLiveData<List<WeeklyModel>> _weekly = new MutableLiveData<>();
@@ -40,102 +50,125 @@ public class LecturerHomeViewModel extends ViewModel {
     }
 
     public void loadTodayClasses() {
-        if (authManager == null) return;
-
-        String lecturerId = authManager.getCurrentUserId();
-        if (lecturerId == null) {
-            _errorMessage.setValue("User not authenticated");
-            return;
-        }
-
         _isLoading.setValue(true);
-        _errorMessage.setValue(null);
 
-        apiService.getTodayClasses(lecturerId).enqueue(new Callback<ClassSectionResponse>() {
+        // Get lecturer ID from AuthManager
+        String lecturerId = authManager.getCurrentUserId(); // Assume you have this method
+
+        Call<ApiResponseDto<HomeDataDto>> call = apiService.getHomeData(lecturerId);
+        call.enqueue(new Callback<ApiResponseDto<HomeDataDto>>() {
             @Override
-            public void onResponse(Call<ClassSectionResponse> call, Response<ClassSectionResponse> response) {
+            public void onResponse(Call<ApiResponseDto<HomeDataDto>> call, Response<ApiResponseDto<HomeDataDto>> response) {
                 _isLoading.setValue(false);
 
                 if (response.isSuccessful() && response.body() != null) {
-                    ClassSectionResponse apiResponse = response.body();
+                    ApiResponseDto<HomeDataDto> apiResponse = response.body();
+
                     if (apiResponse.isSuccess() && apiResponse.getData() != null) {
-                        processClassSections(apiResponse.getData());
+                        processHomeData(apiResponse.getData());
                     } else {
                         _errorMessage.setValue(apiResponse.getError() != null ?
-                                apiResponse.getError() : "No classes found for today");
+                                apiResponse.getError() : "Unknown error occurred");
                     }
                 } else {
-                    _errorMessage.setValue("Failed to load today's classes");
+                    _errorMessage.setValue("Failed to load data: " + response.message());
                 }
             }
 
             @Override
-            public void onFailure(Call<ClassSectionResponse> call, Throwable t) {
+            public void onFailure(Call<ApiResponseDto<HomeDataDto>> call, Throwable t) {
                 _isLoading.setValue(false);
                 _errorMessage.setValue("Network error: " + t.getMessage());
+                Log.e(TAG, "API call failed", t);
             }
         });
     }
 
-    private void processClassSections(List<ClassSectionData> classSections) {
+    private void processHomeData(HomeDataDto homeData) {
         // Convert API data to UI models
-        List<SessionModel> sessionList = convertToSessionModels(classSections);
-        List<WeeklyModel> weeklyList = convertToWeeklyModels(classSections);
+        List<SessionModel> sessionList = mapNextSessionsToSessionModels(homeData.getNextSessions());
+        List<WeeklyModel> weeklyList = mapWeeklyOverviewToWeeklyModels(homeData.getWeeklyOverview());
 
         _sessions.setValue(sessionList);
         _weekly.setValue(weeklyList);
 
-        // Keep exams empty for now (no exam data in this API)
         _exams.setValue(new ArrayList<>());
     }
 
-    private List<SessionModel> convertToSessionModels(List<ClassSectionData> classSections) {
-        List<SessionModel> sessions = new ArrayList<>();
+    private List<SessionModel> mapNextSessionsToSessionModels(List<NextSessionDto> nextSessions) {
+        List<SessionModel> result = new ArrayList<>();
 
-        for (ClassSectionData classSection : classSections) {
-            // Create session title
-            String sessionTitle = classSection.getCourseName() + " - " + classSection.getSectionCode();
+        if (nextSessions == null) return result;
 
-            // Get schedule info
-            String scheduleInfo = "";
-            if (classSection.getSchedules() != null && !classSection.getSchedules().isEmpty()) {
-                ClassSectionData.Schedule schedule = classSection.getSchedules().get(0);
-                scheduleInfo = schedule.getScheduleInfo() + " | " + schedule.getRoomInfo();
-            }
+        for (NextSessionDto session : nextSessions) {
+            String title = session.getClassTitle();
+            String scheduleInfo = formatScheduleInfo(session);
+            String timeRemaining = calculateTimeRemaining(session);
 
-            // Calculate time remaining (you may need to implement this based on schedule time)
-            String timeRemaining = "Starting soon"; // Placeholder
-
-            sessions.add(new SessionModel(sessionTitle, scheduleInfo, timeRemaining));
+            result.add(new SessionModel(title, scheduleInfo, timeRemaining));
         }
 
-        return sessions;
+        return result;
     }
 
-    private List<WeeklyModel> convertToWeeklyModels(List<ClassSectionData> classSections) {
-        List<WeeklyModel> weeklyList = new ArrayList<>();
+    private List<WeeklyModel> mapWeeklyOverviewToWeeklyModels(List<WeeklyOverviewDto> weeklyData) {
+        List<WeeklyModel> result = new ArrayList<>();
 
-        for (ClassSectionData classSection : classSections) {
-            String courseTitle = classSection.getCourseName() + " - " + classSection.getSectionCode();
+        if (weeklyData == null) return result;
 
-            // Parse session progress (e.g., "1" means session 1)
-            int currentSession = 1;
-            try {
-                currentSession = Integer.parseInt(classSection.getSessionProgress());
-            } catch (NumberFormatException e) {
-                // Keep default
-            }
+        for (WeeklyOverviewDto week : weeklyData) {
+            String classTitle = week.getClassName(); // "Introduction to Computer Science - SE705"
 
-            String presented = currentSession + "/" + classSection.getTotalSessions() + " Presented";
-            String sessions = (currentSession - 1) + "/" + classSection.getTotalSessions() + " Sessions";
+            // Dòng trên: Hiển thị số học sinh trong lớp
+            String presented = week.getEnrolledStudents() + " Students";
 
-            // Calculate completion percentage
-            double completionRate = ((double) (currentSession - 1) / classSection.getTotalSessions()) * 100;
-            String completion = String.format("%.0f%%", completionRate);
+            String sessions = week.getSessionsThisWeek() + " Session";
 
-            weeklyList.add(new WeeklyModel(courseTitle, presented, sessions, completion));
+            // Attendance rate hoặc có thể để trống nếu không cần
+            String completion = String.format("%.0f%%", week.getAttendanceRate());
+
+            result.add(new WeeklyModel(classTitle, presented, sessions, completion));
         }
 
-        return weeklyList;
+        return result;
+    }
+
+    @SuppressLint("DefaultLocale")
+    private String formatScheduleInfo(NextSessionDto session) {
+        return String.format("%s %s - %s | %s",
+                session.getStartDate(),
+                session.getStartTime(),
+                session.getEndTime(),
+                session.getRoomInfo()
+        );
+    }
+
+    private String calculateTimeRemaining(NextSessionDto session) {
+        try {
+            SimpleDateFormat dateTimeFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+            String startDateTime = session.getStartDate() + " " + session.getStartTime();
+            Date sessionStart = dateTimeFormat.parse(startDateTime);
+            Date now = new Date();
+
+            if (sessionStart == null) return "Unknown";
+
+            long diffInMillis = sessionStart.getTime() - now.getTime();
+
+            if (diffInMillis <= 0) {
+                return "Started";
+            } else if (diffInMillis < TimeUnit.HOURS.toMillis(1)) {
+                long minutes = TimeUnit.MILLISECONDS.toMinutes(diffInMillis);
+                return minutes + " min left";
+            } else if (diffInMillis < TimeUnit.DAYS.toMillis(1)) {
+                long hours = TimeUnit.MILLISECONDS.toHours(diffInMillis);
+                return hours + " hour(s) left";
+            } else {
+                long days = TimeUnit.MILLISECONDS.toDays(diffInMillis);
+                return days + " day(s) left";
+            }
+        } catch (ParseException e) {
+            Log.e(TAG, "Error parsing date", e);
+            return "Starting soon";
+        }
     }
 }

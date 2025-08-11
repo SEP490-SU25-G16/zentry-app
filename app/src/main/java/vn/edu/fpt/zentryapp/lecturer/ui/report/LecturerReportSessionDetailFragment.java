@@ -19,6 +19,7 @@ import android.view.ViewGroup;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentLecturerReportSessionDetailBinding;
 import vn.edu.fpt.zentryapp.lecturer.adapter.LecturerReportListStudentOnSessionAdapter;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.OverviewSession;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.Student;
 
 public class LecturerReportSessionDetailFragment extends Fragment implements LecturerReportListStudentOnSessionAdapter.OnAttendanceEditListener {
@@ -43,17 +44,23 @@ public class LecturerReportSessionDetailFragment extends Fragment implements Lec
 
         navController = NavHostFragment.findNavController(this);
 
-        // Get arguments from previous fragment
-        String sessionId = getArguments() != null ? getArguments().getString("sessionId", "") : "";
-        String courseCode = getArguments() != null ? getArguments().getString("courseCode", "") : "";
-        String courseName = getArguments() != null ? getArguments().getString("courseName", "") : "";
-        String className = getArguments() != null ? getArguments().getString("className", "") : "";
-        int sessionNumber = getArguments() != null ? getArguments().getInt("sessionNumber", 1) : 1;
+        // Get OverviewSession from arguments
+        OverviewSession sessionInfo = null;
+        if (getArguments() != null) {
+            sessionInfo = (OverviewSession) getArguments().getSerializable("sessionInfo");
+        }
 
         // Initialize ViewModel
         viewModel = new ViewModelProvider(this).get(LecturerReportSessionDetailViewModel.class);
         AuthManager authManager = AuthManager.getInstance(requireContext());
-        viewModel.init(authManager, sessionId, courseCode, courseName, className, sessionNumber);
+
+        if (sessionInfo != null) {
+            viewModel.initWithSessionData(requireContext(), authManager, sessionInfo);
+        } else {
+            // Fallback to sessionId if sessionInfo is not available
+            String sessionId = getArguments() != null ? getArguments().getString("sessionId", "") : "";
+            viewModel.init(requireContext(), authManager, sessionId);
+        }
 
         setupRecyclerView();
         setupClickListeners();
@@ -87,8 +94,6 @@ public class LecturerReportSessionDetailFragment extends Fragment implements Lec
         // Observe session info
         viewModel.sessionInfo().observe(getViewLifecycleOwner(), sessionInfo -> {
             if (sessionInfo != null) {
-                binding.tvSessionDetailGrade.setText(sessionInfo.getGradeDisplay());
-                binding.tvSessionDetailSubject.setText(sessionInfo.getCourseName());
                 binding.tvSessionDetailSessionNumber.setText(sessionInfo.getSessionTitle());
                 binding.tvSessionDetailStudentCount.setText(sessionInfo.getTotalStudents() + " Students");
                 binding.tvSessionDetailAttendanceCount.setText(sessionInfo.getAttendanceSummary());
@@ -98,6 +103,8 @@ public class LecturerReportSessionDetailFragment extends Fragment implements Lec
                 studentAdapter.setCanEditAttendance(canEdit);
 
                 if (canEdit) {
+                    binding.tvEditTimeWarning.setText("⚠️ You can edit attendance within 24 hours of session");
+                    binding.tvEditTimeWarning.setTextColor(0xFF4CAF50); // Green
                     binding.tvEditTimeWarning.setVisibility(View.VISIBLE);
                 } else {
                     binding.tvEditTimeWarning.setText("⚠️ Editing disabled - 24 hours have passed");

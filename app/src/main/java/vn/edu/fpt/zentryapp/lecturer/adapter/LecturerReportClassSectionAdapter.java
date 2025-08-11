@@ -76,7 +76,7 @@ public class LecturerReportClassSectionAdapter extends RecyclerView.Adapter<Lect
             binding.tvStudentsCount.setText(studentsText);
 
             // Bind sessions count
-            String sessionsText = classroom.getCurrentSessions() + "/" + classroom.getTotalSessions() + " Sessions";
+            String sessionsText = classroom.getCompletedSessions() + "/" + classroom.getTotalSessions() + " Sessions";
             binding.tvSessionsCount.setText(sessionsText);
 
             // Bind attendance percentage

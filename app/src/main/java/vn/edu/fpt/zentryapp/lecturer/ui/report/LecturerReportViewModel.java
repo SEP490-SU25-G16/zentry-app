@@ -1,28 +1,36 @@
 package vn.edu.fpt.zentryapp.lecturer.ui.report;
 
-import android.os.Handler;
+import android.util.Log;
 
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
+import vn.edu.fpt.zentryapp.auth.client.ApiClient;
+import vn.edu.fpt.zentryapp.lecturer.data.api.LecturerApiService;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerReportClassSection;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.ApiResponseDto;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.SemesterCourseDto;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.SemesterCoursesDataDto;
 
 public class LecturerReportViewModel extends ViewModel {
+    private final String TAG = "LecturerReportViewModel";
 
     // LiveData cho UI state
     private final MutableLiveData<Boolean> _isLoading = new MutableLiveData<>(false);
     private final MutableLiveData<List<LecturerReportClassSection>> _classrooms = new MutableLiveData<>();
     private final MutableLiveData<String> _errorMessage = new MutableLiveData<>();
+
+    // API service
+    private LecturerApiService apiService;
+    private AuthManager authManager;
 
     // Public getters cho Fragment observe
     public LiveData<Boolean> isLoading() {
@@ -36,114 +44,107 @@ public class LecturerReportViewModel extends ViewModel {
     public LiveData<String> errorMessage() {
         return _errorMessage;
     }
-    private AuthManager authManager;
 
     public void init(AuthManager authManager) {
         this.authManager = authManager;
+        // Initialize API service - bạn cần pass context từ Fragment
+        // this.apiService = ApiClient.getClient(context).create(LecturerApiService.class);
+        loadClassrooms();
+    }
+
+    public void initWithContext(android.content.Context context, AuthManager authManager) {
+        this.authManager = authManager;
+        this.apiService = ApiClient.getClient(context).create(LecturerApiService.class);
         loadClassrooms();
     }
 
     /**
-     * Load classrooms data (main method for this screen)
+     * Load classrooms data from API
      */
     public void loadClassrooms() {
+        if (apiService == null) {
+            Log.e(TAG, "API service not initialized. Call initWithContext() first.");
+            _errorMessage.setValue("Service not initialized");
+            return;
+        }
+
         _isLoading.setValue(true);
 
-        // Simulate network delay
-        new Handler().postDelayed(() -> {
-            List<LecturerReportClassSection> mockClassrooms = generateMockClassrooms();
-            _classrooms.setValue(mockClassrooms);
-            _isLoading.setValue(false);
-        }, 1000);
+        String lecturerId = authManager.getCurrentUserId();
+        String semesterCode = "FA24"; // Có thể dynamic sau này
+
+        Call<ApiResponseDto<SemesterCoursesDataDto>> call = apiService.getSemesterCourses(lecturerId, semesterCode);
+        call.enqueue(new Callback<ApiResponseDto<SemesterCoursesDataDto>>() {
+            @Override
+            public void onResponse(Call<ApiResponseDto<SemesterCoursesDataDto>> call,
+                                   Response<ApiResponseDto<SemesterCoursesDataDto>> response) {
+                _isLoading.setValue(false);
+
+                if (response.isSuccessful() && response.body() != null) {
+                    ApiResponseDto<SemesterCoursesDataDto> apiResponse = response.body();
+
+                    if (apiResponse.isSuccess() && apiResponse.getData() != null) {
+                        processSemesterCourses(apiResponse.getData());
+                    } else {
+                        _errorMessage.setValue(apiResponse.getError() != null ?
+                                apiResponse.getError() : "Failed to load courses");
+                    }
+                } else {
+                    _errorMessage.setValue("Failed to load data: " + response.message());
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ApiResponseDto<SemesterCoursesDataDto>> call, Throwable t) {
+                _isLoading.setValue(false);
+                _errorMessage.setValue("Network error: " + t.getMessage());
+                Log.e(TAG, "API call failed", t);
+            }
+        });
     }
 
-    /**
-     * Generate mock classrooms data matching the new model structure
-     */
-    private List<LecturerReportClassSection> generateMockClassrooms() {
-        List<LecturerReportClassSection> classrooms = new ArrayList<>();
-
-        // Mathematics classes
-        classrooms.add(new LecturerReportClassSection(
-                "Mathematics -G701",
-                20,
-                15,
-                20,
-                90.0,
-                "SE1801 - Room DE-201",
-                "Mon 08:00-09:30",
-                "ACTIVE"
-        ));
-
-        classrooms.add(new LecturerReportClassSection(
-                "Mathematics -G702",
-                20,
-                15,
-                20,
-                75.0,
-                "SE1802 - Room DE-203",
-                "Tue 09:45-11:15",
-                "ACTIVE"
-        ));
-
-        classrooms.add(new LecturerReportClassSection(
-                "Mathematics -G703",
-                18,
-                12,
-                18,
-                85.0,
-                "SE1803 - Room DE-105",
-                "Wed 13:30-15:00",
-                "ACTIVE"
-        ));
-
-        // Computer Science classes
-        classrooms.add(new LecturerReportClassSection(
-                "Data Structures -G801",
-                25,
-                18,
-                22,
-                88.0,
-                "CS1801 - Room IT-301",
-                "Thu 15:15-16:45",
-                "ACTIVE"
-        ));
-
-        classrooms.add(new LecturerReportClassSection(
-                "Web Development -G901",
-                22,
-                16,
-                20,
-                92.0,
-                "CS1802 - Room IT-302",
-                "Fri 17:00-18:30",
-                "ACTIVE"
-        ));
-
-        // Physics classes
-        classrooms.add(new LecturerReportClassSection(
-                "Physics Lab -P501",
-                15,
-                10,
-                15,
-                67.0,
-                "PH1801 - Lab P-201",
-                "Mon 14:00-16:00",
-                "ACTIVE"
-        ));
-
-        return classrooms;
+    private void processSemesterCourses(SemesterCoursesDataDto semesterData) {
+        List<LecturerReportClassSection> classrooms = mapSemesterCoursesToClassSections(
+                semesterData.getSemesterCourses());
+        _classrooms.setValue(classrooms);
     }
+
+    private List<LecturerReportClassSection> mapSemesterCoursesToClassSections(
+            List<SemesterCourseDto> semesterCourses) {
+        List<LecturerReportClassSection> result = new ArrayList<>();
+
+        if (semesterCourses == null) return result;
+
+        for (SemesterCourseDto course : semesterCourses) {
+            // Lưu trữ đầy đủ thông tin từ API để có thể pass về sau
+            result.add(new LecturerReportClassSection(
+                    course.getClassId(),              // classId
+                    course.getCourseName(),           // courseName
+                    course.getEnrolledStudents(),     // studentCount
+                    course.getCompletedSessions(),    // completedSessions
+                    course.getTotalSessions(),        // totalSessions
+                    course.getAttendanceRate(),       // attendancePercentage
+                    course.getCourseCode() + " - " + course.getSectionCode(), // classInfo
+                    "Sessions: " + course.getCompletedSessions() + "/" + course.getTotalSessions(), // scheduleInfo
+                    "ACTIVE",                         // status
+                    course.getCourseCode(),           // courseCode
+                    course.getSectionCode(),          // sectionCode
+                    course.getClassName()             // className
+            ));
+
+        }
+
+        return result;
+    }
+
+
+
 
     /**
      * Handle classroom item click
      */
     public void onClassroomClicked(LecturerReportClassSection classroom) {
-        // Log the click for debugging
-        android.util.Log.d("LecturerReport", "Classroom clicked: " + classroom.getCourseName());
-
-        // This method can be extended to handle specific business logic
-        // before navigation (e.g., tracking analytics, preparing data, etc.)
+        Log.d(TAG, "Classroom clicked: " + classroom.getCourseName());
     }
 
     /**
@@ -154,7 +155,6 @@ public class LecturerReportViewModel extends ViewModel {
         if (currentList == null) return;
 
         if (query == null || query.trim().isEmpty()) {
-            // Show all classrooms if query is empty
             loadClassrooms();
             return;
         }
@@ -173,7 +173,7 @@ public class LecturerReportViewModel extends ViewModel {
     }
 
     /**
-     * Get classrooms by status
+     * Filter by status
      */
     public void filterByStatus(String status) {
         List<LecturerReportClassSection> currentList = _classrooms.getValue();
@@ -193,5 +193,4 @@ public class LecturerReportViewModel extends ViewModel {
 
         _classrooms.setValue(filteredList);
     }
-
 }

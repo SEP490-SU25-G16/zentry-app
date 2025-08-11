@@ -46,7 +46,6 @@ public class LecturerHomeFragment extends Fragment {
         AuthManager authManager = AuthManager.getInstance(requireContext());
         viewModel.init(requireContext(), authManager);
 
-        // Load real data instead of mock
         viewModel.loadTodayClasses();
 
         observeViewModel();

@@ -36,34 +36,6 @@
                 android:padding="16dp">
 
                 <!-- Header - Subject và Grade trên cùng 1 dòng -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:id="@+id/tvSessionDetailSubject"
-                        android:fontFamily="@font/jostsemibold"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Mathematics"
-                        android:textColor="#232B42"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvSessionDetailGrade"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:fontFamily="@font/mulishbold"
-                        android:text="G701"
-                        android:textColor="#232B42"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
-
-                </LinearLayout>
 
 
                 <LinearLayout
@@ -94,8 +66,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp"
-                            android:text="32 Students"
-                            android:textSize="14sp"
+                            android:text=""
+                            android:textSize="16sp"
                             android:textColor="#202244"/>
                     </LinearLayout>
 
@@ -112,8 +84,8 @@
                             android:fontFamily="@font/jostsemibold"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Session - 4"
-                            android:textSize="14sp"
+                            android:text=""
+                            android:textSize="16sp"
                             android:textColor="#202244" />
                     </LinearLayout>
 
@@ -155,7 +127,7 @@
                     android:layout_marginTop="8dp"
                     android:fontFamily="@font/jostsemibold"
                     android:gravity="center"
-                    android:text="29/32 - Attendance"
+                    android:text=""
                     android:textColor="#167F71"
                     android:textSize="14sp"
                     android:textStyle="bold" />

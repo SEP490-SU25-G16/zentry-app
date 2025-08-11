@@ -10,6 +10,11 @@ import vn.edu.fpt.zentryapp.lecturer.data.model.response.ClassSectionResponse;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerDailyScheduleClassSectionResponse;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.StartSessionRequest;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerStartSessionResponse;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.ApiResponseDto;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.ClassSessionsDataDto;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.HomeDataDto;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.SemesterCoursesDataDto;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.SessionAttendanceDataDto;
 
 public interface LecturerApiService {
     @GET("api/schedules/lecturer/daily-schedule")
@@ -18,7 +23,16 @@ public interface LecturerApiService {
             @Query("date") String date
     );
     @GET("/api/class-sections/{lecturer_id}/home")
-    Call<ClassSectionResponse> getTodayClasses(@Path("lecturer_id") String lecturerId);
+    Call<ApiResponseDto<HomeDataDto>> getHomeData(@Path("lecturer_id") String lecturerId);
     @POST("api/attendance/sessions/{sessionId}/start")
     Call<LecturerStartSessionResponse> startSession(@Path("sessionId") String sessionId, @Body StartSessionRequest request);
+    @GET("/api/courses/lecturer/{lecturer_id}/semesters/{semester_code}")
+    Call<ApiResponseDto<SemesterCoursesDataDto>> getSemesterCourses(
+            @Path("lecturer_id") String lecturerId,
+            @Path("semester_code") String semesterCode
+    );
+    @GET("/api/class-sections/{class_section_id}/overview-sessions")
+    Call<ApiResponseDto<ClassSessionsDataDto>> getClassOverviewSessions(@Path("class_section_id") String classSectionId);
+    @GET("/api/attendance/sessions/{session_id}/details")
+    Call<ApiResponseDto<SessionAttendanceDataDto>> getSessionAttendanceDetails(@Path("session_id") String sessionId);
 }

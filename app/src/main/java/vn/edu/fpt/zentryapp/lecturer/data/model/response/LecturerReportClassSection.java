@@ -8,13 +8,16 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Getter
 public class LecturerReportClassSection {
+    private String classId;        // Thêm field này
     private String courseName;
     private int studentCount;
-    private int currentSessions;
+    private int completedSessions;
     private int totalSessions;
     private double attendancePercentage;
     private String classInfo;
-    private String timeRange;
+    private String scheduleInfo;
     private String status;
-
+    private String courseCode;
+    private String sectionCode;
+    private String className;
 }
