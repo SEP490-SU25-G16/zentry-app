@@ -6,24 +6,21 @@ import android.os.Build;
 import android.os.Bundle;
 import android.widget.Toast;
 
-import androidx.activity.EdgeToEdge;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
-import androidx.navigation.NavController;
-import androidx.navigation.Navigation;
-import androidx.navigation.NavGraph;
-import androidx.navigation.NavInflater;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity {
+import vn.edu.fpt.zentryapp.service.AttendanceModels;
+import vn.edu.fpt.zentryapp.service.ManualAttendanceSyncService;
+import vn.edu.fpt.zentryapp.service.NetworkStateManager;
+import vn.edu.fpt.zentryapp.service.OfflineSubmissionManager;
 
+public class MainActivity extends AppCompatActivity {
+    private ManualAttendanceSyncService syncService;
     // ➕ THÊM PERMISSION LAUNCHER
     private ActivityResultLauncher<String[]> blePermissionLauncher;
 
@@ -37,12 +34,92 @@ public class MainActivity extends AppCompatActivity {
 
         // ➕ REQUEST PERMISSIONS NGAY SAU KHI SETUP UI
         requestBLEPermissionsIfNeeded();
+        // ✅ INITIALIZE SYNC SERVICE
+        initializeSyncService();
+
+        // ✅ AUTO SYNC CACHED SUBMISSIONS
+        autoSyncCachedSubmissions();
 
         // No need to modify navigation - the default navigation in nav_graph_root.xml
         // already starts with the login screen (loginFragment)
 
         // Log that we're using the default navigation
         android.util.Log.d("MainActivity", "Using default navigation starting with login screen");
+    }
+    // ✅ NEW: Initialize sync service
+    private void initializeSyncService() {
+        syncService = new ManualAttendanceSyncService(this);
+        android.util.Log.d("MainActivity", "📋 Sync service initialized");
+    }
+
+    // ✅ NEW: Auto sync cached submissions khi vào app
+    private void autoSyncCachedSubmissions() {
+        // Check if có cached submissions
+        if (!syncService.needsSync()) {
+            android.util.Log.d("MainActivity", "✅ No cached submissions to sync");
+            return;
+        }
+
+        // Check network availability
+        NetworkStateManager networkManager = new NetworkStateManager(this);
+        if (!networkManager.isNetworkAvailable()) {
+            android.util.Log.w("MainActivity", "📵 No network - cached submissions will sync later");
+            return;
+        }
+
+        // Get summary info
+        OfflineSubmissionManager.CachedSubmissionSummary summary = syncService.getSyncSummary();
+        android.util.Log.d("MainActivity", "🔄 Found " + summary.totalCount + " cached submissions - starting auto sync");
+
+        // ✅ SILENT AUTO SYNC
+        syncService.syncAllCachedSubmissions(new OfflineSubmissionManager.ManualSyncCallback() {
+            @Override
+            public void onSyncStarted(int totalSubmissions) {
+                android.util.Log.d("MainActivity", "🚀 Auto sync started: " + totalSubmissions + " submissions");
+            }
+
+            @Override
+            public void onSubmissionSynced(AttendanceModels.AttendanceSubmission submission, int remaining) {
+                android.util.Log.d("MainActivity", "✅ Synced: " + submission.getSessionId() + " (" + remaining + " remaining)");
+            }
+
+            @Override
+            public void onSubmissionFailed(AttendanceModels.AttendanceSubmission submission, String error, int remaining) {
+                android.util.Log.w("MainActivity", "❌ Sync failed: " + submission.getSessionId() + " - " + error);
+            }
+
+            @Override
+            public void onSyncCompleted(int successful, int failed) {
+                if (successful > 0) {
+                    android.util.Log.d("MainActivity", "🎉 Auto sync completed: " + successful + " successful, " + failed + " failed");
+
+                    // ✅ OPTIONAL: Show silent toast (không intrusive)
+                    if (successful > 0) {
+                        Toast.makeText(MainActivity.this,
+                                "📤 Synced " + successful + " attendance record" + (successful > 1 ? "s" : ""),
+                                Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    android.util.Log.w("MainActivity", "⚠️ Auto sync completed but no successes");
+                }
+            }
+        });
+    }
+
+    // ✅ NEW: Auto sync lại khi user quay về app (onResume)
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        // ✅ RETRY SYNC khi user quay lại app (maybe có network rồi)
+        if (syncService != null && syncService.needsSync()) {
+            android.util.Log.d("MainActivity", "🔄 App resumed - checking for pending syncs");
+
+            // Delay một chút để app settle
+            new android.os.Handler().postDelayed(() -> {
+                autoSyncCachedSubmissions();
+            }, 1000);
+        }
     }
 
     // ➕ SETUP PERMISSION LAUNCHER

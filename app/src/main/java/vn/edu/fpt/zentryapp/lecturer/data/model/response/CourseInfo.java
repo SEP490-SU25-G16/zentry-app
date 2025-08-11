@@ -28,7 +28,4 @@ public class CourseInfo {
         return totalStudents + " Students";
     }
 
-    public String getGradeDisplay() {
-        return "Grade " + grade;
-    }
 }

@@ -22,6 +22,7 @@ import vn.edu.fpt.zentryapp.lecturer.adapter.LecturerReportClassSectionAdapter;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerReportClassSection;
 import vn.edu.fpt.zentryapp.lecturer.adapter.SessionAdapter;
 import vn.edu.fpt.zentryapp.notification.sharedviewmodel.NotificationViewModel;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.ClassroomInfo;
 
 /**
  * Màn hình này hiển thị list report các classroom/course với attendance percentage
@@ -51,11 +52,11 @@ public class LecturerReportFragment extends Fragment implements LecturerReportCl
 
         navController = NavHostFragment.findNavController(this);
 
-        // Initialize ViewModel
+        // Initialize ViewModel với context
         viewModel = new ViewModelProvider(this).get(LecturerReportViewModel.class);
         notificationViewModel = new ViewModelProvider(requireActivity()).get(NotificationViewModel.class);
         AuthManager authManager = AuthManager.getInstance(requireContext());
-        viewModel.init(authManager);
+        viewModel.initWithContext(requireContext(), authManager);
 
         // Load notifications để có dữ liệu cho badge
         notificationViewModel.loadNotifications();
@@ -91,8 +92,6 @@ public class LecturerReportFragment extends Fragment implements LecturerReportCl
         // Observe loading state
         viewModel.isLoading().observe(getViewLifecycleOwner(), isLoading -> {
             binding.progressLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
-
-            // Optional: Show/hide RecyclerView during loading
             binding.rvSessions.setVisibility(isLoading ? View.GONE : View.VISIBLE);
         });
 
@@ -123,16 +122,22 @@ public class LecturerReportFragment extends Fragment implements LecturerReportCl
 
     @Override
     public void onClassroomClick(LecturerReportClassSection classroom) {
-        Toast.makeText(requireContext(),
-                "Classroom clicked: " + classroom.getCourseName(),
-                Toast.LENGTH_SHORT).show();
+        // Tạo ClassroomInfo object để pass qua Serializable
+        ClassroomInfo classroomInfo = new ClassroomInfo(
+                classroom.getClassId(),
+                classroom.getCourseName(),
+                classroom.getCourseCode(),
+                classroom.getSectionCode(),
+                classroom.getClassName(),
+                classroom.getStudentCount(),
+                classroom.getCompletedSessions(),
+                classroom.getTotalSessions(),
+                classroom.getAttendancePercentage()
+        );
 
-        // Navigate to sessions list of this classroom
+        // Navigate với Serializable object
         Bundle args = new Bundle();
-        args.putString("courseName", classroom.getCourseName());
-        args.putString("classInfo", classroom.getClassInfo());
-        args.putInt("studentCount", classroom.getStudentCount());
-        args.putDouble("attendancePercentage", classroom.getAttendancePercentage());
+        args.putSerializable("classroomInfo", classroomInfo);
 
         navController.navigate(R.id.action_report_to_listSession, args);
     }

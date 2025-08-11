@@ -1,16 +1,23 @@
 package vn.edu.fpt.zentryapp.student.ui.home;
 
 import android.os.Bundle;
-import android.view.*;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import androidx.annotation.*;
+import android.widget.Toast;
+
+import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
-import androidx.recyclerview.widget.*;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.PagerSnapHelper;
+import androidx.recyclerview.widget.RecyclerView;
 
 import vn.edu.fpt.zentryapp.R;
+import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentHomeBinding;
 import vn.edu.fpt.zentryapp.lecturer.adapter.ExamAdapter;
 import vn.edu.fpt.zentryapp.lecturer.adapter.SessionAdapter;
@@ -18,113 +25,176 @@ import vn.edu.fpt.zentryapp.lecturer.adapter.WeeklyAdapter;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.ExamModel;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.SessionModel;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.WeeklyModel;
-import vn.edu.fpt.zentryapp.student.data.model.response.*;
 
 public class StudentHomeFragment extends Fragment {
 
-    private FragmentStudentHomeBinding b;
-    private StudentHomeViewModel vm;
+    private FragmentStudentHomeBinding binding;
+    private StudentHomeViewModel viewModel;
 
-    private int examPos = 0, weeklyPos = 0;
-    private boolean showAllSessions = false;
-    private java.util.List<SessionModel> cachedSessions = java.util.Collections.emptyList();
+    private int currentExamPosition = 0;
+    private int currentWeeklyPosition = 0;
+    private boolean isShowingAllSessions = false;
+    private java.util.List<SessionModel> cachedSessionList = java.util.Collections.emptyList();
 
-    @Override public View onCreateView(@NonNull LayoutInflater i, ViewGroup c, Bundle s){
-        b = FragmentStudentHomeBinding.inflate(i, c, false);
-        return b.getRoot();
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        binding = FragmentStudentHomeBinding.inflate(inflater, container, false);
+        return binding.getRoot();
     }
 
-    @Override public void onViewCreated(@NonNull View v, Bundle s){
-        vm = new ViewModelProvider(this).get(StudentHomeViewModel.class);
-        vm.loadMockData();
-        observeVm();
+    @Override
+    public void onViewCreated(@NonNull View view, Bundle savedInstanceState) {
+        viewModel = new ViewModelProvider(this).get(StudentHomeViewModel.class);
+
+        // Initialize ViewModel with dependencies
+        AuthManager authManager = AuthManager.getInstance(requireContext());
+        viewModel.init(requireContext(), authManager);
+
+        // Load real data instead of mock
+        viewModel.loadStudentHomeData();
+
+        observeViewModel();
     }
 
     /* ---------- Observe ---------- */
-    private void observeVm(){
-        vm.exams().observe(getViewLifecycleOwner(), this::setupExamSlider);
-        vm.sessions().observe(getViewLifecycleOwner(), list -> setupSessions(list, false));
-        vm.weekly().observe(getViewLifecycleOwner(), this::setupWeeklySlider);
+    private void observeViewModel() {
+        // Keep exam slider (empty for now)
+        viewModel.exams().observe(getViewLifecycleOwner(), examList -> {
+            if (examList.isEmpty()) {
+                binding.rvExams.setVisibility(View.GONE);
+                binding.dotsIndicator.setVisibility(View.GONE);
+            } else {
+                setupExamSlider(examList);
+            }
+        });
+
+        viewModel.sessions().observe(getViewLifecycleOwner(), sessionList ->
+                setupSessions(sessionList, false));
+
+        viewModel.weekly().observe(getViewLifecycleOwner(), this::setupWeeklySlider);
+
+        viewModel.errorMessage().observe(getViewLifecycleOwner(), error -> {
+            if (error != null) {
+                Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
+            }
+        });
+
+        viewModel.isLoading().observe(getViewLifecycleOwner(), isLoading -> {
+            // Show/hide loading indicator if you have one
+            // binding.progressLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+        });
     }
 
     /* ---------- Exam slider ---------- */
-    private void setupExamSlider(java.util.List<ExamModel> list){
-        b.rvExams.setLayoutManager(new LinearLayoutManager(getContext(),RecyclerView.HORIZONTAL,false));
-        b.rvExams.setAdapter(new ExamAdapter(list));
-        new PagerSnapHelper().attachToRecyclerView(b.rvExams);
+    private void setupExamSlider(java.util.List<ExamModel> examList) {
+        binding.rvExams.setLayoutManager(new LinearLayoutManager(getContext(), RecyclerView.HORIZONTAL, false));
+        binding.rvExams.setAdapter(new ExamAdapter(examList));
+        new PagerSnapHelper().attachToRecyclerView(binding.rvExams);
 
-        buildDots(list.size(), b.dotsIndicator, examPos);
-        b.rvExams.addOnScrollListener(scrollListener(p -> {
-            examPos = p; updateDots(b.dotsIndicator,p);
+        buildDotIndicators(examList.size(), binding.dotsIndicator, currentExamPosition);
+        binding.rvExams.addOnScrollListener(createScrollListener(position -> {
+            currentExamPosition = position;
+            updateDotIndicators(binding.dotsIndicator, position);
         }));
     }
 
     /* ---------- Sessions ---------- */
-    private void setupSessions(java.util.List<SessionModel> list, boolean rebuild){
-        if(!rebuild) cachedSessions = list;
-        b.sessionsContainer.removeAllViews();
-
-        int count = showAllSessions ? list.size() : 1;
-        for(int i=0;i<count;i++){
-            View v = SessionAdapter.createSessionViews(b.sessionsContainer,list).get(i);
-            if(i<count-1) addBottomMargin(v,12);
-            b.sessionsContainer.addView(v);
+    private void setupSessions(java.util.List<SessionModel> sessionList, boolean isRebuild) {
+        if (sessionList.isEmpty()) {
+            binding.sessionsContainer.removeAllViews();
+            // Add empty state view
+            android.widget.TextView emptyView = new android.widget.TextView(requireContext());
+            emptyView.setText("No classes scheduled for today");
+            emptyView.setGravity(android.view.Gravity.CENTER);
+            binding.sessionsContainer.addView(emptyView);
+            binding.btnSeeAllSessions.setVisibility(View.GONE);
+            return;
         }
 
-        b.btnSeeAllSessions.setText(showAllSessions ? "Show Less" : "See All");
-        b.btnSeeAllSessions.setOnClickListener(v -> {
-            showAllSessions = !showAllSessions;
-            setupSessions(cachedSessions,true);
+        if (!isRebuild) cachedSessionList = sessionList;
+        binding.sessionsContainer.removeAllViews();
+
+        int displayCount = isShowingAllSessions ? sessionList.size() : 1;
+        for (int index = 0; index < displayCount; index++) {
+            View sessionView = SessionAdapter.createSessionViews(binding.sessionsContainer, sessionList).get(index);
+            if (index < displayCount - 1) addBottomMargin(sessionView, 12);
+            binding.sessionsContainer.addView(sessionView);
+        }
+
+        binding.btnSeeAllSessions.setText(isShowingAllSessions ? "Show Less" : "See All");
+        binding.btnSeeAllSessions.setOnClickListener(view -> {
+            isShowingAllSessions = !isShowingAllSessions;
+            setupSessions(cachedSessionList, true);
         });
     }
 
     /* ---------- Weekly slider ---------- */
-    private void setupWeeklySlider(java.util.List<WeeklyModel> list){
-        b.rvWeekly.setLayoutManager(new LinearLayoutManager(getContext(),RecyclerView.HORIZONTAL,false));
-        b.rvWeekly.setAdapter(new WeeklyAdapter(list));
-        new PagerSnapHelper().attachToRecyclerView(b.rvWeekly);
+    private void setupWeeklySlider(java.util.List<WeeklyModel> weeklyList) {
+        binding.rvWeekly.setLayoutManager(new LinearLayoutManager(getContext(), RecyclerView.HORIZONTAL, false));
+        binding.rvWeekly.setAdapter(new WeeklyAdapter(weeklyList));
+        new PagerSnapHelper().attachToRecyclerView(binding.rvWeekly);
 
-        buildDots(list.size(), b.weeklyDotsIndicator, weeklyPos);
-        b.rvWeekly.addOnScrollListener(scrollListener(p -> {
-            weeklyPos = p; updateDots(b.weeklyDotsIndicator,p);
+        buildDotIndicators(weeklyList.size(), binding.weeklyDotsIndicator, currentWeeklyPosition);
+        binding.rvWeekly.addOnScrollListener(createScrollListener(position -> {
+            currentWeeklyPosition = position;
+            updateDotIndicators(binding.weeklyDotsIndicator, position);
         }));
     }
 
     /* ---------- Utilities ---------- */
-    private RecyclerView.OnScrollListener scrollListener(java.util.function.IntConsumer cb){
-        return new RecyclerView.OnScrollListener(){
-            @Override public void onScrollStateChanged(@NonNull RecyclerView rv,int st){
-                if(st==RecyclerView.SCROLL_STATE_IDLE){
-                    int p=((LinearLayoutManager)rv.getLayoutManager())
+    private RecyclerView.OnScrollListener createScrollListener(java.util.function.IntConsumer positionConsumer) {
+        return new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                    int visiblePosition = ((LinearLayoutManager) recyclerView.getLayoutManager())
                             .findFirstCompletelyVisibleItemPosition();
-                    if(p!=RecyclerView.NO_POSITION) cb.accept(p);
+                    if (visiblePosition != RecyclerView.NO_POSITION) {
+                        positionConsumer.accept(visiblePosition);
+                    }
                 }
             }
         };
     }
 
-    private void buildDots(int count, LinearLayout container, int active){
-        container.removeAllViews();
-        for(int i=0;i<count;i++){
-            ImageView d = createDot(); updateDot(d,i==active); container.addView(d);
+    private void buildDotIndicators(int dotCount, LinearLayout dotsContainer, int activePosition) {
+        dotsContainer.removeAllViews();
+        for (int index = 0; index < dotCount; index++) {
+            ImageView dotView = createDotView();
+            updateDotAppearance(dotView, index == activePosition);
+            dotsContainer.addView(dotView);
         }
     }
-    private void updateDots(LinearLayout c,int act){
-        for(int i=0;i<c.getChildCount();i++)
-            updateDot((ImageView)c.getChildAt(i),i==act);
-    }
-    private ImageView createDot(){
-        ImageView d=new ImageView(requireContext());
-        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT);
-        p.setMargins(8,0,8,0); d.setLayoutParams(p); return d;
-    }
-    private void updateDot(ImageView d,boolean a){ d.setBackground(
-            ContextCompat.getDrawable(requireContext(),a?R.drawable.dot_active:R.drawable.dot_inactive)); }
-    private void addBottomMargin(View v,int dp){
-        LinearLayout.LayoutParams p=(LinearLayout.LayoutParams)v.getLayoutParams();
-        p.bottomMargin=(int)(dp*getResources().getDisplayMetrics().density); v.setLayoutParams(p);
+
+    private void updateDotIndicators(LinearLayout dotsContainer, int activePosition) {
+        for (int index = 0; index < dotsContainer.getChildCount(); index++) {
+            updateDotAppearance((ImageView) dotsContainer.getChildAt(index), index == activePosition);
+        }
     }
 
-    @Override public void onDestroyView(){ super.onDestroyView(); b=null; }
+    private ImageView createDotView() {
+        ImageView dotView = new ImageView(requireContext());
+        LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        layoutParams.setMargins(8, 0, 8, 0);
+        dotView.setLayoutParams(layoutParams);
+        return dotView;
+    }
+
+    private void updateDotAppearance(ImageView dotView, boolean isActive) {
+        dotView.setBackground(ContextCompat.getDrawable(requireContext(),
+                isActive ? R.drawable.dot_active : R.drawable.dot_inactive));
+    }
+
+    private void addBottomMargin(View targetView, int marginDp) {
+        LinearLayout.LayoutParams layoutParams = (LinearLayout.LayoutParams) targetView.getLayoutParams();
+        layoutParams.bottomMargin = (int) (marginDp * getResources().getDisplayMetrics().density);
+        targetView.setLayoutParams(layoutParams);
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        binding = null;
+    }
 }

@@ -1,24 +1,36 @@
 package vn.edu.fpt.zentryapp.lecturer.ui.schedule;
 
-
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
-import android.os.Handler;
+import android.content.Context;
+import android.util.Log;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
-import lombok.Getter;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import vn.edu.fpt.zentryapp.auth.client.ApiClient;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
+import vn.edu.fpt.zentryapp.lecturer.data.api.LecturerApiService;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.CalendarSession;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.ApiResponseDto;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.CalendarClassDto;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.CalendarDayDto;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.MonthlyCalendarDataDto;
 
 public class LecturerScheduleCalendarViewModel extends ViewModel {
+    private final String TAG = "LecturerScheduleCalendar";
 
     // LiveData cho UI state
     private final MutableLiveData<Boolean> _isLoading = new MutableLiveData<>(false);
@@ -27,287 +39,271 @@ public class LecturerScheduleCalendarViewModel extends ViewModel {
     private final MutableLiveData<String> _selectedDate = new MutableLiveData<>();
     private final MutableLiveData<Boolean> _hasSessionsForDate = new MutableLiveData<>();
 
-    // Public getters cho Fragment observe
-    public LiveData<Boolean> isLoading() {
-        return _isLoading;
-    }
-
-    public LiveData<List<CalendarSession>> sessions() {
-        return _sessions;
-    }
-
-    public LiveData<String> errorMessage() {
-        return _errorMessage;
-    }
-
-    public LiveData<String> selectedDate() {
-        return _selectedDate;
-    }
-
-    public LiveData<Boolean> hasSessionsForDate() {
-        return _hasSessionsForDate;
-    }
-
+    // API service
+    private LecturerApiService apiService;
     private AuthManager authManager;
-    private Calendar currentSelectedDate;
 
-    public void init(AuthManager authManager) {
+    // Cache monthly data
+    private Map<String, List<CalendarSession>> monthlySessionsCache = new HashMap<>();
+    private Calendar currentSelectedDate;
+    private int currentMonth = -1;
+    private int currentYear = -1;
+
+    // Public getters cho Fragment observe
+    public LiveData<Boolean> isLoading() { return _isLoading; }
+    public LiveData<List<CalendarSession>> sessions() { return _sessions; }
+    public LiveData<String> errorMessage() { return _errorMessage; }
+    public LiveData<String> selectedDate() { return _selectedDate; }
+    public LiveData<Boolean> hasSessionsForDate() { return _hasSessionsForDate; }
+
+    public void init(Context context, AuthManager authManager) {
         this.authManager = authManager;
+        this.apiService = ApiClient.getClient(context).create(LecturerApiService.class);
 
         // Initialize with today's date
         currentSelectedDate = Calendar.getInstance();
-        loadSessionsForDate(currentSelectedDate);
+        loadMonthlyCalendarAndSelectDate(currentSelectedDate);
+    }
+
+    /**
+     * Load monthly calendar data and then select specific date
+     */
+    private void loadMonthlyCalendarAndSelectDate(Calendar selectedDate) {
+        int month = selectedDate.get(Calendar.MONTH) + 1; // Calendar.MONTH is 0-based
+        int year = selectedDate.get(Calendar.YEAR);
+
+        // Check if we need to load new month data
+        if (currentMonth != month || currentYear != year) {
+            loadMonthlyCalendar(month, year, selectedDate);
+        } else {
+            // Use cached data
+            selectDateFromCache(selectedDate);
+        }
+    }
+
+    /**
+     * Load monthly calendar data from API
+     */
+    private void loadMonthlyCalendar(int month, int year, Calendar selectedDate) {
+        _isLoading.setValue(true);
+
+        String lecturerId = authManager.getCurrentUserId();
+
+        Call<ApiResponseDto<MonthlyCalendarDataDto>> call = apiService.getMonthlyCalendar(lecturerId, month, year);
+        call.enqueue(new Callback<ApiResponseDto<MonthlyCalendarDataDto>>() {
+            @Override
+            public void onResponse(Call<ApiResponseDto<MonthlyCalendarDataDto>> call,
+                                   Response<ApiResponseDto<MonthlyCalendarDataDto>> response) {
+                _isLoading.setValue(false);
+
+                if (response.isSuccessful() && response.body() != null) {
+                    ApiResponseDto<MonthlyCalendarDataDto> apiResponse = response.body();
+
+                    if (apiResponse.isSuccess() && apiResponse.getData() != null) {
+                        processMonthlyCalendar(apiResponse.getData(), month, year);
+                        selectDateFromCache(selectedDate);
+                    } else {
+                        _errorMessage.setValue(apiResponse.getError() != null ?
+                                apiResponse.getError() : "Failed to load calendar");
+                    }
+                } else {
+                    _errorMessage.setValue("Failed to load calendar: " + response.message());
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ApiResponseDto<MonthlyCalendarDataDto>> call, Throwable t) {
+                _isLoading.setValue(false);
+                _errorMessage.setValue("Network error: " + t.getMessage());
+                Log.e(TAG, "API call failed", t);
+            }
+        });
+    }
+
+    /**
+     * Process monthly calendar data and cache it
+     */
+    private void processMonthlyCalendar(MonthlyCalendarDataDto calendarData, int month, int year) {
+        currentMonth = month;
+        currentYear = year;
+        monthlySessionsCache.clear();
+
+        if (calendarData.getCalendarDays() == null) return;
+
+        for (CalendarDayDto dayDto : calendarData.getCalendarDays()) {
+            List<CalendarSession> sessions = mapCalendarDayToSessions(dayDto);
+
+            // Create date key for caching
+            String dateKey = extractDateKey(dayDto.getDate());
+            if (dateKey != null) {
+                monthlySessionsCache.put(dateKey, sessions);
+            }
+        }
+
+        Log.d(TAG, "Cached " + monthlySessionsCache.size() + " days for month " + month + "/" + year);
+    }
+
+    /**
+     * Map calendar day DTO to sessions
+     */
+    private List<CalendarSession> mapCalendarDayToSessions(CalendarDayDto dayDto) {
+        List<CalendarSession> sessions = new ArrayList<>();
+
+        if (dayDto.getClasses() == null) return sessions;
+
+        // Parse session date from dayDto.getDate()
+        Date sessionDate = parseApiDate(dayDto.getDate());
+
+        for (CalendarClassDto classDto : dayDto.getClasses()) {
+            CalendarSession session = new CalendarSession();
+            session.setSessionId(classDto.getSessionId());
+            session.setClassSectionId(classDto.getClassSectionId());
+            session.setCourseName(classDto.getCourseName());
+            session.setSectionCode(classDto.getSectionCode());
+            session.setClassName(classDto.getCourseName() + " - " + classDto.getSectionCode());
+            session.setRoom(classDto.getRoomName());
+            session.setBuilding(classDto.getBuilding());
+            session.setSessionDate(sessionDate);
+
+            // Parse start time and create full datetime
+            Date startTime = parseSessionTime(dayDto.getDate(), classDto.getStartTime());
+            session.setStartTime(startTime);
+
+            // Estimate end time (assume 1.5 hour sessions)
+            if (startTime != null) {
+                Calendar endCal = Calendar.getInstance();
+                endCal.setTime(startTime);
+                endCal.add(Calendar.HOUR_OF_DAY, 1);
+                endCal.add(Calendar.MINUTE, 30);
+                session.setEndTime(endCal.getTime());
+            }
+
+            // Set session type and status
+            session.setSessionType("LECTURE"); // Default type
+            updateSessionStatus(session);
+
+            sessions.add(session);
+        }
+
+        return sessions;
+    }
+
+    /**
+     * Parse API date string to Date object
+     */
+    private Date parseApiDate(String dateString) {
+        try {
+            SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+            return format.parse(dateString);
+        } catch (ParseException e) {
+            Log.e(TAG, "Error parsing API date: " + dateString, e);
+            return null;
+        }
+    }
+
+    /**
+     * Parse session time and combine with date
+     */
+    private Date parseSessionTime(String dateString, String timeString) {
+        try {
+            // Extract date part
+            String datePart = dateString.substring(0, 10); // "2025-08-11"
+            String fullDateTime = datePart + " " + timeString; // "2025-08-11 16:26:29"
+
+            SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+            return format.parse(fullDateTime);
+        } catch (ParseException | StringIndexOutOfBoundsException e) {
+            Log.e(TAG, "Error parsing session time: " + timeString, e);
+            return null;
+        }
+    }
+
+    /**
+     * Extract date key for caching (YYYY-MM-DD format)
+     */
+    private String extractDateKey(String dateString) {
+        try {
+            return dateString.substring(0, 10); // "2025-08-11"
+        } catch (StringIndexOutOfBoundsException e) {
+            Log.e(TAG, "Error extracting date key from: " + dateString, e);
+            return null;
+        }
+    }
+
+    /**
+     * Select date from cached data
+     */
+    private void selectDateFromCache(Calendar selectedDate) {
+        this.currentSelectedDate = (Calendar) selectedDate.clone();
+
+        // Update selected date display
+        SimpleDateFormat dateFormat = new SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.getDefault());
+        _selectedDate.setValue(dateFormat.format(selectedDate.getTime()));
+
+        // Get sessions for selected date
+        String dateKey = String.format(Locale.getDefault(), "%04d-%02d-%02d",
+                selectedDate.get(Calendar.YEAR),
+                selectedDate.get(Calendar.MONTH) + 1,
+                selectedDate.get(Calendar.DAY_OF_MONTH));
+
+        List<CalendarSession> sessions = monthlySessionsCache.get(dateKey);
+        if (sessions == null) {
+            sessions = new ArrayList<>();
+        }
+
+        _sessions.setValue(sessions);
+        _hasSessionsForDate.setValue(!sessions.isEmpty());
+
+        Log.d(TAG, "Selected date: " + dateKey + ", found " + sessions.size() + " sessions");
+    }
+
+    /**
+     * Update session status based on current time
+     */
+    private void updateSessionStatus(CalendarSession session) {
+        if (session.getStartTime() == null) {
+            session.setStatus("UPCOMING");
+            return;
+        }
+
+        long currentTime = System.currentTimeMillis();
+        long startTime = session.getStartTime().getTime();
+        long endTime = session.getEndTime() != null ? session.getEndTime().getTime() : startTime + (90 * 60 * 1000); // +90 minutes
+
+        if (currentTime < startTime) {
+            session.setStatus("UPCOMING");
+        } else if (currentTime >= startTime && currentTime <= endTime) {
+            session.setStatus("ONGOING");
+        } else {
+            session.setStatus("COMPLETED");
+        }
+    }
+
+    /**
+     * Load sessions for specific date (called from calendar date selection)
+     */
+    public void loadSessionsForDate(int year, int month, int dayOfMonth) {
+        Calendar selectedDate = Calendar.getInstance();
+        selectedDate.set(year, month, dayOfMonth);
+        loadMonthlyCalendarAndSelectDate(selectedDate);
     }
 
     /**
      * Load sessions for specific date
      */
     public void loadSessionsForDate(Calendar selectedDate) {
-        this.currentSelectedDate = (Calendar) selectedDate.clone();
-
-        _isLoading.setValue(true);
-
-        // Update selected date display
-        SimpleDateFormat dateFormat = new SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.getDefault());
-        _selectedDate.setValue(dateFormat.format(selectedDate.getTime()));
-
-        // Simulate network delay
-        new Handler().postDelayed(() -> {
-            List<CalendarSession> sessions = generateSessionsForDate(selectedDate);
-            _sessions.setValue(sessions);
-            _hasSessionsForDate.setValue(!sessions.isEmpty());
-            _isLoading.setValue(false);
-        }, 800);
+        loadMonthlyCalendarAndSelectDate(selectedDate);
     }
 
     /**
-     * Load sessions for date from DatePicker
-     */
-    public void loadSessionsForDate(int year, int month, int dayOfMonth) {
-        Calendar selectedDate = Calendar.getInstance();
-        selectedDate.set(year, month, dayOfMonth);
-        loadSessionsForDate(selectedDate);
-    }
-
-    /**
-     * Refresh current date sessions
+     * Refresh current month data
      */
     public void refreshSessions() {
         if (currentSelectedDate != null) {
-            loadSessionsForDate(currentSelectedDate);
-        }
-    }
-
-    /**
-     * Generate mock sessions for specific date
-     */
-    private List<CalendarSession> generateSessionsForDate(Calendar date) {
-        List<CalendarSession> sessions = new ArrayList<>();
-
-        // Get day of week (1 = Sunday, 2 = Monday, etc.)
-        int dayOfWeek = date.get(Calendar.DAY_OF_WEEK);
-
-        // Generate different schedules based on day of week
-        switch (dayOfWeek) {
-            case Calendar.MONDAY:
-                sessions.addAll(generateMondaySchedule(date));
-                break;
-            case Calendar.TUESDAY:
-                sessions.addAll(generateTuesdaySchedule(date));
-                break;
-            case Calendar.WEDNESDAY:
-                sessions.addAll(generateWednesdaySchedule(date));
-                break;
-            case Calendar.THURSDAY:
-                sessions.addAll(generateThursdaySchedule(date));
-                break;
-            case Calendar.FRIDAY:
-                sessions.addAll(generateFridaySchedule(date));
-                break;
-            case Calendar.SATURDAY:
-                sessions.addAll(generateSaturdaySchedule(date));
-                break;
-            case Calendar.SUNDAY:
-                // Usually no classes on Sunday, but might have meetings
-                sessions.addAll(generateSundaySchedule(date));
-                break;
-        }
-
-        // Update session status based on current time if selected date is today
-        if (isToday(date)) {
-            updateSessionStatus(sessions);
-        } else if (date.before(Calendar.getInstance())) {
-            // Past date - all sessions completed
-            for (CalendarSession session : sessions) {
-                session.setStatus("COMPLETED");
-            }
-        } else {
-            // Future date - all sessions upcoming
-            for (CalendarSession session : sessions) {
-                session.setStatus("UPCOMING");
-            }
-        }
-
-        return sessions;
-    }
-
-    /**
-     * Generate Monday schedule
-     */
-    private List<CalendarSession> generateMondaySchedule(Calendar date) {
-        List<CalendarSession> sessions = new ArrayList<>();
-
-        sessions.add(createSession("MON_1", "CSE101", "Lập trình căn bản", "SE1801", "DE-201",
-                date, 8, 0, 9, 30, "LECTURE"));
-        sessions.add(createSession("MON_2", "CSE201", "Cấu trúc dữ liệu", "SE1802", "DE-203",
-                date, 10, 0, 11, 30, "PRACTICE"));
-        sessions.add(createSession("MON_3", "MEETING", "Faculty Meeting", "All Staff", "Conference Room",
-                date, 14, 0, 15, 30, "MEETING"));
-
-        return sessions;
-    }
-
-    /**
-     * Generate Tuesday schedule
-     */
-    private List<CalendarSession> generateTuesdaySchedule(Calendar date) {
-        List<CalendarSession> sessions = new ArrayList<>();
-
-        sessions.add(createSession("TUE_1", "CSE301", "Lập trình Web", "SE1803", "DE-105",
-                date, 9, 0, 10, 30, "LECTURE"));
-        sessions.add(createSession("TUE_2", "CSE401", "Mobile Development", "SE1804", "DE-302",
-                date, 13, 30, 15, 0, "PRACTICE"));
-
-        return sessions;
-    }
-
-    /**
-     * Generate Wednesday schedule
-     */
-    private List<CalendarSession> generateWednesdaySchedule(Calendar date) {
-        List<CalendarSession> sessions = new ArrayList<>();
-
-        sessions.add(createSession("WED_1", "CSE101", "Lập trình căn bản", "SE1801", "DE-201",
-                date, 8, 0, 9, 30, "PRACTICE"));
-        sessions.add(createSession("WED_2", "CSE501", "Machine Learning", "AI1801", "DE-401",
-                date, 10, 0, 11, 30, "LECTURE"));
-        sessions.add(createSession("WED_3", "CSE201", "Cấu trúc dữ liệu", "SE1802", "DE-203",
-                date, 15, 0, 16, 30, "EXAM"));
-
-        return sessions;
-    }
-
-    /**
-     * Generate Thursday schedule
-     */
-    private List<CalendarSession> generateThursdaySchedule(Calendar date) {
-        List<CalendarSession> sessions = new ArrayList<>();
-
-        sessions.add(createSession("THU_1", "CSE301", "Lập trình Web", "SE1803", "DE-105",
-                date, 7, 30, 9, 0, "LECTURE"));
-        sessions.add(createSession("THU_2", "CSE401", "Mobile Development", "SE1804", "DE-302",
-                date, 14, 0, 15, 30, "LECTURE"));
-
-        return sessions;
-    }
-
-    /**
-     * Generate Friday schedule
-     */
-    private List<CalendarSession> generateFridaySchedule(Calendar date) {
-        List<CalendarSession> sessions = new ArrayList<>();
-
-        sessions.add(createSession("FRI_1", "CSE501", "Machine Learning", "AI1801", "DE-401",
-                date, 8, 30, 10, 0, "PRACTICE"));
-        sessions.add(createSession("FRI_2", "REVIEW", "Week Review Meeting", "Lecturers", "Meeting Room",
-                date, 16, 0, 17, 0, "MEETING"));
-
-        return sessions;
-    }
-
-    /**
-     * Generate Saturday schedule (lighter schedule)
-     */
-    private List<CalendarSession> generateSaturdaySchedule(Calendar date) {
-        List<CalendarSession> sessions = new ArrayList<>();
-
-        sessions.add(createSession("SAT_1", "EXTRA", "Extra Class", "SE1801", "DE-201",
-                date, 9, 0, 10, 30, "LECTURE"));
-
-        return sessions;
-    }
-
-    /**
-     * Generate Sunday schedule (usually empty or meetings only)
-     */
-    private List<CalendarSession> generateSundaySchedule(Calendar date) {
-        List<CalendarSession> sessions = new ArrayList<>();
-
-        // Occasionally have meetings on Sunday
-        if (date.get(Calendar.WEEK_OF_MONTH) % 2 == 0) {
-            sessions.add(createSession("SUN_1", "PLANNING", "Weekly Planning", "Department", "Office",
-                    date, 10, 0, 11, 0, "MEETING"));
-        }
-
-        return sessions;
-    }
-
-    /**
-     * Helper method to create session
-     */
-    private CalendarSession createSession(String sessionId, String courseCode, String courseName,
-                                          String className, String room, Calendar date,
-                                          int startHour, int startMinute, int endHour, int endMinute,
-                                          String sessionType) {
-        Calendar startTime = (Calendar) date.clone();
-        startTime.set(Calendar.HOUR_OF_DAY, startHour);
-        startTime.set(Calendar.MINUTE, startMinute);
-        startTime.set(Calendar.SECOND, 0);
-
-        Calendar endTime = (Calendar) date.clone();
-        endTime.set(Calendar.HOUR_OF_DAY, endHour);
-        endTime.set(Calendar.MINUTE, endMinute);
-        endTime.set(Calendar.SECOND, 0);
-
-        CalendarSession session = new CalendarSession();
-        session.setSessionId(sessionId);
-        session.setCourseCode(courseCode);
-        session.setCourseName(courseName);
-        session.setClassName(className);
-        session.setRoom(room);
-        session.setStartTime(startTime.getTime());
-        session.setEndTime(endTime.getTime());
-        session.setSessionDate(date.getTime());
-        session.setStatus("UPCOMING");
-        session.setSessionType(sessionType);
-
-        return session;
-    }
-
-    /**
-     * Check if date is today
-     */
-    private boolean isToday(Calendar date) {
-        Calendar today = Calendar.getInstance();
-        return date.get(Calendar.YEAR) == today.get(Calendar.YEAR) &&
-                date.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR);
-    }
-
-    /**
-     * Update session status based on current time for today's sessions
-     */
-    private void updateSessionStatus(List<CalendarSession> sessions) {
-        long currentTime = System.currentTimeMillis();
-
-        for (CalendarSession session : sessions) {
-            if (currentTime < session.getStartTime().getTime()) {
-                session.setStatus("UPCOMING");
-            } else if (currentTime >= session.getStartTime().getTime() &&
-                    currentTime <= session.getEndTime().getTime()) {
-                session.setStatus("ONGOING");
-            } else {
-                session.setStatus("COMPLETED");
-            }
+            // Force reload by resetting current month/year
+            currentMonth = -1;
+            currentYear = -1;
+            loadMonthlyCalendarAndSelectDate(currentSelectedDate);
         }
     }
 }

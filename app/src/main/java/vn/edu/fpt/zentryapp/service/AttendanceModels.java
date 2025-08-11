@@ -23,32 +23,17 @@ public class AttendanceModels {
 
     @Getter
     @AllArgsConstructor
-    public static class BLEAdvertiseData {
-        private final String macAddress;
-        private final String roomName;
-    }
-
-
-    @Getter
-    @AllArgsConstructor
     public static class ScannedDevice {
-        private final String deviceId;
+        private final String androidId;
         private final int rssi;
     }
 
     @AllArgsConstructor
     @Getter
     public static class AttendanceSubmission {
-        private final String submitterDeviceMacAddress;
+        private final String submitterDeviceAndroidId;
         private final String sessionId;
         private final List<ScannedDevice> scannedDevices;
         private final String timestamp;
-        public AttendanceSubmission(String submitterDeviceMacAddress, String userId,
-                                    String sessionId, List<ScannedDevice> scannedDevices, Date timestamp) {
-            this.submitterDeviceMacAddress = submitterDeviceMacAddress;
-            this.sessionId = sessionId;
-            this.scannedDevices = scannedDevices;
-            this.timestamp = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault()).format(timestamp);
-        }
     }
 }

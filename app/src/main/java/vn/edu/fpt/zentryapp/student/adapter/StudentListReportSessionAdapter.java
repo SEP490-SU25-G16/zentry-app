@@ -5,8 +5,12 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.core.content.ContextCompat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.databinding.ItemSessionStudentBinding;
 import vn.edu.fpt.zentryapp.student.data.model.response.StudentSession;
@@ -48,11 +52,17 @@ public class StudentListReportSessionAdapter extends RecyclerView.Adapter<Studen
         }
 
         public void bind(StudentSession studentSession, boolean isLastItem) {
-            binding.tvSessionTitle.setText(studentSession.getTitle());
-            binding.tvSessionAttendance.setText(studentSession.getAttendanceStatus());
-            binding.tvSessionDate.setText(studentSession.getDate());
+            binding.tvSessionTitle.setText(studentSession.getSessionTitle());
+            binding.tvSessionDate.setText(studentSession.getFormattedDate());
 
-            // Set attendance background và text color linh hoạt
+            // Check time để quyết định hiển thị gì
+            if (isSessionInFuture(studentSession)) {
+                binding.tvSessionAttendance.setText("Future");
+            } else {
+                binding.tvSessionAttendance.setText(studentSession.getAttendanceStatus());
+            }
+
+            // Set attendance background và text color (giữ nguyên logic cũ)
             setAttendanceStyle(studentSession);
 
             // Hide divider for last item
@@ -60,7 +70,34 @@ public class StudentListReportSessionAdapter extends RecyclerView.Adapter<Studen
                     android.view.View.GONE : android.view.View.VISIBLE);
         }
 
+        private boolean isSessionInFuture(StudentSession studentSession) {
+            try {
+                SimpleDateFormat dateTimeFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+                String sessionDateTime = studentSession.getSessionDate() + " " +
+                        (studentSession.getStartTime() != null ? studentSession.getStartTime() : "00:00:00");
+
+                Date sessionDate = dateTimeFormat.parse(sessionDateTime);
+                Date now = new Date();
+
+                return sessionDate != null && sessionDate.after(now);
+            } catch (ParseException e) {
+                return false;
+            }
+        }
+
         private void setAttendanceStyle(StudentSession studentSession) {
+            // Nếu session trong tương lai, dùng background xám
+            if (isSessionInFuture(studentSession)) {
+                binding.tvSessionAttendance.setBackground(
+                        ContextCompat.getDrawable(binding.getRoot().getContext(),
+                                R.drawable.rounded_gray_background));
+                binding.tvSessionAttendance.setTextColor(
+                        ContextCompat.getColor(binding.getRoot().getContext(),
+                                android.R.color.white));
+                return;
+            }
+
+            // Logic cũ cho session đã diễn ra
             String status = studentSession.getAttendanceStatus().toLowerCase();
 
             switch (status) {

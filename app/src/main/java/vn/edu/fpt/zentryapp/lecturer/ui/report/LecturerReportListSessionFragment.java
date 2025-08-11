@@ -21,6 +21,7 @@ import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentLecturerReportListSessionBinding;
 import vn.edu.fpt.zentryapp.lecturer.adapter.LecturerListSessionDetailAdapter;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.OverviewSession;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.ClassroomInfo;
 
 public class LecturerReportListSessionFragment extends Fragment implements LecturerListSessionDetailAdapter.OnSessionDetailClickListener {
 
@@ -44,20 +45,31 @@ public class LecturerReportListSessionFragment extends Fragment implements Lectu
 
         navController = NavHostFragment.findNavController(this);
 
-        // Get data from arguments
-        String courseCode = getArguments() != null ? getArguments().getString("courseCode", "") : "";
-        String className = getArguments() != null ? getArguments().getString("className", "") : "";
-        String courseName = getArguments() != null ? getArguments().getString("courseName", "") : "";
+        // Get classId from arguments (passed from report fragment)
+        String classId = "";
+        if (getArguments() != null) {
+            // Nếu sử dụng ClassroomInfo
+            ClassroomInfo classroomInfo = (ClassroomInfo) getArguments().getSerializable("classroomInfo");
+            if (classroomInfo != null) {
+                classId = classroomInfo.getClassId();
+            }
 
-        // Initialize ViewModel
+            // Hoặc nếu pass trực tiếp classId
+            if (classId.isEmpty()) {
+                classId = getArguments().getString("classId", "");
+            }
+        }
+
+        // Initialize ViewModel với classId
         viewModel = new ViewModelProvider(this).get(LecturerReportListSessionViewModel.class);
         AuthManager authManager = AuthManager.getInstance(requireContext());
-        viewModel.init(authManager, courseCode, className, courseName);
+        viewModel.init(requireContext(), authManager, classId);
 
         setupRecyclerView();
         setupClickListeners();
         observeViewModel();
     }
+
 
     private void setupRecyclerView() {
         sessionAdapter = new LecturerListSessionDetailAdapter();
@@ -86,7 +98,7 @@ public class LecturerReportListSessionFragment extends Fragment implements Lectu
         // Observe course info
         viewModel.courseInfo().observe(getViewLifecycleOwner(), courseInfo -> {
             if (courseInfo != null) {
-                binding.tvReportGrade.setText(courseInfo.getGradeDisplay());
+                binding.tvReportGrade.setText(courseInfo.getGrade());
                 binding.tvReportSubject.setText(courseInfo.getCourseName());
                 binding.tvReportStudentCount.setText(courseInfo.getStudentCount());
                 binding.tvReportSessionCount.setText(courseInfo.getSessionProgress());
@@ -110,13 +122,8 @@ public class LecturerReportListSessionFragment extends Fragment implements Lectu
 
     @Override
     public void onSessionDetailClick(OverviewSession session) {
-        Toast.makeText(requireContext(),
-                "Opening " + session.getSessionTitle(), Toast.LENGTH_SHORT).show();
-
         Bundle args = new Bundle();
-        args.putString("sessionId", session.getSessionId());
-        args.putInt("sessionNumber", session.getSessionNumber());
-
+        args.putSerializable("sessionInfo", session);
         navController.navigate(R.id.action_listSession_to_sessionDetail, args);
     }
 

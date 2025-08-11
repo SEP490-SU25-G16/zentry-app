@@ -36,14 +36,13 @@
                 android:ellipsize="end" />
 
         </LinearLayout>
-
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cvNotification"
             android:layout_width="48dp"
             android:layout_height="48dp"
             app:cardCornerRadius="24dp"
             app:cardElevation="2dp"
-            app:strokeWidth="0dp">
+            app:strokeWidth="0dp"/>
 
             <FrameLayout
                 android:layout_width="match_parent"
@@ -74,8 +73,6 @@
                     android:visibility="gone" />
 
             </FrameLayout>
-
-        </com.google.android.material.card.MaterialCardView>
 
     </LinearLayout>
 

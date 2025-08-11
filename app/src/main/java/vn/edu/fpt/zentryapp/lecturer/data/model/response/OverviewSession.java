@@ -1,24 +1,32 @@
 package vn.edu.fpt.zentryapp.lecturer.data.model.response;
 
+import java.io.Serializable;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class OverviewSession {
-    private String sessionId;     // Giữ lại để identify
-    private int sessionNumber;    // Dùng cho getSessionTitle()
-    private Date date;            // Dùng cho getFormattedDate()
-    private int totalStudents;    // Dùng cho getAttendanceSummary()
-    private int presentStudents;  // Dùng cho getAttendanceSummary()
+public class OverviewSession implements Serializable {
+    private String sessionId;
+    private int sessionNumber;
+    private String sessionTitle;
+    private Date date;
+    private int totalStudents;
+    private int presentStudents;
+    private String startTime;
+    private String endTime;
+    private String roomInfo;
+    private String status;
 
-    // Helper methods - chỉ giữ những cái đang dùng
     public String getAttendanceSummary() {
         return presentStudents + "/" + totalStudents + " - Attendance";
     }

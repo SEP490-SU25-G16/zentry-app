@@ -42,7 +42,7 @@ public class LecturerHistoryAdapter extends RecyclerView.Adapter<LecturerHistory
 
     @Override
     public void onBindViewHolder(@NonNull RoundViewHolder holder, int position) {
-        holder.bind(rounds.get(position), position + 1); // Truyền số thứ tự
+        holder.bind(rounds.get(position));
     }
 
     @Override
@@ -66,9 +66,9 @@ public class LecturerHistoryAdapter extends RecyclerView.Adapter<LecturerHistory
             });
         }
 
-        public void bind(Round round, int roundNumber) {
+        public void bind(Round round) {
             // Set số thứ tự trong circle
-            binding.tvRoundNumber.setText(String.valueOf(roundNumber));
+            binding.tvRoundNumber.setText(String.valueOf(round.getRoundNumber()));
 
             // Set title
             binding.tvRoundTitle.setText(round.getRoundTitle());

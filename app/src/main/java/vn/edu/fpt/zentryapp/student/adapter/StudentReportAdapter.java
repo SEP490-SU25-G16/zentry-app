@@ -14,7 +14,8 @@ import vn.edu.fpt.zentryapp.student.data.model.response.StudentReport;
 
 public class StudentReportAdapter extends RecyclerView.Adapter<StudentReportAdapter.ViewHolder> {
 
-    private List<StudentReport> reports = new ArrayList<>();
+    private List<StudentReport> reports = new ArrayList<>();       // Hiển thị
+    private List<StudentReport> allReports = new ArrayList<>();    // Gốc
     private OnReportClickListener onReportClickListener;
 
     public interface OnReportClickListener {
@@ -26,7 +27,29 @@ public class StudentReportAdapter extends RecyclerView.Adapter<StudentReportAdap
     }
 
     public void setReports(List<StudentReport> reports) {
-        this.reports = reports != null ? reports : new ArrayList<>();
+        this.allReports = reports != null ? new ArrayList<>(reports) : new ArrayList<>();
+        this.reports = new ArrayList<>(allReports);
+        notifyDataSetChanged();
+    }
+
+    public void filter(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            reports = new ArrayList<>(allReports);
+        } else {
+            String lowerQuery = query.toLowerCase();
+            List<StudentReport> filtered = new ArrayList<>();
+            for (StudentReport item : allReports) {
+                // Lọc theo courseName, courseCode và lecturerName
+                if (item.getCourseName().toLowerCase().contains(lowerQuery) ||
+                        item.getCourseCode().toLowerCase().contains(lowerQuery) ||
+                        item.getSectionCode().toLowerCase().contains(lowerQuery) ||
+                        (item.getLecturerName() != null &&
+                                item.getLecturerName().toLowerCase().contains(lowerQuery))) {
+                    filtered.add(item);
+                }
+            }
+            reports = filtered;
+        }
         notifyDataSetChanged();
     }
 
@@ -64,17 +87,11 @@ public class StudentReportAdapter extends RecyclerView.Adapter<StudentReportAdap
         }
 
         public void bind(StudentReport report) {
-            // Set course title (Mathematics - G701)
-            binding.tvCourseTitle.setText(report.getCourseTitle());
-
-            // Set lecturer info (Lecturer: Hasha)
-            binding.tvLecturerName.setText(report.getLecturerInfo());
-
-            // Set sessions with purple background (15/20 Sessions)
-            binding.tvSessions.setText(report.getSessionsText());
-
-            // Set attendance percentage with green background (90%)
-            binding.tvAttendancePercentage.setText(report.getAttendancePercentageText());
+            // Sử dụng các method đúng từ StudentReport model
+            binding.tvCourseTitle.setText(report.getCourseName()); // hoặc getClassName() nếu muốn full name
+            binding.tvLecturerName.setText(report.getLecturerDisplayName());
+            binding.tvSessions.setText(report.getSessionProgress());
+            binding.tvAttendancePercentage.setText(report.getAttendanceDisplay());
         }
     }
 }

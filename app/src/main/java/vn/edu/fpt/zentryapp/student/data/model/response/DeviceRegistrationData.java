@@ -18,8 +18,8 @@ public class DeviceRegistrationData {
     @SerializedName("DeviceToken")
     private String deviceToken;
 
-    @SerializedName("MacAddress")
-    private String macAddress;
+    @SerializedName("AndroidId")
+    private String androidId;
 
     @SerializedName("CreatedAt")
     private String createdAt;

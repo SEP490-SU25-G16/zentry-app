@@ -4,23 +4,42 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
-import android.os.Handler;
+import android.content.Context;
+import android.util.Log;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import vn.edu.fpt.zentryapp.auth.client.ApiClient;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
+import vn.edu.fpt.zentryapp.lecturer.data.api.LecturerApiService;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.CourseInfo;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.OverviewSession;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.ApiResponseDto;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.ClassOverviewDto;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.ClassSessionsDataDto;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.SessionDetailDto;
 
 public class LecturerReportListSessionViewModel extends ViewModel {
+    private final String TAG = "LecturerReportListSession";
 
     // LiveData cho UI state
     private final MutableLiveData<Boolean> _isLoading = new MutableLiveData<>(false);
     private final MutableLiveData<CourseInfo> _courseInfo = new MutableLiveData<>();
     private final MutableLiveData<List<OverviewSession>> _sessions = new MutableLiveData<>();
     private final MutableLiveData<String> _errorMessage = new MutableLiveData<>();
+
+    // API service
+    private LecturerApiService apiService;
+    private AuthManager authManager;
+    private String classId;
 
     // Public getters cho Fragment observe
     public LiveData<Boolean> isLoading() {
@@ -39,114 +58,136 @@ public class LecturerReportListSessionViewModel extends ViewModel {
         return _errorMessage;
     }
 
-    private AuthManager authManager;
-    private String courseCode;
-    private String className;
-    private String courseName;
-
-    public void init(AuthManager authManager, String courseCode, String className, String courseName) {
+    public void init(Context context, AuthManager authManager, String classId) {
         this.authManager = authManager;
-        this.courseCode = courseCode;
-        this.className = className;
-        this.courseName = courseName;
+        this.classId = classId;
+        this.apiService = ApiClient.getClient(context).create(LecturerApiService.class);
 
-        loadCourseInfo();
-        loadSessions();
+        loadClassOverviewAndSessions();
     }
 
     /**
-     * Load course information
+     * Load class overview and sessions from API
      */
-    private void loadCourseInfo() {
+    private void loadClassOverviewAndSessions() {
+        if (classId == null || classId.isEmpty()) {
+            _errorMessage.setValue("Class ID is required");
+            return;
+        }
+
         _isLoading.setValue(true);
 
-        // Simulate network delay
-        new Handler().postDelayed(() -> {
-            CourseInfo courseInfo = generateCourseInfo(courseCode, courseName, className);
+        Call<ApiResponseDto<ClassSessionsDataDto>> call = apiService.getClassOverviewSessions(classId);
+        call.enqueue(new Callback<ApiResponseDto<ClassSessionsDataDto>>() {
+            @Override
+            public void onResponse(Call<ApiResponseDto<ClassSessionsDataDto>> call,
+                                   Response<ApiResponseDto<ClassSessionsDataDto>> response) {
+                _isLoading.setValue(false);
+
+                if (response.isSuccessful() && response.body() != null) {
+                    ApiResponseDto<ClassSessionsDataDto> apiResponse = response.body();
+
+                    if (apiResponse.isSuccess() && apiResponse.getData() != null) {
+                        processClassSessionsData(apiResponse.getData());
+                    } else {
+                        _errorMessage.setValue(apiResponse.getError() != null ?
+                                apiResponse.getError() : "Failed to load class sessions");
+                    }
+                } else {
+                    _errorMessage.setValue("Failed to load data: " + response.message());
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ApiResponseDto<ClassSessionsDataDto>> call, Throwable t) {
+                _isLoading.setValue(false);
+                _errorMessage.setValue("Network error: " + t.getMessage());
+                Log.e(TAG, "API call failed", t);
+            }
+        });
+    }
+
+    private void processClassSessionsData(ClassSessionsDataDto data) {
+        // Process overview data
+        if (data.getOverview() != null) {
+            CourseInfo courseInfo = mapOverviewToCourseInfo(data.getOverview());
             _courseInfo.setValue(courseInfo);
-        }, 500);
-    }
+        }
 
-    /**
-     * Load all sessions for this course and class
-     */
-    private void loadSessions() {
-        // Simulate network delay
-        new Handler().postDelayed(() -> {
-            List<OverviewSession> sessions = generateMockSessions();
+        // Process sessions data
+        if (data.getSessions() != null) {
+            List<OverviewSession> sessions = mapSessionsToOverviewSessions(data.getSessions());
             _sessions.setValue(sessions);
-            _isLoading.setValue(false);
-        }, 1000);
+        }
     }
 
-    /**
-     * Refresh sessions data
-     */
-    public void refreshSessions() {
-        loadCourseInfo();
-        loadSessions();
-    }
-
-    /**
-     * Generate mock course info
-     */
-    private CourseInfo generateCourseInfo(String courseCode, String courseName, String className) {
+    private CourseInfo mapOverviewToCourseInfo(ClassOverviewDto overview) {
         CourseInfo courseInfo = new CourseInfo();
-        courseInfo.setCourseCode(courseCode);
-        courseInfo.setCourseName(courseName);
-        courseInfo.setClassName(className);
-        courseInfo.setRoom("DE-201");
-        courseInfo.setGrade("07");
-        courseInfo.setTotalStudents(32);
-        courseInfo.setTotalSessions(20);
-        courseInfo.setCompletedSessions(12);
-        courseInfo.setSemester("Fall 2024");
-        courseInfo.setAcademicYear("2024-2025");
+        courseInfo.setCourseCode(overview.getCourseCode());
+        courseInfo.setCourseName(overview.getCourseName());
+        courseInfo.setClassName(overview.getClassName());
+        courseInfo.setTotalStudents(overview.getEnrolledStudents());
+        courseInfo.setTotalSessions(overview.getTotalSessions());
+        courseInfo.setCompletedSessions(overview.getCompletedSessions());
+        courseInfo.setSemester(overview.getSemesterInfo());
+
+        // Set room info (get first room if available)
+        if (overview.getRoomInfos() != null && !overview.getRoomInfos().isEmpty()) {
+            courseInfo.setRoom(overview.getRoomInfos().get(0));
+        }
+
+        courseInfo.setGrade(overview.getSectionCode());
 
         return courseInfo;
     }
 
-    /**
-     * Generate mock sessions data - simplified
-     */
-    private List<OverviewSession> generateMockSessions() {
+    private List<OverviewSession> mapSessionsToOverviewSessions(List<SessionDetailDto> sessionDtos) {
         List<OverviewSession> sessions = new ArrayList<>();
 
-        Calendar calendar = Calendar.getInstance();
-        calendar.set(2024, Calendar.NOVEMBER, 1);
-
-        // Generate 20 sessions
-        for (int i = 1; i <= 20; i++) {
+        for (SessionDetailDto dto : sessionDtos) {
             OverviewSession session = new OverviewSession();
-            session.setSessionId("S" + courseCode + "_" + i);
-            session.setSessionNumber(i);
-            session.setDate(calendar.getTime());
-            session.setTotalStudents(32);
-            session.setPresentStudents(generateRandomAttendance(32, i));
+            session.setSessionId(dto.getSessionId());
+            session.setSessionNumber(dto.getSessionNumber());
+            session.setTotalStudents(dto.getTotalStudents());
+            session.setPresentStudents(dto.getAttendedCount());
+
+            // Parse date
+            Date sessionDate = parseDate(dto.getSessionDate());
+            session.setDate(sessionDate);
+
+            // Set session title
+            session.setSessionTitle(dto.getSessionName());
+
+            // Set time info
+            session.setStartTime(dto.getSessionTime());
+            session.setEndTime(dto.getEndTime());
+
+            // Set room info
+            session.setRoomInfo(dto.getRoomInfo());
+
+            // Set status
+            session.setStatus(dto.getStatus());
 
             sessions.add(session);
-
-            // Move to next session date (every 3 days)
-            calendar.add(Calendar.DAY_OF_MONTH, 3);
         }
 
         return sessions;
     }
 
-    /**
-     * Generate realistic attendance numbers
-     */
-    private int generateRandomAttendance(int total, int sessionNumber) {
-        double baseAttendance = 0.85;
-        double variation = Math.random() * 0.15;
-
-        if (sessionNumber <= 3) {
-            baseAttendance = 0.95;
-        } else if (sessionNumber >= 8 && sessionNumber <= 10) {
-            baseAttendance = 0.75;
+    private Date parseDate(String dateString) {
+        try {
+            SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            return format.parse(dateString);
+        } catch (ParseException e) {
+            Log.e(TAG, "Error parsing date: " + dateString, e);
+            return new Date(); // Return current date as fallback
         }
+    }
 
-        int attendance = (int) (total * (baseAttendance + variation));
-        return Math.max(15, Math.min(total, attendance));
+    /**
+     * Refresh data
+     */
+    public void refreshData() {
+        loadClassOverviewAndSessions();
     }
 }

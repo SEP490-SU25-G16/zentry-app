@@ -40,7 +40,6 @@ import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.ApiClient;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.ItemStudentScheduleClassSectionBinding;
-import vn.edu.fpt.zentryapp.lecturer.data.model.response.Round;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.RoundDetail;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.RoundsDataResponse;
 import vn.edu.fpt.zentryapp.service.AttendanceApiService;
@@ -67,9 +66,8 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
     private static final String ACTION_VIEW = "VIEW";
     private static final String ACTION_UPCOMING = "UPCOMING";
     private static final String ACTION_MISSED = "MISSED";
-
-
     private List<StudentScheduleClassSection> sessions = new ArrayList<>();
+    private List<StudentScheduleClassSection> allSessions = new ArrayList<>();
     private OnSessionActionListener listener;
     private AuthManager authManager;
     private Context context;
@@ -87,7 +85,26 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
 
     @SuppressLint("NotifyDataSetChanged")
     public void setSessions(List<StudentScheduleClassSection> sessions) {
-        this.sessions = sessions != null ? sessions : new ArrayList<>();
+        this.allSessions = sessions != null ? new ArrayList<>(sessions) : new ArrayList<>();
+        this.sessions = new ArrayList<>(allSessions);
+        notifyDataSetChanged();
+    }
+    @SuppressLint("NotifyDataSetChanged")
+    public void filter(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            sessions = new ArrayList<>(allSessions);
+        } else {
+            String lower = query.toLowerCase();
+            List<StudentScheduleClassSection> filtered = new ArrayList<>();
+            for (StudentScheduleClassSection item : allSessions) {
+                if ((item.getCourseName() != null && item.getCourseName().toLowerCase().contains(lower)) ||
+                        (item.getSectionCode() != null && item.getSectionCode().toLowerCase().contains(lower)) ||
+                        (item.getCourseDisplay() != null && item.getCourseDisplay().toLowerCase().contains(lower))) {
+                    filtered.add(item);
+                }
+            }
+            sessions = filtered;
+        }
         notifyDataSetChanged();
     }
 
@@ -106,7 +123,7 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
     @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        holder.bind(sessions.get(position));
+        holder.bind(allSessions.get(position));
     }
 
     @Override
@@ -305,7 +322,7 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
         }
 
         private boolean hasActiveSessionInList() {
-            return sessions.stream()
+            return allSessions.stream()
                     .anyMatch(session -> STATUS_ACTIVE.equals(session.getStatus()));
         }
 
@@ -467,8 +484,6 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
 
             Log.d(TAG, "Student joined session: " + session.getSessionId());
         }
-
-
 
         @RequiresApi(api = Build.VERSION_CODES.O)
         private void loadSessionRounds(StudentScheduleClassSection session) {

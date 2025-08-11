@@ -11,7 +11,12 @@ public class Student {
     private String studentId;
     private String studentCode;
     private String fullName;
+    private String email;
     private boolean isPresent;
+    private String attendanceStatus;
+    private String enrollmentId;
+    private String enrollmentStatus;
+    private String enrolledAt;
 
     // Helper methods
     public String getAttendanceStatus() {

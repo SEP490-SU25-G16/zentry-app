@@ -28,6 +28,7 @@ import android.util.Log;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.RequiresPermission;
 import androidx.core.app.NotificationCompat;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
@@ -239,9 +240,23 @@ public class BLEAttendanceService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "=== SERVICE START COMMAND ===");
 
-        // Validate intent
-        if (intent == null || !"START_ATTENDANCE".equals(intent.getAction())) {
-            Log.w(TAG, "Invalid intent, stopping service");
+        if (intent == null) {
+            Log.w(TAG, "Null intent, stopping service");
+            stopSelf();
+            return START_NOT_STICKY;
+        }
+
+        String action = intent.getAction();
+
+        if ("STOP_ATTENDANCE".equals(action)) {
+            Log.d(TAG, "Received STOP_ATTENDANCE action");
+            stopAttendanceService();
+            return START_NOT_STICKY;
+        }
+
+        // Handle START_ATTENDANCE action (existing code)
+        if (!"START_ATTENDANCE".equals(action)) {
+            Log.w(TAG, "Invalid action: " + action + ", stopping service");
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -304,9 +319,9 @@ public class BLEAttendanceService extends Service {
         if (rounds != null && !rounds.isEmpty()) {
             roundScheduler = new AttendanceRoundScheduler(
                     rounds,
-                    this::executeRound,      // Callback khi đến giờ execute round
-                    this::calculateRound,    // Callback khi đến giờ calculate round
-                    this::onAllRoundsComplete // Callback khi tất cả rounds hoàn thành
+                    this::executeRound,           // Callback khi đến giờ execute round
+                    this::calculateRound,         // Callback khi đến giờ calculate round
+                    this::onAllRoundsComplete    // Callback khi tất cả rounds hoàn thành
             );
             roundScheduler.start();
             Log.d(TAG, "Round scheduler started with " + rounds.size() + " rounds");
@@ -457,7 +472,7 @@ public class BLEAttendanceService extends Service {
 
         Log.d(TAG, "Round " + round.getRoundNumber() + ": " + topDevices.size() + " devices detected");
         for (AttendanceModels.ScannedDevice device : topDevices) {
-            Log.d(TAG, "  " + device.getDeviceId() + " RSSI: " + device.getRssi());
+            Log.d(TAG, "  " + device.getAndroidId() + " RSSI: " + device.getRssi());
         }
 
         String timestamp = createTimestamp();
@@ -614,6 +629,7 @@ public class BLEAttendanceService extends Service {
         // Dừng scheduler
         if (roundScheduler != null) {
             roundScheduler.stop();
+            roundScheduler = null;
             Log.d(TAG, "✅ Round scheduler stopped");
         }
 
@@ -628,6 +644,10 @@ public class BLEAttendanceService extends Service {
         Log.d(TAG, "✅ Service stopped completely");
     }
 
+    public int getCachedSubmissionCount() {
+        return submissionHandler != null ? submissionHandler.getCachedSubmissionCount() : 0;
+    }
+
     @RequiresPermission(allOf = {Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_SCAN})
     @Override
     public void onDestroy() {
@@ -638,6 +658,7 @@ public class BLEAttendanceService extends Service {
         if (advertiser != null) advertiser.stopAdvertising(advCallback);
         if (scanner != null) scanner.stopScan(scanCallback);
         if (roundScheduler != null) roundScheduler.stop();
+        if (submissionHandler != null) submissionHandler.destroy();
     }
 
     /**

@@ -36,16 +36,6 @@
                 android:textSize="16sp"
                 android:maxLines="2" />
         </LinearLayout>
-
-        <!-- Notification icon (giống lecturer) -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cvStudentNotification"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            app:cardCornerRadius="24dp"
-            app:cardElevation="2dp"
-            app:strokeWidth="0dp">
-
             <ImageView
                 android:id="@+id/btnStudentNotification"
                 android:layout_width="48dp"
@@ -53,7 +43,6 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:padding="2dp"
                 android:src="@drawable/ic_notification" />
-        </com.google.android.material.card.MaterialCardView>
     </LinearLayout>
 
     <!-- ===== SEMESTER TAGS CARD (placeholder giống lecturer) ===== -->
