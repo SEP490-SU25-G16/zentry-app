@@ -20,6 +20,7 @@ import android.view.ViewGroup;
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentReportBinding;
+import vn.edu.fpt.zentryapp.notification.sharedviewmodel.NotificationViewModel;
 import vn.edu.fpt.zentryapp.student.adapter.StudentReportAdapter;
 import vn.edu.fpt.zentryapp.student.data.model.response.StudentReport;
 
@@ -29,6 +30,8 @@ public class StudentReportFragment extends Fragment implements StudentReportAdap
     private StudentReportViewModel viewModel;
     private StudentReportAdapter reportAdapter;
     private NavController navController;
+    private NotificationViewModel notificationViewModel;
+    private static final String TAG = "StudentReportFragment";
 
     @Nullable
     @Override
@@ -48,13 +51,40 @@ public class StudentReportFragment extends Fragment implements StudentReportAdap
 
         // Initialize ViewModel với context
         viewModel = new ViewModelProvider(this).get(StudentReportViewModel.class);
+        notificationViewModel = new ViewModelProvider(requireActivity()).get(NotificationViewModel.class);
         AuthManager authManager = AuthManager.getInstance(requireContext());
         viewModel.init(requireContext(), authManager);
+        
+        // Load notifications để có dữ liệu cho badge
+        notificationViewModel.loadNotifications();
 
         setupRecyclerView();
+        setupClickListeners();
         observeViewModel();
         setupSearchBar();
         setupRefreshListener();
+    }
+
+    private void setupClickListeners() {
+        // Notification button click handler
+        binding.btnStudentReportNotification.setOnClickListener(v -> {
+            try {
+                if (navController.getCurrentDestination() != null && 
+                    navController.getCurrentDestination().getAction(R.id.action_studentReport_to_notification) != null) {
+                    navController.navigate(R.id.action_studentReport_to_notification);
+                } else {
+                    // Fallback navigation if action isn't available
+                    Log.w(TAG, "Navigation action not available, using fallback");
+                    Toast.makeText(requireContext(), "Đang chuyển đến thông báo...", Toast.LENGTH_SHORT).show();
+                    
+                    // Try to find notificationFragment by ID
+                    navController.navigate(R.id.notificationFragment);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Navigation error: ", e);
+                Toast.makeText(requireContext(), "Chức năng thông báo đang được phát triển", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void setupRefreshListener() {
@@ -63,7 +93,7 @@ public class StudentReportFragment extends Fragment implements StudentReportAdap
         //     viewModel.refreshReports();
         // });
     }
-
+    
     private void setupSearchBar() {
         binding.etStudentSearch.addTextChangedListener(new android.text.TextWatcher() {
             @Override
@@ -122,6 +152,16 @@ public class StudentReportFragment extends Fragment implements StudentReportAdap
             if (error != null) {
                 Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
                 Log.e("StudentReportFragment", "Error: " + error);
+            }
+        });
+        
+        // Observe notification unseen count để hiển thị badge
+        notificationViewModel.getUnseenCount().observe(getViewLifecycleOwner(), unseenCount -> {
+            if (unseenCount != null && unseenCount > 0) {
+                binding.tvNotificationBadge.setVisibility(View.VISIBLE);
+                binding.tvNotificationBadge.setText(String.valueOf(unseenCount));
+            } else {
+                binding.tvNotificationBadge.setVisibility(View.GONE);
             }
         });
     }

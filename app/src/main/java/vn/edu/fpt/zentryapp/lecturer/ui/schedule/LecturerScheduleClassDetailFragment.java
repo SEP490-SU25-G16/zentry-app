@@ -147,7 +147,17 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
         binding.btnScheduleClassDetailNotification.setOnClickListener(v -> {
             // Navigate đến NotificationFragment
             try {
-                navController.navigate(R.id.action_scheduleClassDetail_to_notification);
+                if (navController.getCurrentDestination() != null && 
+                    navController.getCurrentDestination().getAction(R.id.action_scheduleClassDetail_to_notification) != null) {
+                    navController.navigate(R.id.action_scheduleClassDetail_to_notification);
+                } else {
+                    // Fallback navigation if action isn't available
+                    android.util.Log.w("LecturerScheduleClassDetail", "Navigation action not available, using fallback");
+                    Toast.makeText(requireContext(), "Đang chuyển đến thông báo...", Toast.LENGTH_SHORT).show();
+                    
+                    // Try to find notificationFragment by ID
+                    navController.navigate(R.id.notificationFragment);
+                }
             } catch (Exception e) {
                 android.util.Log.e("LecturerScheduleClassDetail", "Navigation error: ", e);
                 Toast.makeText(requireContext(), "Chức năng thông báo đang được phát triển", Toast.LENGTH_SHORT).show();

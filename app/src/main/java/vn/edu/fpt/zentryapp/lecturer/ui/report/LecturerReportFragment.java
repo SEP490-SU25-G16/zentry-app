@@ -79,7 +79,17 @@ public class LecturerReportFragment extends Fragment implements LecturerReportCl
         binding.btnNotification.setOnClickListener(v -> {
             // Navigate đến NotificationFragment (cùng fragment với student)
             try {
-                navController.navigate(R.id.action_lecturerReport_to_notification);
+                if (navController.getCurrentDestination() != null && 
+                    navController.getCurrentDestination().getAction(R.id.action_lecturerReport_to_notification) != null) {
+                    navController.navigate(R.id.action_lecturerReport_to_notification);
+                } else {
+                    // Fallback navigation if action isn't available
+                    android.util.Log.w("LecturerReport", "Navigation action not available, using fallback");
+                    Toast.makeText(requireContext(), "Đang chuyển đến thông báo...", Toast.LENGTH_SHORT).show();
+                    
+                    // Try to find notificationFragment by ID
+                    navController.navigate(R.id.notificationFragment);
+                }
             } catch (Exception e) {
                 // Fallback nếu action không tồn tại
                 android.util.Log.e("LecturerReport", "Navigation error: ", e);

@@ -107,10 +107,24 @@ public class StudentScheduleFragment extends Fragment implements StudentSchedule
             // TODO: Navigate to calendar
         });
 
-        // Notification click
+        // Notification click - using shared navigation handler
         binding.ivStudentNotification.setOnClickListener(v -> {
-            Toast.makeText(requireContext(), "Notification clicked", Toast.LENGTH_SHORT).show();
-            // TODO: Navigate to notifications
+            try {
+                if (navController.getCurrentDestination() != null && 
+                    navController.getCurrentDestination().getAction(R.id.action_studentSchedule_to_notification) != null) {
+                    navController.navigate(R.id.action_studentSchedule_to_notification);
+                } else {
+                    // Fallback navigation if action isn't available
+                    android.util.Log.w(TAG, "Navigation action not available, using fallback");
+                    Toast.makeText(requireContext(), "Đang chuyển đến thông báo...", Toast.LENGTH_SHORT).show();
+                    
+                    // Try to find notificationFragment by ID
+                    navController.navigate(R.id.notificationFragment);
+                }
+            } catch (Exception e) {
+                android.util.Log.e(TAG, "Navigation error: ", e);
+                Toast.makeText(requireContext(), "Chức năng thông báo đang được phát triển", Toast.LENGTH_SHORT).show();
+            }
         });
 
         // Search functionality
@@ -120,11 +134,6 @@ public class StudentScheduleFragment extends Fragment implements StudentSchedule
                 // TODO: Implement search
                 Toast.makeText(requireContext(), "Searching: " + query, Toast.LENGTH_SHORT).show();
             }
-        });
-
-        // Navigate to notification screen
-        binding.btnStudentScheduleNotification.setOnClickListener(v -> {
-            navController.navigate(R.id.action_studentSchedule_to_notification);
         });
 
     }
