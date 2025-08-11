@@ -45,6 +45,37 @@
             android:padding="2dp"
             android:src="@drawable/ic_notification" />
 
+        <!-- Notification Button -->
+        <Button
+            android:id="@+id/btnStudentScheduleNotification"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:text=""
+            android:visibility="invisible" />
+
+        <!-- Notification Badge -->
+        <FrameLayout
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="-40dp">
+
+            <TextView
+                android:id="@+id/tvNotificationBadge"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_gravity="top|end"
+                android:layout_marginTop="2dp"
+                android:layout_marginEnd="2dp"
+                android:background="@drawable/bg_notification_badge"
+                android:gravity="center"
+                android:text="5"
+                android:textColor="@android:color/white"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+        </FrameLayout>
     </LinearLayout>
 
     <!-- Main Content Container -->

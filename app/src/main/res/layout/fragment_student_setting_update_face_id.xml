@@ -60,6 +60,20 @@
             
         </FrameLayout>
 
+        <!-- Status Text -->
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Position your face in the oval"
+            android:textSize="16sp"
+            android:textColor="#232B42"
+            android:gravity="center"
+            android:padding="8dp"
+            android:background="@drawable/bg_rounded_light"
+            android:textStyle="bold"/>
+
         <!-- Instructions -->
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
@@ -95,21 +109,45 @@
             
         </androidx.cardview.widget.CardView>
 
-        <!-- Update Button -->
-        <Button
-            android:id="@+id/btnUpdateFace"
+        <!-- Action Buttons -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Update Face ID"
-            android:textAllCaps="false"
-            android:textSize="16sp"
-            android:padding="12dp"
-            android:background="@drawable/bg_button_primary"
-            android:textColor="#FFFFFF"/>
+            android:orientation="horizontal"
+            android:layout_marginTop="16dp">
+            
+            <!-- Cancel Button -->
+            <Button
+                android:id="@+id/btnCancel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="Cancel"
+                android:textAllCaps="false"
+                android:textSize="16sp"
+                android:padding="12dp"
+                android:background="@drawable/bg_button_secondary"
+                android:textColor="#232B42"/>
+
+            <!-- Update Button -->
+            <Button
+                android:id="@+id/btnUpdate"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="Update Face ID"
+                android:textAllCaps="false"
+                android:textSize="16sp"
+                android:padding="12dp"
+                android:background="@drawable/bg_button_primary"
+                android:textColor="#FFFFFF"/>
+        </LinearLayout>
             
         <!-- Progress Bar -->
         <ProgressBar
-            android:id="@+id/progressBarUpdateFaceId"
+            android:id="@+id/progressBar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"

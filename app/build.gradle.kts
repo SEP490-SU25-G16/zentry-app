@@ -67,7 +67,7 @@ dependencies {
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
     
-    // Face ID dependencies - sử dụng phiên bản từ OnDevice-Face-Recognition-Android
+    // Face ID dependencies
     implementation("com.google.ai.edge.litert:litert:1.1.2")
     implementation("com.google.ai.edge.litert:litert-gpu:1.1.2")
     implementation("com.google.ai.edge.litert:litert-gpu-api:1.1.2")

@@ -20,6 +20,8 @@ import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentLecturerReportBinding;
 import vn.edu.fpt.zentryapp.lecturer.adapter.LecturerReportClassSectionAdapter;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerReportClassSection;
+import vn.edu.fpt.zentryapp.lecturer.adapter.SessionAdapter;
+import vn.edu.fpt.zentryapp.notification.sharedviewmodel.NotificationViewModel;
 import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.ClassroomInfo;
 
 /**
@@ -31,6 +33,8 @@ public class LecturerReportFragment extends Fragment implements LecturerReportCl
     private FragmentLecturerReportBinding binding;
     private LecturerReportViewModel viewModel;
     private LecturerReportClassSectionAdapter adapter;
+    private NotificationViewModel notificationViewModel;
+    private SessionAdapter sessionAdapter;
     private NavController navController;
 
     @Nullable
@@ -50,8 +54,12 @@ public class LecturerReportFragment extends Fragment implements LecturerReportCl
 
         // Initialize ViewModel với context
         viewModel = new ViewModelProvider(this).get(LecturerReportViewModel.class);
+        notificationViewModel = new ViewModelProvider(requireActivity()).get(NotificationViewModel.class);
         AuthManager authManager = AuthManager.getInstance(requireContext());
         viewModel.initWithContext(requireContext(), authManager);
+
+        // Load notifications để có dữ liệu cho badge
+        notificationViewModel.loadNotifications();
 
         setupRecyclerView();
         setupClickListeners();
@@ -69,7 +77,14 @@ public class LecturerReportFragment extends Fragment implements LecturerReportCl
     private void setupClickListeners() {
         // Notification button
         binding.btnNotification.setOnClickListener(v -> {
-            Toast.makeText(requireContext(), "Notifications", Toast.LENGTH_SHORT).show();
+            // Navigate đến NotificationFragment (cùng fragment với student)
+            try {
+                navController.navigate(R.id.action_lecturerReport_to_notification);
+            } catch (Exception e) {
+                // Fallback nếu action không tồn tại
+                android.util.Log.e("LecturerReport", "Navigation error: ", e);
+                Toast.makeText(requireContext(), "Chức năng thông báo đang được phát triển", Toast.LENGTH_SHORT).show();
+            }
         });
     }
 
@@ -91,6 +106,16 @@ public class LecturerReportFragment extends Fragment implements LecturerReportCl
         viewModel.errorMessage().observe(getViewLifecycleOwner(), error -> {
             if (error != null) {
                 Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
+            }
+        });
+
+        // Observe notification unseen count để hiển thị badge
+        notificationViewModel.getUnseenCount().observe(getViewLifecycleOwner(), unseenCount -> {
+            if (unseenCount != null && unseenCount > 0) {
+                binding.tvNotificationBadge.setVisibility(View.VISIBLE);
+                binding.tvNotificationBadge.setText(String.valueOf(unseenCount));
+            } else {
+                binding.tvNotificationBadge.setVisibility(View.GONE);
             }
         });
     }

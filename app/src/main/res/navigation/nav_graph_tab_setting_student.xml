@@ -80,7 +80,7 @@
     <!-- 6. Register Face ID -->
     <fragment
         android:id="@+id/studentSettingRegisterFaceIdFragment"
-        android:name="vn.edu.fpt.zentryapp.student.ui.setting.StudentSettingRegisterFaceIdFragment"
+        android:name="vn.edu.fpt.zentryapp.faceid.ui.setting.StudentSettingRegisterFaceIdFragment"
         android:label="Register Face ID">
         <action
             android:id="@+id/action_registerFaceId_to_settings"
@@ -92,7 +92,7 @@
     <!-- 7. Update Face ID -->
     <fragment
         android:id="@+id/studentSettingUpdateFaceIdFragment"
-        android:name="vn.edu.fpt.zentryapp.student.ui.setting.StudentSettingUpdateFaceIdFragment"
+        android:name="vn.edu.fpt.zentryapp.faceid.ui.setting.StudentSettingUpdateFaceIdFragment"
         android:label="Update Face ID">
         <action
             android:id="@+id/action_updateFaceId_to_settings"
@@ -104,7 +104,7 @@
     <!-- 8. Verify Face ID -->
     <fragment
         android:id="@+id/studentSettingVerifyFaceIdFragment"
-        android:name="vn.edu.fpt.zentryapp.student.ui.setting.StudentSettingVerifyFaceIdFragment"
+        android:name="vn.edu.fpt.zentryapp.faceid.ui.setting.StudentSettingVerifyFaceIdFragment"
         android:label="Verify Face ID">
         <action
             android:id="@+id/action_verifyFaceId_to_settings"

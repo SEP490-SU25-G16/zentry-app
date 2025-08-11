@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Màu cơ bản -->
+    <color name="primaryText">#232B42</color> <!-- màu chữ chính -->
+    <color name="gray">#888888</color> <!-- màu mô tả, ngày tháng -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="green">#00FF00</color>
@@ -36,4 +39,30 @@
     <color name="attendance_poor">#EF4444</color>
 
 
+
+    <color name="tab_selected_background">#EEF3F9</color>
+    <color name="success">#4CAF50</color>
+    <color name="warning">#FFC107</color>
+    <color name="info">#2196F3</color>
+    <color name="notification_unread_background">#E6F2FF</color>
+    <color name="lightGray">#E5E5E5</color>
+
+    <!-- UI Design Colors -->
+    <color name="background_light">#F9F9F9</color>
+    <color name="text_primary">#2C2C2E</color>
+    <color name="text_secondary">#8E8E93</color>
+
+    <color name="success_green">#4CAF50</color>
+    <color name="error_red">#F44336</color>
+    <color name="processing_blue">#2196F3</color>
+    <color name="warning_orange">#FF9800</color>
+    <color name="warning_yellow">#FFC107</color>
+
+    <!-- UI Colors -->
+    <color name="background_primary">#FFFFFF</color>
+
+    <!-- Button Colors -->
+    <color name="button_primary">#1976D2</color>
+    <color name="button_secondary">#E3F2FD</color>
+    <color name="liveness_challenge_blue">#0000FF</color>
 </resources>

@@ -6,6 +6,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.logging.HttpLoggingInterceptor;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
+import java.util.concurrent.TimeUnit;
 
 public class ApiClient {
     private static final String BASE_URL =  "https://api.khanhlongtran-sep490.online/"; // ipconfig  => change to call API
@@ -21,6 +22,9 @@ public class ApiClient {
             OkHttpClient client = new OkHttpClient.Builder()
                     .addInterceptor(new AuthInterceptor(authManager))
                     .addInterceptor(logging) // Chỉ cho development
+                    .connectTimeout(30, TimeUnit.SECONDS) // 🔧 NEW: Connection timeout
+                    .readTimeout(60, TimeUnit.SECONDS)    // 🔧 NEW: Read timeout for large data
+                    .writeTimeout(60, TimeUnit.SECONDS)   // 🔧 NEW: Write timeout for large data
                     .build();
 
             retrofit = new Retrofit.Builder()

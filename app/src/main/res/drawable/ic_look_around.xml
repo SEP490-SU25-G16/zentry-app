@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Vòng tròn xung quanh -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M12,2a10,10 0 1,0 0.01,0Z"
+        android:fillAlpha="0.1"/>
+
+    <!-- Mắt -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M12,6C7.5,6 4.36,9.28 3,12c1.36,2.72 4.5,6 9,6s7.64,-3.28 9,-6c-1.36,-2.72 -4.5,-6 -9,-6Zm0,10a4,4 0 1,1 0,-8 4,4 0 0,1 0,8Z"/>
+
+    <!-- Đồng tử -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M12,10a2,2 0 1,0 0.01,0Z"/>
+</vector>

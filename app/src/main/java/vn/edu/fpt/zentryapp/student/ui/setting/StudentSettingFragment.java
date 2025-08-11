@@ -10,6 +10,7 @@ import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
 import androidx.navigation.fragment.NavHostFragment;
 
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -70,20 +71,46 @@ public class StudentSettingFragment extends Fragment {
         });
 
         // Xử lý click Notifications để điều hướng sang màn hình cài đặt thông báo
-        binding.llStudentSettingRowNotifications.setOnClickListener(v ->
-                navController.navigate(R.id.action_studentSetting_to_notifications)
-        );
+        binding.llStudentSettingRowNotifications.setOnClickListener(v -> {
+            try {
+                Log.d("StudentSettingFragment", "Navigating to StudentSettingNotificationFragment");
+
+                // Tạo bundle để truyền source
+                Bundle args = new Bundle();
+                args.putString(StudentSettingNotificationFragment.ARG_SOURCE,
+                               StudentSettingNotificationFragment.SOURCE_SETTINGS);
+
+                // Navigate với bundle
+                navController.navigate(R.id.action_studentSetting_to_notifications, args);
+            } catch (Exception e) {
+                Log.e("StudentSettingFragment", "Navigation error", e);
+            }
+        });
 
         // Xử lý click Profile Overview để điều hướng sang màn hình tổng quan profile
         binding.llStudentSettingRowProfileOverview.setOnClickListener(v ->
                 navController.navigate(R.id.action_studentSetting_to_profileOverview)
         );
 
-        // TODO: Xử lý Logout nếu có
+        // Xử lý Logout
         binding.llStudentSettingRowLogout.setOnClickListener(v -> {
-            viewModel.logout();
-            NavController nav = Navigation.findNavController(requireActivity(), R.id.nav_host_fragment);
-            nav.navigate(R.id.action_global_logout);
+            try {
+                Log.d("StudentSettingFragment", "Performing logout");
+                authManager.clearTokens();
+                // 2. Điều hướng về LoginFragment với popUpTo để xóa back stack
+                androidx.navigation.NavOptions navOptions = new androidx.navigation.NavOptions.Builder()
+                    .setPopUpTo(R.id.nav_graph_root, true)
+                    .build();
+
+                // Sử dụng action global logout đã định nghĩa trong nav_graph_root.xml
+                NavController navController = androidx.navigation.Navigation.findNavController(
+                    requireActivity(), R.id.nav_host_fragment);
+                navController.navigate(R.id.action_global_logout, null, navOptions);
+
+                Log.d("StudentSettingFragment", "Logout navigation completed");
+            } catch (Exception e) {
+                Log.e("StudentSettingFragment", "Error during logout: ", e);
+            }
         });
     }
 

@@ -30,16 +30,20 @@ import java.util.Objects;
 
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
+import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.databinding.FragmentLecturerScheduleClassDetailBinding;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerScheduleClassSection;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.Round;
 import vn.edu.fpt.zentryapp.lecturer.ui.schedule.tabs.LecturerHistoryFragment;
 import vn.edu.fpt.zentryapp.lecturer.ui.schedule.tabs.LecturerAttendanceFragment;
 
+import vn.edu.fpt.zentryapp.notification.sharedviewmodel.NotificationViewModel;
+
 public class LecturerScheduleClassDetailFragment extends Fragment implements LecturerHistoryFragment.OnRoundClickListener {
 
     private FragmentLecturerScheduleClassDetailBinding binding;
     private LecturerScheduleClassDetailViewModel viewModel;
+    private NotificationViewModel notificationViewModel;
     private NavController navController;
     private LecturerScheduleClassSection session;
     private LecturerHistoryFragment historyFragment;
@@ -68,8 +72,13 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
 
         // Initialize ViewModel
         viewModel = new ViewModelProvider(this).get(LecturerScheduleClassDetailViewModel.class);
+        notificationViewModel = new ViewModelProvider(requireActivity()).get(NotificationViewModel.class);
         AuthManager authManager = AuthManager.getInstance(requireContext());
         viewModel.init(requireContext(), authManager, session);
+
+
+        // Load notifications để có dữ liệu cho badge
+        notificationViewModel.loadNotifications();
 
         setupViewPager();
         setupClickListeners();
@@ -135,8 +144,15 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
 
         binding.btnScheduleClassDetailEndSession.setOnClickListener(v -> showEndSessionConfirmation());
 
-        binding.btnScheduleClassDetailNotification.setOnClickListener(v ->
-                Toast.makeText(requireContext(), "Notifications", Toast.LENGTH_SHORT).show());
+        binding.btnScheduleClassDetailNotification.setOnClickListener(v -> {
+            // Navigate đến NotificationFragment
+            try {
+                navController.navigate(R.id.action_scheduleClassDetail_to_notification);
+            } catch (Exception e) {
+                android.util.Log.e("LecturerScheduleClassDetail", "Navigation error: ", e);
+                Toast.makeText(requireContext(), "Chức năng thông báo đang được phát triển", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     @SuppressLint("SetTextI18n")
@@ -167,6 +183,16 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
         viewModel.listFinalAttendance().observe(getViewLifecycleOwner(), attendanceList -> {
             if (attendanceList != null && attendanceFragment != null) {
                 attendanceFragment.updateAttendanceData(attendanceList);
+            }
+        });
+
+        // Observe notification unseen count để hiển thị badge
+        notificationViewModel.getUnseenCount().observe(getViewLifecycleOwner(), unseenCount -> {
+            if (unseenCount != null && unseenCount > 0) {
+                binding.tvNotificationBadge.setVisibility(View.VISIBLE);
+                binding.tvNotificationBadge.setText(String.valueOf(unseenCount));
+            } else {
+                binding.tvNotificationBadge.setVisibility(View.GONE);
             }
         });
 

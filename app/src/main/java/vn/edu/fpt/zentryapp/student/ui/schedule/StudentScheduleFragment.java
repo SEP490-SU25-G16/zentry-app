@@ -22,6 +22,8 @@ import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentScheduleBinding;
 import vn.edu.fpt.zentryapp.student.adapter.StudentScheduleClassSectionAdapter;
 import vn.edu.fpt.zentryapp.student.data.model.response.StudentScheduleClassSection;
+import vn.edu.fpt.zentryapp.notification.sharedviewmodel.NotificationViewModel;
+
 
 public class StudentScheduleFragment extends Fragment implements StudentScheduleClassSectionAdapter.OnSessionActionListener {
 
@@ -30,6 +32,7 @@ public class StudentScheduleFragment extends Fragment implements StudentSchedule
     private FragmentStudentScheduleBinding binding;
     private StudentScheduleViewModel viewModel;
     private StudentScheduleClassSectionAdapter scheduleAdapter;
+    private NotificationViewModel notificationViewModel;
     private NavController navController;
 
     @Nullable
@@ -51,7 +54,11 @@ public class StudentScheduleFragment extends Fragment implements StudentSchedule
         // Initialize ViewModel
         viewModel = new ViewModelProvider(this).get(StudentScheduleViewModel.class);
         AuthManager authManager = AuthManager.getInstance(requireContext());
+        notificationViewModel = new ViewModelProvider(requireActivity()).get(NotificationViewModel.class);
         viewModel.init(requireContext(), authManager);
+
+        // Load notifications để có dữ liệu cho badge
+        notificationViewModel.loadNotifications();
 
         setupRecyclerView();
         setupClickListeners();
@@ -106,6 +113,19 @@ public class StudentScheduleFragment extends Fragment implements StudentSchedule
             // TODO: Navigate to notifications
         });
 
+        // Search functionality
+        binding.ivStudentSearch.setOnClickListener(v -> {
+            String query = binding.etStudentSearch.getText().toString().trim();
+            if (!query.isEmpty()) {
+                // TODO: Implement search
+                Toast.makeText(requireContext(), "Searching: " + query, Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        // Navigate to notification screen
+        binding.btnStudentScheduleNotification.setOnClickListener(v -> {
+            navController.navigate(R.id.action_studentSchedule_to_notification);
+        });
 
     }
 
@@ -133,6 +153,16 @@ public class StudentScheduleFragment extends Fragment implements StudentSchedule
         viewModel.errorMessage().observe(getViewLifecycleOwner(), error -> {
             if (error != null) {
                 Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
+            }
+        });
+
+        // Observe notification unseen count để hiển thị badge
+        notificationViewModel.getUnseenCount().observe(getViewLifecycleOwner(), unseenCount -> {
+            if (unseenCount != null && unseenCount > 0) {
+                binding.tvNotificationBadge.setVisibility(View.VISIBLE);
+                binding.tvNotificationBadge.setText(String.valueOf(unseenCount));
+            } else {
+                binding.tvNotificationBadge.setVisibility(View.GONE);
             }
         });
     }
