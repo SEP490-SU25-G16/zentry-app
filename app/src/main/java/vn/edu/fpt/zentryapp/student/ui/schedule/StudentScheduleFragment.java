@@ -106,14 +106,7 @@ public class StudentScheduleFragment extends Fragment implements StudentSchedule
             // TODO: Navigate to notifications
         });
 
-        // Search functionality
-        binding.ivStudentSearch.setOnClickListener(v -> {
-            String query = binding.etStudentSearch.getText().toString().trim();
-            if (!query.isEmpty()) {
-                // TODO: Implement search
-                Toast.makeText(requireContext(), "Searching: " + query, Toast.LENGTH_SHORT).show();
-            }
-        });
+
     }
 
     private void observeViewModel() {

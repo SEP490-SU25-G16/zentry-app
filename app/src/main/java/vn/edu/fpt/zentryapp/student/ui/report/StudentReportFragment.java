@@ -1,5 +1,6 @@
 package vn.edu.fpt.zentryapp.student.ui.report;
 
+import android.annotation.SuppressLint;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.Toast;
@@ -12,7 +13,6 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.navigation.NavController;
 import androidx.navigation.fragment.NavHostFragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
-
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -46,14 +46,22 @@ public class StudentReportFragment extends Fragment implements StudentReportAdap
 
         navController = NavHostFragment.findNavController(this);
 
-        // Initialize ViewModel
+        // Initialize ViewModel với context
         viewModel = new ViewModelProvider(this).get(StudentReportViewModel.class);
         AuthManager authManager = AuthManager.getInstance(requireContext());
-        viewModel.init(authManager);
+        viewModel.init(requireContext(), authManager);
 
         setupRecyclerView();
         observeViewModel();
         setupSearchBar();
+        setupRefreshListener();
+    }
+
+    private void setupRefreshListener() {
+        // Add pull-to-refresh functionality if SwipeRefreshLayout exists
+        // binding.swipeRefresh.setOnRefreshListener(() -> {
+        //     viewModel.refreshReports();
+        // });
     }
 
     private void setupSearchBar() {
@@ -63,7 +71,8 @@ public class StudentReportFragment extends Fragment implements StudentReportAdap
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                reportAdapter.filter(s.toString());
+                // Use ViewModel search instead of adapter filter
+                viewModel.searchReports(s.toString());
             }
 
             @Override
@@ -72,7 +81,7 @@ public class StudentReportFragment extends Fragment implements StudentReportAdap
 
         binding.ivStudentSearch.setOnClickListener(v -> {
             String query = binding.etStudentSearch.getText().toString();
-            reportAdapter.filter(query);
+            viewModel.searchReports(query);
         });
     }
 
@@ -85,10 +94,17 @@ public class StudentReportFragment extends Fragment implements StudentReportAdap
     }
 
     private void observeViewModel() {
+        // Observe loading state
         viewModel.isLoading().observe(getViewLifecycleOwner(), isLoading -> {
             binding.progressLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+
+            // Stop refresh animation if SwipeRefreshLayout exists
+            // if (binding.swipeRefresh != null) {
+            //     binding.swipeRefresh.setRefreshing(isLoading);
+            // }
         });
 
+        // Observe reports data
         viewModel.reports().observe(getViewLifecycleOwner(), reports -> {
             if (reports != null) {
                 reportAdapter.setReports(reports);
@@ -96,26 +112,50 @@ public class StudentReportFragment extends Fragment implements StudentReportAdap
                 boolean isEmpty = reports.isEmpty();
                 binding.rvReports.setVisibility(isEmpty ? View.GONE : View.VISIBLE);
                 binding.layoutEmptyState.setVisibility(isEmpty ? View.VISIBLE : View.GONE);
+
+                Log.d("StudentReportFragment", "Loaded " + reports.size() + " reports");
             }
         });
 
+        // Observe errors
         viewModel.errorMessage().observe(getViewLifecycleOwner(), error -> {
             if (error != null) {
                 Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
+                Log.e("StudentReportFragment", "Error: " + error);
             }
         });
     }
 
     @Override
     public void onReportClick(StudentReport report) {
+        Log.d("StudentReportFragment", "Report clicked: " + report.getCourseName());
+
+        // Show class details in toast (for debugging)
+        @SuppressLint("DefaultLocale") String classInfo = String.format("%s\n%s\n%s\n%.1f%% Attendance",
+                report.getClassName(),
+                report.getClassInfo(),
+                report.getLecturerDisplayName(),
+                report.getAttendanceRate());
+
+        // Pass StudentReport object via Serializable
         Bundle args = new Bundle();
         args.putSerializable("studentReport", report);
 
-        navController.navigate(R.id.action_studentReport_to_listSession, args);    }
+        navController.navigate(R.id.action_studentReport_to_listSession, args);
+    }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
         binding = null;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Refresh data when returning to this screen
+        if (viewModel != null) {
+            viewModel.refreshReports();
+        }
     }
 }

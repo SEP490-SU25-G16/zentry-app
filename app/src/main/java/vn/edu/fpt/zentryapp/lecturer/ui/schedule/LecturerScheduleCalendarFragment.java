@@ -1,6 +1,5 @@
 package vn.edu.fpt.zentryapp.lecturer.ui.schedule;
 
-
 import android.os.Bundle;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
@@ -17,7 +16,6 @@ import android.view.ViewGroup;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentLecturerScheduleCalendarBinding;
 import vn.edu.fpt.zentryapp.lecturer.adapter.LecturerCalendarClassSectionAdapter;
-import vn.edu.fpt.zentryapp.lecturer.data.model.response.CalendarSession;
 
 public class LecturerScheduleCalendarFragment extends Fragment {
 
@@ -41,10 +39,10 @@ public class LecturerScheduleCalendarFragment extends Fragment {
 
         navController = NavHostFragment.findNavController(this);
 
-        // Initialize ViewModel
+        // Initialize ViewModel với context
         viewModel = new ViewModelProvider(this).get(LecturerScheduleCalendarViewModel.class);
         AuthManager authManager = AuthManager.getInstance(requireContext());
-        viewModel.init(authManager);
+        viewModel.init(requireContext(), authManager);
 
         setupRecyclerView();
         setupCalendarListener();
@@ -54,7 +52,6 @@ public class LecturerScheduleCalendarFragment extends Fragment {
 
     private void setupRecyclerView() {
         sessionAdapter = new LecturerCalendarClassSectionAdapter();
-
         binding.rvSessions.setLayoutManager(new LinearLayoutManager(requireContext()));
         binding.rvSessions.setAdapter(sessionAdapter);
     }
@@ -85,6 +82,13 @@ public class LecturerScheduleCalendarFragment extends Fragment {
             }
         });
 
+        // Observe selected date
+        viewModel.selectedDate().observe(getViewLifecycleOwner(), selectedDate -> {
+            if (selectedDate != null) {
+                // Update UI with selected date if needed
+                // binding.tvSelectedDate.setText(selectedDate);
+            }
+        });
 
         // Observe has sessions for date
         viewModel.hasSessionsForDate().observe(getViewLifecycleOwner(), hasSessions -> {
@@ -106,5 +110,14 @@ public class LecturerScheduleCalendarFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         binding = null;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Refresh data when returning to this screen
+        if (viewModel != null) {
+            viewModel.refreshSessions();
+        }
     }
 }

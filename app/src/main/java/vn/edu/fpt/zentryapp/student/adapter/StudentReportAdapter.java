@@ -39,9 +39,12 @@ public class StudentReportAdapter extends RecyclerView.Adapter<StudentReportAdap
             String lowerQuery = query.toLowerCase();
             List<StudentReport> filtered = new ArrayList<>();
             for (StudentReport item : allReports) {
-                // Lọc theo courseTitle và lecturer (bạn có thể add field khác)
-                if (item.getCourseTitle().toLowerCase().contains(lowerQuery) ||
-                        item.getLecturerInfo().toLowerCase().contains(lowerQuery)) {
+                // Lọc theo courseName, courseCode và lecturerName
+                if (item.getCourseName().toLowerCase().contains(lowerQuery) ||
+                        item.getCourseCode().toLowerCase().contains(lowerQuery) ||
+                        item.getSectionCode().toLowerCase().contains(lowerQuery) ||
+                        (item.getLecturerName() != null &&
+                                item.getLecturerName().toLowerCase().contains(lowerQuery))) {
                     filtered.add(item);
                 }
             }
@@ -84,10 +87,11 @@ public class StudentReportAdapter extends RecyclerView.Adapter<StudentReportAdap
         }
 
         public void bind(StudentReport report) {
-            binding.tvCourseTitle.setText(report.getCourseTitle());
-            binding.tvLecturerName.setText(report.getLecturerInfo());
-            binding.tvSessions.setText(report.getSessionsText());
-            binding.tvAttendancePercentage.setText(report.getAttendancePercentageText());
+            // Sử dụng các method đúng từ StudentReport model
+            binding.tvCourseTitle.setText(report.getCourseName()); // hoặc getClassName() nếu muốn full name
+            binding.tvLecturerName.setText(report.getLecturerDisplayName());
+            binding.tvSessions.setText(report.getSessionProgress());
+            binding.tvAttendancePercentage.setText(report.getAttendanceDisplay());
         }
     }
 }

@@ -9,7 +9,6 @@ import android.content.Context;
 import android.util.Log;
 
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -19,7 +18,7 @@ import retrofit2.Callback;
 import retrofit2.Response;
 import vn.edu.fpt.zentryapp.auth.client.ApiClient;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
-import vn.edu.fpt.zentryapp.student.data.api.StudentScheduleApiService;
+import vn.edu.fpt.zentryapp.student.data.api.StudentApiService;
 import vn.edu.fpt.zentryapp.student.data.model.response.StudentDailyScheduleClassSectionResponse;
 import vn.edu.fpt.zentryapp.student.data.model.response.StudentScheduleClassSection;
 
@@ -31,7 +30,7 @@ public class StudentScheduleViewModel extends ViewModel {
     private final MutableLiveData<String> _errorMessage = new MutableLiveData<>();
 
     // API Service
-    private StudentScheduleApiService apiService;
+    private StudentApiService apiService;
     private AuthManager authManager;
 
     // Public getters
@@ -41,7 +40,7 @@ public class StudentScheduleViewModel extends ViewModel {
 
     public void init(Context context, AuthManager authManager) {
         this.authManager = authManager;
-        this.apiService = ApiClient.getClient(context).create(StudentScheduleApiService.class);
+        this.apiService = ApiClient.getClient(context).create(StudentApiService.class);
 
         loadSessions();
     }

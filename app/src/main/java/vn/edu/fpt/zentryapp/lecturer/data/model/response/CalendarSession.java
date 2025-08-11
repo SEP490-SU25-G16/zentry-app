@@ -13,15 +13,18 @@ import java.util.Locale;
 @AllArgsConstructor
 public class CalendarSession {
     private String sessionId;
+    private String classSectionId;
     private String courseCode;
     private String courseName;
+    private String sectionCode;
     private String className;
     private String room;
+    private String building;
     private Date startTime;
     private Date endTime;
     private Date sessionDate;
     private String status;
-    private String sessionType; // "LECTURE", "PRACTICE", "EXAM", "MEETING"
+    private String sessionType;
 
     // Helper methods
     public String getStartTimeDisplay() {

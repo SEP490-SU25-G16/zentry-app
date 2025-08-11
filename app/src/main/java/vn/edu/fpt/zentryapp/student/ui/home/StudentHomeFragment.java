@@ -6,13 +6,18 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
-import androidx.recyclerview.widget.*;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.PagerSnapHelper;
+import androidx.recyclerview.widget.RecyclerView;
 
 import vn.edu.fpt.zentryapp.R;
+import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentHomeBinding;
 import vn.edu.fpt.zentryapp.lecturer.adapter.ExamAdapter;
 import vn.edu.fpt.zentryapp.lecturer.adapter.SessionAdapter;
@@ -20,7 +25,6 @@ import vn.edu.fpt.zentryapp.lecturer.adapter.WeeklyAdapter;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.ExamModel;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.SessionModel;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.WeeklyModel;
-import vn.edu.fpt.zentryapp.student.data.model.response.*;
 
 public class StudentHomeFragment extends Fragment {
 
@@ -41,15 +45,44 @@ public class StudentHomeFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, Bundle savedInstanceState) {
         viewModel = new ViewModelProvider(this).get(StudentHomeViewModel.class);
-        viewModel.loadMockData();
+
+        // Initialize ViewModel with dependencies
+        AuthManager authManager = AuthManager.getInstance(requireContext());
+        viewModel.init(requireContext(), authManager);
+
+        // Load real data instead of mock
+        viewModel.loadStudentHomeData();
+
         observeViewModel();
     }
 
     /* ---------- Observe ---------- */
     private void observeViewModel() {
-        viewModel.exams().observe(getViewLifecycleOwner(), this::setupExamSlider);
-        viewModel.sessions().observe(getViewLifecycleOwner(), sessionList -> setupSessions(sessionList, false));
+        // Keep exam slider (empty for now)
+        viewModel.exams().observe(getViewLifecycleOwner(), examList -> {
+            if (examList.isEmpty()) {
+                binding.rvExams.setVisibility(View.GONE);
+                binding.dotsIndicator.setVisibility(View.GONE);
+            } else {
+                setupExamSlider(examList);
+            }
+        });
+
+        viewModel.sessions().observe(getViewLifecycleOwner(), sessionList ->
+                setupSessions(sessionList, false));
+
         viewModel.weekly().observe(getViewLifecycleOwner(), this::setupWeeklySlider);
+
+        viewModel.errorMessage().observe(getViewLifecycleOwner(), error -> {
+            if (error != null) {
+                Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
+            }
+        });
+
+        viewModel.isLoading().observe(getViewLifecycleOwner(), isLoading -> {
+            // Show/hide loading indicator if you have one
+            // binding.progressLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+        });
     }
 
     /* ---------- Exam slider ---------- */
@@ -67,6 +100,17 @@ public class StudentHomeFragment extends Fragment {
 
     /* ---------- Sessions ---------- */
     private void setupSessions(java.util.List<SessionModel> sessionList, boolean isRebuild) {
+        if (sessionList.isEmpty()) {
+            binding.sessionsContainer.removeAllViews();
+            // Add empty state view
+            android.widget.TextView emptyView = new android.widget.TextView(requireContext());
+            emptyView.setText("No classes scheduled for today");
+            emptyView.setGravity(android.view.Gravity.CENTER);
+            binding.sessionsContainer.addView(emptyView);
+            binding.btnSeeAllSessions.setVisibility(View.GONE);
+            return;
+        }
+
         if (!isRebuild) cachedSessionList = sessionList;
         binding.sessionsContainer.removeAllViews();
 
