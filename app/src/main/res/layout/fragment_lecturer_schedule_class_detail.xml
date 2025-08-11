@@ -116,7 +116,7 @@
                         android:textAllCaps="false"
                         android:textColor="#FFFFFF"
                         android:textSize="12sp"
-                        app:backgroundTint="#A3BFED"
+                        app:backgroundTint="#3B82F6"
                         app:cornerRadius="20dp"
                         app:icon="@drawable/ic_face_id_request"
                         app:iconGravity="textStart"

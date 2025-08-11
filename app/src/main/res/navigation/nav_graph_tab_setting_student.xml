@@ -27,6 +27,9 @@
         <action
             android:id="@+id/action_studentSetting_to_updateFaceId"
             app:destination="@id/studentSettingUpdateFaceIdFragment" />
+        <action
+            android:id="@+id/action_studentSetting_to_verifyFaceId"
+            app:destination="@id/studentSettingVerifyFaceIdFragment" />
     </fragment>
 
     <!-- 2. Device Info -->

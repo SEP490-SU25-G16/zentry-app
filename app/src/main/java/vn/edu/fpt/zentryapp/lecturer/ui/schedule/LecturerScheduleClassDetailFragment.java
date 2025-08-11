@@ -17,6 +17,8 @@ import androidx.navigation.NavController;
 import androidx.navigation.fragment.NavHostFragment;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
 
+import vn.edu.fpt.zentryapp.lecturer.ui.faceid.FaceIdRequestDialog;
+
 import android.view.GestureDetector;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -30,7 +32,6 @@ import java.util.Objects;
 
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
-import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.databinding.FragmentLecturerScheduleClassDetailBinding;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerScheduleClassSection;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.Round;
@@ -139,8 +140,7 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
     private void setupClickListeners() {
         binding.ivScheduleClassDetailBack.setOnClickListener(v -> navController.navigateUp());
 
-        binding.btnScheduleClassDetailRequestFaceId.setOnClickListener(v ->
-                Toast.makeText(requireContext(), "Create face id", Toast.LENGTH_SHORT).show());
+        binding.btnScheduleClassDetailRequestFaceId.setOnClickListener(v -> showFaceIdRequestDialog());
 
         binding.btnScheduleClassDetailEndSession.setOnClickListener(v -> showEndSessionConfirmation());
 
@@ -288,5 +288,21 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
     public void onDestroyView() {
         super.onDestroyView();
         binding = null;
+    }
+    
+    private void showFaceIdRequestDialog() {
+        FaceIdRequestDialog dialog = new FaceIdRequestDialog();
+        dialog.setFaceIdRequestListener(this::scheduleFaceIdVerification);
+        dialog.show(getChildFragmentManager(), "FaceIdRequestDialog");
+    }
+    
+    private void scheduleFaceIdVerification(int totalSeconds) {
+        // Implement the logic to schedule face ID verification with the provided time
+        String message = String.format("Face ID verification scheduled for %d minutes and %d seconds", 
+                totalSeconds / 60, totalSeconds % 60);
+        Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show();
+        
+        // Here you would typically call your ViewModel to save this configuration
+        // viewModel.scheduleFaceIdVerification(totalSeconds);
     }
 }

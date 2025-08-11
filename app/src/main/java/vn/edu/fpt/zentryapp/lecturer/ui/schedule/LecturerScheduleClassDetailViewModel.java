@@ -50,7 +50,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
     private final MutableLiveData<RoundResultDto> _roundResult = new MutableLiveData<>();
     private final MutableLiveData<Boolean> _isLoadingRoundDetail = new MutableLiveData<>(false);
     private final MutableLiveData<String> _errorMessage = new MutableLiveData<>();
-    private final MutableLiveData<Boolean> _canAddFaceId = new MutableLiveData<>(true);
+    private final MutableLiveData<Boolean> _canAddFaceId = new MutableLiveData<>(true); // Always enable for demo
     private final MutableLiveData<List<Attendance>> _listRoundAttendance = new MutableLiveData<>();
     private final MutableLiveData<Integer> _currentRoundNumber = new MutableLiveData<>();
     private final MutableLiveData<Boolean> _isEndingSession = new MutableLiveData<>(false);
@@ -190,10 +190,8 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                                 SessionDetailInfoRound sessionInfo = mapScheduleToSessionInfo(apiResponse.getData());
                                 _sessionInfo.setValue(sessionInfo);
 
-                                // ✅ FIXED: Check session status từ API response
-                                boolean canAddFaceId = "Active".equalsIgnoreCase(apiResponse.getData().getSessionStatus());
-                                _canAddFaceId.setValue(canAddFaceId);
-
+                                // Always enable the face ID button for demo purposes
+                                _canAddFaceId.setValue(true);
                                 Log.d(TAG, "✅ Loaded schedule detail successfully");
                             } else {
                                 String error = apiResponse.getError() != null ? apiResponse.getError() : "Unknown API error";

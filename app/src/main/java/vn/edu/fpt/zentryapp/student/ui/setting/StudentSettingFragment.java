@@ -64,7 +64,19 @@ public class StudentSettingFragment extends Fragment {
         // Xử lý click Face ID: điều hướng dựa trên trạng thái đăng ký Face ID
         binding.llStudentSettingRowFaceId.setOnClickListener(v -> {
             if (hasFaceId) {
-                navController.navigate(R.id.action_studentSetting_to_updateFaceId);
+                // Show option dialog for verify or update
+                new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                    .setTitle("Face ID Options")
+                    .setItems(new CharSequence[]{"Verify Face ID", "Update Face ID"}, (dialog, which) -> {
+                        if (which == 0) {
+                            // Navigate to verify Face ID
+                            navController.navigate(R.id.action_studentSetting_to_verifyFaceId);
+                        } else {
+                            // Navigate to update Face ID
+                            navController.navigate(R.id.action_studentSetting_to_updateFaceId);
+                        }
+                    })
+                    .show();
             } else {
                 navController.navigate(R.id.action_studentSetting_to_registerFaceId);
             }
