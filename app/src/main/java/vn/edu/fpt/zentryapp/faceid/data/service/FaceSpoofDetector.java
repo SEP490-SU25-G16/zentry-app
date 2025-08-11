@@ -74,6 +74,10 @@ public class FaceSpoofDetector {
 
     private volatile boolean isInitialized = false;
     private final CountDownLatch initLatch = new CountDownLatch(1);
+    // Context-aware fusion config and buffers
+    private final AntiSpoofConfig antiSpoofConfig = new AntiSpoofConfig();
+    private int contextFrameCounter = 0;
+    private float[] reusableGradients = null;
 
     /**
      * Class to track temporal data for analysis
@@ -265,14 +269,6 @@ public class FaceSpoofDetector {
         return new java.util.LinkedList<>(frameHistory);
     }
 
-    /**
-     * Detect if a face is spoofed
-     *
-     * @param frameImage Original frame image
-     * @param faceRect   Face bounding box
-     * @param ovalRect   Oval guide boundaries (optional, can be null)
-     * @return Spoof detection result
-     */
     private static void ensureAllocatedSafe(Interpreter i) {
         try { if (i != null) i.allocateTensors(); } catch (Throwable ignore) {}
     }
@@ -394,6 +390,16 @@ public class FaceSpoofDetector {
             TemporalFrameData currentFrame = new TemporalFrameData(combined, faceRect);
             updateFrameHistory(currentFrame);
             
+            // Context branch (downscaled full-frame heuristics) with stride and triggers
+            float frameArea = (float) (frameImage.getWidth() * frameImage.getHeight());
+            float faceRatio = (faceRect.width() * faceRect.height()) / Math.max(1f, frameArea);
+            boolean nearMargin = isNearMargin(faceRect, frameImage.getWidth(), frameImage.getHeight(), antiSpoofConfig.marginTrigger);
+            boolean shouldRunContext = (faceRatio >= antiSpoofConfig.faceRatioTrigger) || nearMargin;
+            float contextSpoofScore = 0f;
+            if (shouldRunContext && (contextFrameCounter++ % Math.max(1, antiSpoofConfig.contextStride) == 0)) {
+                contextSpoofScore = computeContextSpoofScore(frameImage, faceRect, antiSpoofConfig);
+            }
+            
             // 🔒 ENHANCED MULTI-LAYER DETECTION
             
             // Layer 1: Enhanced AI model analysis with weighted combining
@@ -408,9 +414,15 @@ public class FaceSpoofDetector {
             // Layer 4: Strict oval boundary validation
             boolean isWithinOvalBoundary = validateOvalBoundary(faceRect, ovalRect);
             
-            // 🎯 IMPROVED DECISION LOGIC - More balanced and ML model priority - MUCH more lenient now
+            // 🎯 IMPROVED DECISION LOGIC - combine model and context
             boolean isSpoof;
             float confidence;
+            float finalSpoofProb = clamp01(combined[2] + antiSpoofConfig.contextWeight * contextSpoofScore);
+            if (antiSpoofConfig.debugLogs) {
+                Log.d(TAG, String.format(java.util.Locale.US,
+                        "FUSION faceRatio=%.3f modelSpoof=%.3f ctx=%.3f final=%.3f nearMargin=%b",
+                        faceRatio, combined[2], contextSpoofScore, finalSpoofProb, nearMargin));
+            }
 
             // Case 1: Strong ML model confidence for real face - prioritize model results
             if (combined[0] > 0.70f && !modelIndicatesSpoof) { // Increased from 0.65f for higher confidence
@@ -432,17 +444,18 @@ public class FaceSpoofDetector {
                 confidence = combined[0];
                 Log.d(TAG, "🟢 ACCEPTABLE REAL: ML model result trusted");
             }
-            // Case 4: Strong spoof indicators - multiple red flags (strengthened)
-            else if ((modelIndicatesSpoof && hasUniformTexture) || 
+            // Case 4: Strong spoof indicators or finalSpoofProb above threshold
+            else if (finalSpoofProb >= antiSpoofConfig.threshold ||
+                     (modelIndicatesSpoof && hasUniformTexture) || 
                      (modelIndicatesSpoof && (!hasNaturalMovement || !isWithinOvalBoundary)) ||
                      (hasUniformTexture && !hasNaturalMovement)) {
                 // Added new condition: uniform texture + no natural movement
                 isSpoof = true;
-                confidence = Math.max(0.85f, combined[2]); // Increased from 0.80f
+                confidence = Math.max(0.85f, finalSpoofProb);
                 Log.d(TAG, "🔴 HIGH CONFIDENCE SPOOF: Multiple strong indicators");
             }
             // Case 5: Stricter on unclear cases - default to spoof for security
-            else if (combined[0] > 0.50f && combined[2] < 0.50f && hasNaturalMovement) {
+            else if (combined[0] > 0.50f && finalSpoofProb < 0.50f && hasNaturalMovement) {
                 // Added hasNaturalMovement requirement and narrowed thresholds
                 isSpoof = false;
                 confidence = Math.max(0.60f, combined[0]); // Increased from 0.58f
@@ -450,8 +463,8 @@ public class FaceSpoofDetector {
             }
             // Case 6: Default to spoof for very unclear cases
             else {
-                isSpoof = true;
-                confidence = Math.max(0.70f, combined[2]); // Increased from 0.65f
+                isSpoof = finalSpoofProb >= 0.50f;
+                confidence = Math.max(0.70f, finalSpoofProb);
                 Log.d(TAG, "🟠 LIKELY SPOOF: Failed validation checks");
             }
             
@@ -878,6 +891,130 @@ public class FaceSpoofDetector {
         }
 
         return exp;
+    }
+    private static float clamp01(float value) {
+        if (value < 0f) return 0f;
+        if (value > 1f) return 1f;
+        return value;
+    }
+
+    // ---------- Context branch helpers (no ML) ----------
+    private boolean isNearMargin(Rect faceRect, int frameW, int frameH, float marginRatio) {
+        int mx = Math.round(frameW * marginRatio);
+        int my = Math.round(frameH * marginRatio);
+        return faceRect.left <= mx || faceRect.top <= my || (frameW - faceRect.right) <= mx || (frameH - faceRect.bottom) <= my;
+    }
+
+    private float computeContextSpoofScore(Bitmap fullFrame, Rect faceRect, AntiSpoofConfig cfg) {
+        int targetW = cfg.contextWidth;
+        int targetH = Math.round(fullFrame.getHeight() * (targetW / (float) fullFrame.getWidth()));
+        if (targetH <= 0) targetH = targetW;
+
+        Bitmap scaled = Bitmap.createScaledBitmap(fullFrame, targetW, targetH, true);
+        if (scaled.getConfig() != Bitmap.Config.ARGB_8888) {
+            scaled = scaled.copy(Bitmap.Config.ARGB_8888, false);
+        }
+
+        if (reusableGradients == null || reusableGradients.length < targetW * targetH) {
+            reusableGradients = new float[targetW * targetH];
+        }
+
+        int[] px = new int[targetW * targetH];
+        scaled.getPixels(px, 0, targetW, 0, 0, targetW, targetH);
+        float edgeDensity = computeEdgeDensity(px, targetW, targetH, reusableGradients);
+        float longLineScore = estimateLongLineScore(reusableGradients, targetW, targetH);
+        float bezelLikelihood = estimateBezelLikelihood(px, targetW, targetH, faceRect, fullFrame.getWidth(), fullFrame.getHeight());
+
+        float contextScore = cfg.bezelWeight * bezelLikelihood + cfg.edgeWeight * edgeDensity + cfg.lineWeight * longLineScore;
+        if (antiSpoofConfig.debugLogs) {
+            float faceRatio = (faceRect.width() * faceRect.height()) / (float)(fullFrame.getWidth() * fullFrame.getHeight());
+            Log.d(TAG, String.format(java.util.Locale.US,
+                    "CTX faceRatio=%.3f edge=%.3f line=%.3f bezel=%.3f ctx=%.3f",
+                    faceRatio, edgeDensity, longLineScore, bezelLikelihood, contextScore));
+        }
+        return clamp01(contextScore);
+    }
+
+    private float computeEdgeDensity(int[] pixels, int w, int h, float[] gradOut) {
+        int idx = 0; for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++, idx++) {
+                int p = pixels[idx];
+                float r = ((p >> 16) & 0xFF);
+                float g = ((p >> 8) & 0xFF);
+                float b = (p & 0xFF);
+                pixels[idx] = (int)(0.299f * r + 0.587f * g + 0.114f * b);
+            }
+        }
+        int countStrong = 0; float sum = 0f;
+        for (int y = 1; y < h - 1; y++) {
+            for (int x = 1; x < w - 1; x++) {
+                int c = y * w + x;
+                float gx = (pixels[c+1] - pixels[c-1]) * 0.5f + (pixels[c+1+w] - pixels[c-1+w]) * 0.25f + (pixels[c+1-w] - pixels[c-1-w]) * 0.25f;
+                float gy = (pixels[c+w] - pixels[c-w]) * 0.5f + (pixels[c+1+w] - pixels[c+1-w]) * 0.25f + (pixels[c-1+w] - pixels[c-1-w]) * 0.25f;
+                float mag = (float)Math.sqrt(gx*gx + gy*gy) / 255f;
+                gradOut[c] = mag;
+                sum += mag; if (mag > 0.4f) countStrong++;
+            }
+        }
+        float density = (countStrong) / (float)(w * h);
+        float meanMag = sum / (w * h);
+        return clamp01(0.5f * density + 0.5f * meanMag);
+    }
+
+    private float estimateLongLineScore(float[] grad, int w, int h) {
+        int maxRun = 0; int runs = 0;
+        for (int y = 0; y < h; y++) {
+            int run = 0;
+            for (int x = 0; x < w; x++) {
+                float v = grad[y * w + x];
+                if (v > 0.35f) { run++; } else { if (run >= 8) { runs++; maxRun = Math.max(maxRun, run); } run = 0; }
+            }
+            if (run >= 8) { runs++; maxRun = Math.max(maxRun, run); }
+        }
+        for (int x = 0; x < w; x++) {
+            int run = 0;
+            for (int y = 0; y < h; y++) {
+                float v = grad[y * w + x];
+                if (v > 0.35f) { run++; } else { if (run >= 8) { runs++; maxRun = Math.max(maxRun, run); } run = 0; }
+            }
+            if (run >= 8) { runs++; maxRun = Math.max(maxRun, run); }
+        }
+        float runScore = clamp01(maxRun / (float) Math.max(w, h));
+        float countScore = clamp01(runs / (float) Math.max(w, h));
+        return clamp01(0.7f * runScore + 0.3f * countScore);
+    }
+
+    private float estimateBezelLikelihood(int[] pixelsARGB, int w, int h, Rect faceRectFullRes, int fullW, int fullH) {
+        float sx = w / (float) fullW; float sy = h / (float) fullH;
+        int fx = Math.max(0, Math.round(faceRectFullRes.left * sx));
+        int fy = Math.max(0, Math.round(faceRectFullRes.top * sy));
+        int fw = Math.min(w - fx, Math.round(faceRectFullRes.width() * sx));
+        int fh = Math.min(h - fy, Math.round(faceRectFullRes.height() * sy));
+
+        int ring = Math.max(2, Math.min(w, h) / 20);
+        int left = Math.max(0, fx - ring);
+        int right = Math.min(w - 1, fx + fw + ring);
+        int top = Math.max(0, fy - ring);
+        int bottom = Math.min(h - 1, fy + fh + ring);
+
+        int total = 0; int dark = 0; int flat = 0;
+        for (int y = top; y <= bottom; y++) {
+            for (int x = left; x <= right; x++) {
+                boolean inFace = (x >= fx && x <= fx + fw && y >= fy && y <= fy + fh);
+                if (inFace) continue;
+                int p = pixelsARGB[y * w + x];
+                int r = (p >> 16) & 0xFF; int g = (p >> 8) & 0xFF; int b = p & 0xFF;
+                int lum = (int)(0.299f * r + 0.587f * g + 0.114f * b);
+                if (lum < 32) dark++;
+                float mag = 0f; try { mag = reusableGradients[y * w + x]; } catch (Throwable ignore) {}
+                if (mag < 0.05f) flat++;
+                total++;
+            }
+        }
+        if (total <= 0) return 0f;
+        float darkRatio = dark / (float) total;
+        float flatRatio = flat / (float) total;
+        return clamp01(0.7f * darkRatio + 0.3f * flatRatio);
     }
 
     /**
