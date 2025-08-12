@@ -12,6 +12,9 @@ import android.util.Log;
 import android.util.Size;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.view.Surface;
+import android.view.WindowManager;
+import android.hardware.display.DisplayManager;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -146,8 +149,8 @@ public class CameraView extends FrameLayout {
             }
         } catch (Exception ignore) {}
         
-        // Get screen metrics
-        int rotation = previewView.getDisplay().getRotation();
+        // Get screen rotation safely (previewView.getDisplay() may be null if not yet attached)
+        int rotation = getSafeRotation();
         
         // CameraSelector - Front camera for face capture
         CameraSelector cameraSelector = new CameraSelector.Builder()
@@ -292,6 +295,35 @@ public class CameraView extends FrameLayout {
         } catch (Exception e) {
             Log.e(TAG, "Use case binding failed", e);
         }
+    }
+
+    /**
+     * Safely get the current display rotation with fallbacks for cases where the view is not yet attached.
+     */
+    private int getSafeRotation() {
+        try {
+            if (previewView != null && previewView.getDisplay() != null) {
+                return previewView.getDisplay().getRotation();
+            }
+            android.view.Display display = null;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                DisplayManager dm = (DisplayManager) getContext().getSystemService(Context.DISPLAY_SERVICE);
+                if (dm != null) {
+                    display = dm.getDisplay(android.view.Display.DEFAULT_DISPLAY);
+                }
+            } else {
+                WindowManager wm = (WindowManager) getContext().getSystemService(Context.WINDOW_SERVICE);
+                if (wm != null) {
+                    display = wm.getDefaultDisplay();
+                }
+            }
+            if (display != null) {
+                return display.getRotation();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "getSafeRotation fallback error", e);
+        }
+        return Surface.ROTATION_0;
     }
     
     private void drainWorkerQueue(@Nullable FrameAnalysisCallback analysisCallback) {

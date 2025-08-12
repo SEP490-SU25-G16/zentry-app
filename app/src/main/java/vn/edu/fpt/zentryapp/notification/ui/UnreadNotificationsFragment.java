@@ -38,12 +38,14 @@ public class UnreadNotificationsFragment extends Fragment {
         RecyclerView recyclerView = view.findViewById(R.id.recyclerViewNotifications);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 
-        viewModel = new ViewModelProvider(requireActivity()).get(NotificationViewModel.class);
+        // Scope theo fragment để tránh share giữa Lecturer/Student
+        viewModel = new ViewModelProvider(this).get(NotificationViewModel.class);
 
         adapter = new NotificationAdapter(new ArrayList<>(), new NotificationAdapter.OnItemClickListener() {
             @Override
             public void onItemClick(NotificationItem item) {
                 viewModel.markAsRead(item.getId());
+                handleNotificationClick(item);
             }
 
             @Override
@@ -92,6 +94,28 @@ public class UnreadNotificationsFragment extends Fragment {
         // Reset pagination và apply filter khi fragment được tạo
         viewModel.resetPagination();
         viewModel.applyFilter(NotificationViewModel.FilterType.UNREAD);
+    }
+
+    private void handleNotificationClick(NotificationItem item) {
+        if (item == null) return;
+        try {
+            String raw = item.getRawData();
+            if (raw != null) {
+                org.json.JSONObject json = new org.json.JSONObject(raw);
+                String type = json.optString("type", "");
+                if ("FACE_VERIFICATION_REQUEST".equalsIgnoreCase(type)) {
+                    String deeplink = json.optString("deeplink", "");
+                    if (!deeplink.isEmpty()) {
+                        android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(deeplink));
+                        startActivity(intent);
+                    } else {
+                        androidx.navigation.NavController navController = androidx.navigation.fragment.NavHostFragment.findNavController(this);
+                        navController.navigate(vn.edu.fpt.zentryapp.R.id.studentSettingVerifyFaceIdFragment);
+                    }
+                    return;
+                }
+            }
+        } catch (Exception ignored) {}
     }
 
     @Override

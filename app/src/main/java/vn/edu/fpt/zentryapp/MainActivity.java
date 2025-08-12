@@ -43,8 +43,30 @@ public class MainActivity extends AppCompatActivity {
         // No need to modify navigation - the default navigation in nav_graph_root.xml
         // already starts with the login screen (loginFragment)
 
-        // Log that we're using the default navigation
+        // Handle deep link intents for Navigation
+        try {
+            androidx.navigation.fragment.NavHostFragment host = (androidx.navigation.fragment.NavHostFragment)
+                    getSupportFragmentManager().findFragmentById(R.id.nav_host_fragment);
+            if (host != null) {
+                androidx.navigation.NavController navController = host.getNavController();
+                navController.handleDeepLink(getIntent());
+            }
+        } catch (Exception ignored) {}
         android.util.Log.d("MainActivity", "Using default navigation starting with login screen");
+    }
+
+    @Override
+    protected void onNewIntent(android.content.Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        try {
+            androidx.navigation.fragment.NavHostFragment host = (androidx.navigation.fragment.NavHostFragment)
+                    getSupportFragmentManager().findFragmentById(R.id.nav_host_fragment);
+            if (host != null) {
+                androidx.navigation.NavController navController = host.getNavController();
+                navController.handleDeepLink(intent);
+            }
+        } catch (Exception ignored) {}
     }
     // ✅ NEW: Initialize sync service
     private void initializeSyncService() {

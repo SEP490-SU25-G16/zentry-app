@@ -51,6 +51,7 @@ dependencies {
     // OkHttp cho HTTP client
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation(libs.firebase.messaging)
 
     // Lombok
     compileOnly("org.projectlombok:lombok:1.18.30")

@@ -28,6 +28,7 @@ public class NotificationViewModel extends ViewModel {
     private final MutableLiveData<Boolean> showSeeMoreButton = new MutableLiveData<>(false);
     private final MutableLiveData<Integer> unseenCount = new MutableLiveData<>(0);
     private boolean isDataLoaded = false;
+    private String lastLoadedUserId = null;
     
     // Pagination constants
     private static final int INITIAL_LOAD_COUNT = 6; // Số thông báo load lần đầu
@@ -88,7 +89,8 @@ public class NotificationViewModel extends ViewModel {
                                 dto.getBody(),
                                 dto.getCreatedAt(),
                                 dto.isRead(),
-                                false
+                                false,
+                                dto.getData()
                         ));
                     }
                 } else {
@@ -114,7 +116,12 @@ public class NotificationViewModel extends ViewModel {
 
     // Overload cho phép caller truyền vào userId (lấy từ AuthManager ở layer có context)
     public void loadNotifications(String userId) {
-        if (isDataLoaded) return;
+        // Reload if user changes
+        if (lastLoadedUserId == null || !lastLoadedUserId.equals(userId)) {
+            clearDataForNewUser();
+        } else if (isDataLoaded) {
+            return;
+        }
         if (userId == null || userId.isEmpty()) {
             allNotifications.setValue(new ArrayList<>());
             applyFilter(currentFilter);
@@ -136,7 +143,8 @@ public class NotificationViewModel extends ViewModel {
                                 dto.getBody(),
                                 dto.getCreatedAt(),
                                 dto.isRead(),
-                                false
+                                false,
+                                dto.getData()
                         ));
                     }
                 } else {
@@ -146,6 +154,7 @@ public class NotificationViewModel extends ViewModel {
                 allNotifications.setValue(items);
                 applyFilter(currentFilter);
                 isDataLoaded = true;
+                lastLoadedUserId = userId;
                 updateUnseenCount();
             }
 
@@ -155,6 +164,7 @@ public class NotificationViewModel extends ViewModel {
                 allNotifications.setValue(new ArrayList<>());
                 applyFilter(currentFilter);
                 isDataLoaded = true;
+                lastLoadedUserId = userId;
                 updateUnseenCount();
             }
         });
@@ -162,7 +172,12 @@ public class NotificationViewModel extends ViewModel {
 
     // Preferred overload: caller supplies context (for AuthInterceptor) and userId
     public void loadNotifications(String userId, Context context) {
-        if (isDataLoaded) return;
+        // Reload if user changes
+        if (lastLoadedUserId == null || !lastLoadedUserId.equals(userId)) {
+            clearDataForNewUser();
+        } else if (isDataLoaded) {
+            return;
+        }
         if (userId == null || userId.isEmpty()) {
             allNotifications.setValue(new ArrayList<>());
             applyFilter(currentFilter);
@@ -184,7 +199,8 @@ public class NotificationViewModel extends ViewModel {
                                 dto.getBody(),
                                 dto.getCreatedAt(),
                                 dto.isRead(),
-                                false
+                                false,
+                                dto.getData()
                         ));
                     }
                 } else {
@@ -194,6 +210,7 @@ public class NotificationViewModel extends ViewModel {
                 allNotifications.setValue(items);
                 applyFilter(currentFilter);
                 isDataLoaded = true;
+                lastLoadedUserId = userId;
                 updateUnseenCount();
             }
 
@@ -203,6 +220,7 @@ public class NotificationViewModel extends ViewModel {
                 allNotifications.setValue(new ArrayList<>());
                 applyFilter(currentFilter);
                 isDataLoaded = true;
+                lastLoadedUserId = userId;
                 updateUnseenCount();
             }
         });
@@ -256,6 +274,14 @@ public class NotificationViewModel extends ViewModel {
     public void resetPagination() {
         currentDisplayCount = INITIAL_LOAD_COUNT;
         seeMoreClicked = false;
+    }
+
+    private void clearDataForNewUser() {
+        isDataLoaded = false;
+        allNotifications.setValue(new ArrayList<>());
+        filteredNotifications.setValue(new ArrayList<>());
+        resetPagination();
+        updateUnseenCount();
     }
     
     public boolean canLoadMoreByScroll() {

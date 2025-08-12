@@ -109,6 +109,8 @@
         android:id="@+id/studentSettingVerifyFaceIdFragment"
         android:name="vn.edu.fpt.zentryapp.faceid.ui.setting.StudentSettingVerifyFaceIdFragment"
         android:label="Verify Face ID">
+        <deepLink
+            app:uri="zentry://face-verify" />
         <action
             android:id="@+id/action_verifyFaceId_to_settings"
             app:destination="@id/studentSettingFragment"

@@ -1,5 +1,6 @@
 package vn.edu.fpt.zentryapp.notification.ui;
 
+import android.content.BroadcastReceiver;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -56,7 +57,8 @@ public class NotificationFragment extends Fragment {
         btnSettings = view.findViewById(R.id.btnSettings);
 
         // Initialize ViewModel
-        viewModel = new ViewModelProvider(requireActivity()).get(NotificationViewModel.class);
+        // Scope theo fragment để tránh share giữa Lecturer/Student
+        viewModel = new ViewModelProvider(this).get(NotificationViewModel.class);
 
         // Set adapter for ViewPager2
         NotificationPagerAdapter pagerAdapter = new NotificationPagerAdapter(this);
@@ -80,6 +82,9 @@ public class NotificationFragment extends Fragment {
         // Load initial data from API with userId and context
         String userId = vn.edu.fpt.zentryapp.auth.client.AuthManager.getInstance(requireContext()).getCurrentUserId();
         viewModel.loadNotifications(userId, requireContext());
+        // Listen for realtime updates from FCM service
+        androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(requireContext())
+                .registerReceiver(reloadReceiver, new android.content.IntentFilter("vn.edu.fpt.zentryapp.NOTIFICATIONS_UPDATED"));
         
         // Đánh dấu tất cả thông báo là đã seen khi vào màn hình notification
         viewModel.markAllAsSeen();
@@ -106,4 +111,17 @@ public class NotificationFragment extends Fragment {
             Toast.makeText(getContext(), "Không thể mở cài đặt thông báo", Toast.LENGTH_SHORT).show();
         }
     }
+    // Broadcast receiver to reload notifications immediately
+    private final BroadcastReceiver reloadReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(android.content.Context context, android.content.Intent intent) {
+            String userId = vn.edu.fpt.zentryapp.auth.client.AuthManager.getInstance(context).getCurrentUserId();
+            if (userId != null) {
+                viewModel.resetPagination();
+                viewModel.loadNotifications(userId, context);
+            }
+        }
+    };
+
 }
+
