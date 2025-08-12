@@ -23,10 +23,13 @@ import vn.edu.fpt.zentryapp.R;
 
 public class FaceIdRequestDialog extends DialogFragment {
 
-    private Dialog currentDialog;
+    // Single-dialog, multi-step state machine (avoid stacking multiple dialogs)
     private FaceIdRequestListener listener;
     private int minutes = 0;
     private int seconds = 0;
+    private Step currentStep = Step.INITIAL;
+
+    private enum Step { INITIAL, TIME_INPUT, PROCESSING, SUCCESS }
 
     public interface FaceIdRequestListener {
         void onFaceIdRequestConfigured(int totalSeconds);
@@ -48,155 +51,112 @@ public class FaceIdRequestDialog extends DialogFragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        // Start with initial step layout
         return inflater.inflate(R.layout.dialog_face_id_request_initial, container, false);
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        
-        // Setup initial dialog using findViewById
-        view.findViewById(R.id.btnContinue).setOnClickListener(v -> showTimeInputDialog());
+        bindInitialStep(view);
     }
 
-    private void showTimeInputDialog() {
-        // Create time input dialog
-        Dialog dialog = new Dialog(requireContext());
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog.setContentView(R.layout.dialog_face_id_time_input);
-        
-        dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-        dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        
-        // Find views directly instead of using binding
-        EditText etMinutes = dialog.findViewById(R.id.etMinutes);
-        EditText etSeconds = dialog.findViewById(R.id.etSeconds);
-        View btnStartVerification = dialog.findViewById(R.id.btnStartVerification);
-        
-        // Add text watchers for validation
-        etMinutes.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+    private void bindInitialStep(View root) {
+        currentStep = Step.INITIAL;
+        View btnContinue = root.findViewById(R.id.btnContinue);
+        if (btnContinue != null) {
+            btnContinue.setOnClickListener(v -> showTimeInputStep());
+        }
+    }
 
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+    private void showTimeInputStep() {
+        if (getView() == null || getContext() == null) return;
+        currentStep = Step.TIME_INPUT;
+        // Replace content of existing dialog view
+        ViewGroup parent = (ViewGroup) getView();
+        parent.removeAllViews();
+        LayoutInflater.from(getContext()).inflate(R.layout.dialog_face_id_time_input, parent, true);
 
-            @Override
-            public void afterTextChanged(Editable s) {
+        EditText etMinutes = parent.findViewById(R.id.etMinutes);
+        EditText etSeconds = parent.findViewById(R.id.etSeconds);
+        View btnStartVerification = parent.findViewById(R.id.btnStartVerification);
+
+        TextWatcher minuteWatcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
                 if (s.length() > 0) {
-                    minutes = Integer.parseInt(s.toString());
-                    if (minutes > 60) {
-                        etMinutes.setText("60");
-                        minutes = 60;
-                    }
-                } else {
-                    minutes = 0;
-                }
+                    try {
+                        minutes = Integer.parseInt(s.toString());
+                    } catch (NumberFormatException e) { minutes = 0; }
+                    if (minutes > 60) { minutes = 60; etMinutes.setText("60"); etMinutes.setSelection(etMinutes.getText().length()); }
+                } else minutes = 0;
             }
-        });
-        
-        etSeconds.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {}
-
-            @Override
-            public void afterTextChanged(Editable s) {
+        };
+        TextWatcher secondWatcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
                 if (s.length() > 0) {
-                    seconds = Integer.parseInt(s.toString());
-                    if (seconds > 59) {
-                        etSeconds.setText("59");
-                        seconds = 59;
-                    }
-                } else {
-                    seconds = 0;
-                }
+                    try {
+                        seconds = Integer.parseInt(s.toString());
+                    } catch (NumberFormatException e) { seconds = 0; }
+                    if (seconds > 59) { seconds = 59; etSeconds.setText("59"); etSeconds.setSelection(etSeconds.getText().length()); }
+                } else seconds = 0;
             }
-        });
-        
-        // Setup start verification button
+        };
+        etMinutes.addTextChangedListener(minuteWatcher);
+        etSeconds.addTextChangedListener(secondWatcher);
+
         btnStartVerification.setOnClickListener(v -> {
             if ((minutes == 0 && seconds == 0) || (minutes == 0 && seconds < 30)) {
                 Toast.makeText(requireContext(), "Please set a time of at least 30 seconds", Toast.LENGTH_SHORT).show();
             } else {
-                dialog.dismiss();
-                processVerification();
+                showProcessingStep();
             }
         });
-        
-        dialog.setCancelable(true);
-        dialog.show();
-        currentDialog = dialog;
     }
-    
-    private void processVerification() {
-        // Show a loading dialog or progress indicator
-        Dialog progressDialog = new Dialog(requireContext());
-        progressDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        progressDialog.setContentView(R.layout.dialog_processing);
-        progressDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-        progressDialog.setCancelable(false);
-        
-        // Handle the case where Lottie might not be available
-        try {
-            // Try to find the Lottie animation view
-            View animationView = progressDialog.findViewById(R.id.animationView);
-            if (animationView != null && animationView.getVisibility() == View.VISIBLE) {
-                // Animation view is available, hide the progress bar
-                progressDialog.findViewById(R.id.progressBar).setVisibility(View.VISIBLE);
-                animationView.setVisibility(View.GONE);
-            }
-        } catch (Exception e) {
-            // Fallback to the progress bar if there's any issue with Lottie
-            progressDialog.findViewById(R.id.progressBar).setVisibility(View.VISIBLE);
-        }
-        
-        progressDialog.show();
-        
-        // Simulate processing (replace with actual implementation)
+
+    private void showProcessingStep() {
+        if (getView() == null || getContext() == null) return;
+        currentStep = Step.PROCESSING;
+        ViewGroup parent = (ViewGroup) getView();
+        parent.removeAllViews();
+        LayoutInflater.from(getContext()).inflate(R.layout.dialog_processing, parent, true);
+
+        // Ensure progress bar visible (handle optional animation view fallback)
+        View progressBar = parent.findViewById(R.id.progressBar);
+        if (progressBar != null) progressBar.setVisibility(View.VISIBLE);
+        View animationView = parent.findViewById(R.id.animationView);
+        if (animationView != null) animationView.setVisibility(View.GONE);
+
+        // Simulate processing delay
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            progressDialog.dismiss();
-            showSuccessDialog();
-            
-            // Notify listener with total seconds
+            if (!isAdded()) return;
+            // Notify listener
             if (listener != null) {
                 int totalSeconds = (minutes * 60) + seconds;
                 listener.onFaceIdRequestConfigured(totalSeconds);
             }
+            showSuccessStep();
         }, 2000);
     }
-    
-    private void showSuccessDialog() {
-        Dialog dialog = new Dialog(requireContext());
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog.setContentView(R.layout.dialog_face_id_success);
-        
-        dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-        dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        
-        // Find views directly instead of using binding
-        View btnBack = dialog.findViewById(R.id.btnBack);
-        
-        // Setup back button
-        btnBack.setOnClickListener(v -> {
-            dialog.dismiss();
-            dismiss();
-        });
-        
-        dialog.setCancelable(false);
-        dialog.show();
-        currentDialog = dialog;
+
+    private void showSuccessStep() {
+        if (getView() == null || getContext() == null) return;
+        currentStep = Step.SUCCESS;
+        ViewGroup parent = (ViewGroup) getView();
+        parent.removeAllViews();
+        LayoutInflater.from(getContext()).inflate(R.layout.dialog_face_id_success, parent, true);
+        View btnBack = parent.findViewById(R.id.btnBack);
+        if (btnBack != null) {
+            btnBack.setOnClickListener(v -> dismiss());
+        }
     }
-    
+
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        
-        // Close any open dialogs
-        if (currentDialog != null && currentDialog.isShowing()) {
-            currentDialog.dismiss();
-        }
+        // Nothing extra to dismiss now (single dialog approach)
     }
 }
