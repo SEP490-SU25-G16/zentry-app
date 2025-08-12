@@ -60,7 +60,7 @@ public class FaceAnalysisController {
      * Start a 5-second analysis of face quality before proceeding with registration
      * Collects frame scores to ensure consistent high-quality face detection
      */
-    public void startAnalysis(FaceIdService faceIdService, Rect ovalRect, boolean livenessVerified) {
+    public void startAnalysis(FaceIdService faceIdService, RectF ovalRect, boolean livenessVerified) {
         // Check if already analyzing
         if (isAnalyzing) {
             Log.d(TAG, "Already analyzing, ignoring new request");

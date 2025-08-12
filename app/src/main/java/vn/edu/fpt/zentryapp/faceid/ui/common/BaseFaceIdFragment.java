@@ -99,6 +99,8 @@ public abstract class BaseFaceIdFragment extends Fragment {
                             faceIdService.getFaceSpoofDetector(),
                             faceOverlayView != null ? faceOverlayView.getOvalRect() : null
                     );
+                    // Wire spoof detection into camera pipeline so enhanced path is used
+                    cameraController.setSpoofDetectionController(spoofDetectionController);
                 }
                 
                 showLoading(false, "Look at the camera");
@@ -131,9 +133,24 @@ public abstract class BaseFaceIdFragment extends Fragment {
         // Create spoof detection controller
         spoofDetectionController = new FaceIdSpoofDetectionController(requireContext());
         
-        // Set camera controller callbacks
-        cameraController.setFrameProcessedCallback(this::onFrameProcessed);
+        // Set camera controller callbacks (frame + liveness requests)
+        cameraController.setFrameProcessedCallback(new FaceIdCameraController.FrameProcessedCallback() {
+            @Override
+            public void onFrameProcessed(Bitmap bitmap, Rect faceRect, boolean isValidPosition, boolean isSpoof, String statusMessage) {
+                BaseFaceIdFragment.this.onFrameProcessed(bitmap, faceRect, isValidPosition, isSpoof, statusMessage);
+            }
+
+            @Override
+            public void onLivenessChallengeRequested(Rect faceRect) {
+                BaseFaceIdFragment.this.onLivenessChallengeRequested(faceRect);
+            }
+        });
     }
+
+    /**
+     * Called when spoof detection requests a liveness challenge. Subclasses may override.
+     */
+    protected void onLivenessChallengeRequested(Rect faceRect) { /* no-op by default */ }
     
     /**
      * Check camera permission and start camera if granted

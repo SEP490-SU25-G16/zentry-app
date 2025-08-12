@@ -78,8 +78,11 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
         viewModel.init(requireContext(), authManager, session);
 
 
-        // Load notifications để có dữ liệu cho badge
-        notificationViewModel.loadNotifications();
+        // Load notifications từ API để có dữ liệu cho badge
+        String userId = authManager.getCurrentUserId();
+        if (userId != null) {
+            notificationViewModel.loadNotifications(userId, requireContext());
+        }
 
         setupViewPager();
         setupClickListeners();

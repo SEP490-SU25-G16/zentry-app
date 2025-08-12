@@ -55,8 +55,11 @@ public class StudentReportFragment extends Fragment implements StudentReportAdap
         AuthManager authManager = AuthManager.getInstance(requireContext());
         viewModel.init(requireContext(), authManager);
         
-        // Load notifications để có dữ liệu cho badge
-        notificationViewModel.loadNotifications();
+        // Load notifications từ API để có dữ liệu cho badge
+        String userId = authManager.getCurrentUserId();
+        if (userId != null) {
+            notificationViewModel.loadNotifications(userId, requireContext());
+        }
 
         setupRecyclerView();
         setupClickListeners();

@@ -166,6 +166,14 @@ public class FaceIdCameraController {
             return;
         }
         
+        if (result.triggerLivenessChallenge) {
+            // Request liveness challenge while keeping state responsive
+            if (frameProcessedCallback != null) {
+                frameProcessedCallback.onLivenessChallengeRequested(boundingBox);
+            }
+            return;
+        }
+
         // For real face detections
         if (!result.isSpoof) {
             // Check face position using oval view
@@ -181,7 +189,7 @@ public class FaceIdCameraController {
                 message = "Keep your face steady";
             }
             
-            frameProcessedCallback.onFrameProcessed(bitmap, boundingBox, isInGoodPosition && result.shouldProceed, 
+            frameProcessedCallback.onFrameProcessed(bitmap, boundingBox, isInGoodPosition, 
                     false, message);
         }
     }
@@ -214,5 +222,6 @@ public class FaceIdCameraController {
      */
     public interface FrameProcessedCallback {
         void onFrameProcessed(Bitmap bitmap, Rect faceRect, boolean isValidPosition, boolean isSpoof, String statusMessage);
+        void onLivenessChallengeRequested(Rect faceRect);
     }
 }

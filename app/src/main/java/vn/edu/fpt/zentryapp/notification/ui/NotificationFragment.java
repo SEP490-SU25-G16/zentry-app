@@ -77,8 +77,9 @@ public class NotificationFragment extends Fragment {
         tvGoToHistory.setOnClickListener(v ->
                 Toast.makeText(getContext(), "Navigate to historical notifications...", Toast.LENGTH_SHORT).show());
 
-        // Load initial data
-        viewModel.loadNotifications();
+        // Load initial data from API with userId and context
+        String userId = vn.edu.fpt.zentryapp.auth.client.AuthManager.getInstance(requireContext()).getCurrentUserId();
+        viewModel.loadNotifications(userId, requireContext());
         
         // Đánh dấu tất cả thông báo là đã seen khi vào màn hình notification
         viewModel.markAllAsSeen();

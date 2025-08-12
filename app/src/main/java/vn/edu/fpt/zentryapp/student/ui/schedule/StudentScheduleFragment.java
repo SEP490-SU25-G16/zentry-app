@@ -57,8 +57,11 @@ public class StudentScheduleFragment extends Fragment implements StudentSchedule
         notificationViewModel = new ViewModelProvider(requireActivity()).get(NotificationViewModel.class);
         viewModel.init(requireContext(), authManager);
 
-        // Load notifications để có dữ liệu cho badge
-        notificationViewModel.loadNotifications();
+        // Load notifications từ API để có dữ liệu cho badge
+        String userId = authManager.getCurrentUserId();
+        if (userId != null) {
+            notificationViewModel.loadNotifications(userId, requireContext());
+        }
 
         setupRecyclerView();
         setupClickListeners();

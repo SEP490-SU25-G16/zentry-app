@@ -86,8 +86,9 @@ public class AllNotificationsFragment extends Fragment {
             adapter.setSeeMoreVisible(shouldShow);
         });
 
-        // Load dữ liệu trước khi apply filter
-        viewModel.loadNotifications();
+        // Load dữ liệu từ API với userId và context
+        String userId = vn.edu.fpt.zentryapp.auth.client.AuthManager.getInstance(requireContext()).getCurrentUserId();
+        viewModel.loadNotifications(userId, requireContext());
         // Reset pagination và apply filter khi fragment được tạo
         viewModel.resetPagination();
         viewModel.applyFilter(NotificationViewModel.FilterType.ALL);

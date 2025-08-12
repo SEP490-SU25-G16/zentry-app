@@ -133,7 +133,7 @@ public class LivenessVerificationController implements FaceIdEnhancer.FaceIdEnha
     /**
      * Close and clean up resources
      */
-    public void close() {
+    public void cleanup() {
         if (faceIdEnhancer != null) {
             faceIdEnhancer.close();
             faceIdEnhancer = null;

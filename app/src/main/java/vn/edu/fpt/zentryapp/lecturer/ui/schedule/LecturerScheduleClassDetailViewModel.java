@@ -936,10 +936,42 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
         _faceIdRequestError.setValue(null);
         _faceIdRequestSuccess.setValue(null);
 
+        // Validate and resolve required identifiers
+        String lecturerId = session.getLecturerId();
+        if (lecturerId == null || lecturerId.trim().isEmpty()) {
+            // Fallback to current authenticated user as lecturer
+            String currentUserId = authManager != null ? authManager.getCurrentUserId() : null;
+            if (currentUserId != null && !currentUserId.trim().isEmpty()) {
+                lecturerId = currentUserId;
+                Log.w(TAG, "LecturerId missing in session. Falling back to current userId=" + lecturerId);
+            } else {
+                _isCreatingFaceIdRequest.setValue(false);
+                _faceIdRequestError.setValue("Lecturer ID not available");
+                Log.e(TAG, "Cannot create Face ID request: lecturerId is null/empty");
+                return;
+            }
+        }
+
+        String sessionId = session.getSessionId();
+        if (sessionId == null || sessionId.trim().isEmpty()) {
+            _isCreatingFaceIdRequest.setValue(false);
+            _faceIdRequestError.setValue("Session ID not available");
+            Log.e(TAG, "Cannot create Face ID request: sessionId is null/empty");
+            return;
+        }
+
+        String classSectionId = session.getClassSectionId();
+        if (classSectionId == null || classSectionId.trim().isEmpty()) {
+            _isCreatingFaceIdRequest.setValue(false);
+            _faceIdRequestError.setValue("Class section ID not available");
+            Log.e(TAG, "Cannot create Face ID request: classSectionId is null/empty");
+            return;
+        }
+
         FaceIdRequestCreateRequest request = new FaceIdRequestCreateRequest(
-                session.getLecturerId(),
-                session.getSessionId(),
-                session.getClassSectionId(),
+                lecturerId,
+                sessionId,
+                classSectionId,
                 expiresInMinutes,
                 title,
                 body
@@ -953,11 +985,18 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                         _isCreatingFaceIdRequest.setValue(false);
                         if (response.isSuccessful() && response.body() != null) {
                             FaceIdRequestCreateResponse apiResponse = response.body();
-                            if (apiResponse.isSuccess()) {
+                            if (apiResponse.isEffectiveSuccess()) {
                                 String msg = apiResponse.getMessage() != null ? apiResponse.getMessage() : "Face ID request created";
                                 _faceIdRequestSuccess.setValue(msg);
                                 Log.d(TAG, "Face ID request created successfully");
                             } else {
+                                // Try to extract success from root-level fields even if Success=false
+                                if (apiResponse.getRequestId() != null && !apiResponse.getRequestId().isEmpty()) {
+                                    String msg = apiResponse.getMessage() != null ? apiResponse.getMessage() : "Face ID request created";
+                                    _faceIdRequestSuccess.setValue(msg);
+                                    Log.w(TAG, "Face ID request treated as success via root fields: requestId=" + apiResponse.getRequestId());
+                                    return;
+                                }
                                 String err = apiResponse.getError() != null ? apiResponse.getError() : "Failed to create Face ID request";
                                 _faceIdRequestError.setValue(err);
                                 Log.e(TAG, "Face ID request API error: " + err);
