@@ -16,6 +16,9 @@ import vn.edu.fpt.zentryapp.faceid.data.service.FaceIdConfig;
 import vn.edu.fpt.zentryapp.faceid.ui.common.BaseFaceIdFragment;
 import vn.edu.fpt.zentryapp.faceid.ui.common.FaceIdProcessingCallback;
 import vn.edu.fpt.zentryapp.faceid.ui.common.FaceIdProcessor;
+import vn.edu.fpt.zentryapp.faceid.ui.setting.action.FaceVerifyAction;
+import vn.edu.fpt.zentryapp.faceid.ui.setting.controller.FaceIdRegistrationOrchestrator;
+import android.graphics.RectF;
 
 /**
  * Fragment for verifying Face ID
@@ -28,6 +31,7 @@ public class StudentSettingVerifyFaceIdFragment extends BaseFaceIdFragment {
     private FaceIdProcessor faceIdProcessor;
     private boolean isProcessing = false;
     private NavController navController;
+    private FaceIdRegistrationOrchestrator orchestrator;
     
     @Nullable
     @Override
@@ -74,6 +78,12 @@ public class StudentSettingVerifyFaceIdFragment extends BaseFaceIdFragment {
         if (binding == null) return;
         binding.tvStatus.setText(message);
     }
+
+    @Override
+    protected void showErrorDialog(String title, String message) {
+        if (!isAdded()) return;
+        vn.edu.fpt.zentryapp.faceid.ui.setting.util.ErrorPresenter.showError(requireContext(), title, message);
+    }
     
     @Override
     protected void setActionButtonEnabled(boolean enabled) {
@@ -89,6 +99,12 @@ public class StudentSettingVerifyFaceIdFragment extends BaseFaceIdFragment {
     @Override
     protected void onFaceIdServiceInitialized() {
         faceIdProcessor = new FaceIdProcessor(faceIdService);
+        // Wire orchestrator (safe analysis routing)
+        orchestrator = new FaceIdRegistrationOrchestrator(null)
+                .withService(() -> faceIdService)
+                .withOval(() -> faceOverlayView != null ? new RectF(faceOverlayView.getOvalRect()) : null);
+        setFrameRouter((bitmap, faceRect, isValidPosition, isSpoof, statusMessage) ->
+                orchestrator.routeProcessedFrame(bitmap, faceRect, isValidPosition, isSpoof, statusMessage));
     }
     
     /**
@@ -120,47 +136,32 @@ public class StudentSettingVerifyFaceIdFragment extends BaseFaceIdFragment {
             return;
         }
         
-        // Verify face ID with enhanced security validation using oval boundary
-        faceIdProcessor.verifyFace(
+        // Verify face ID via action wrapper (SRP)
+        new FaceVerifyAction().execute(
+                faceIdProcessor,
                 currentFrameBitmap,
                 currentFaceRect,
                 faceOverlayView != null ? faceOverlayView.getOvalRect() : null,
                 userId,
-                new FaceIdProcessingCallback() {
+                new FaceVerifyAction.Callback() {
                     @Override
                     public void onSuccess(String message, Object metadata) {
                         if (!isAdded()) return;
-                        
                         isProcessing = false;
                         showLoading(false, "Verification successful");
-                        
-                        // Get confidence score from metadata
                         float confidence = 0;
-                        if (metadata instanceof Float) {
-                            confidence = (Float) metadata;
-                        }
-                        
-                        // Show success message
+                        if (metadata instanceof Float) confidence = (Float) metadata;
                         showSuccessDialog("Verification Successful",
-                                "Your Face ID has been verified with " +
-                                        Math.round(confidence * 100) + "% confidence",
+                                "Your Face ID has been verified with " + Math.round(confidence * 100) + "% confidence",
                                 "Continue",
-                                () -> {
-                                    if (isAdded()) {
-                                        // Navigate back to settings after successful verification
-                                        navController.navigate(R.id.action_verifyFaceId_to_settings);
-                                    }
-                                });
+                                () -> { if (isAdded()) navController.navigate(R.id.action_verifyFaceId_to_settings); });
                     }
-                    
+
                     @Override
                     public void onFailure(String errorMessage) {
                         if (!isAdded()) return;
-                        
                         isProcessing = false;
                         showLoading(false, "Verification failed");
-                        
-                        // Show appropriate error message
                         if (errorMessage.contains("spoof") || errorMessage.contains("Spoof")) {
                             showErrorDialog("Security Alert",
                                     "Spoof detection triggered. Please ensure you're using a real face.");
@@ -173,11 +174,10 @@ public class StudentSettingVerifyFaceIdFragment extends BaseFaceIdFragment {
                         } else {
                             showErrorDialog("Verification Error", errorMessage);
                         }
-                        
-                        // Restart camera
                         startCamera();
                     }
-                });
+                }
+        );
     }
     
     @Override

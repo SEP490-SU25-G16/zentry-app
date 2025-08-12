@@ -49,6 +49,18 @@ public abstract class BaseFaceIdFragment extends Fragment {
     protected Bitmap currentFrameBitmap;
     protected Rect currentFaceRect;
 
+    // Optional frame router to allow external orchestrators to consume frames first
+    public interface FrameRouter {
+        /**
+         * Route a processed frame. Return true if the frame has been fully handled and
+         * default processing should be skipped; return false to let base handle as usual.
+         */
+        boolean route(Bitmap bitmap, Rect faceRect, boolean isValidPosition, boolean isSpoof, String statusMessage);
+    }
+    @Nullable
+    private FrameRouter frameRouter;
+    protected void setFrameRouter(@Nullable FrameRouter router) { this.frameRouter = router; }
+
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
@@ -187,6 +199,13 @@ public abstract class BaseFaceIdFragment extends Fragment {
      * Called when a frame is processed with face detection results
      */
     protected void onFrameProcessed(Bitmap bitmap, Rect faceRect, boolean isValidPosition, boolean isSpoof, String statusMessage) {
+        // Give a chance to an external router (e.g., orchestrator) to consume this frame
+        if (frameRouter != null) {
+            try {
+                boolean consumed = frameRouter.route(bitmap, faceRect, isValidPosition, isSpoof, statusMessage);
+                if (consumed) return;
+            } catch (Exception ignored) {}
+        }
         currentFrameBitmap = bitmap;
         currentFaceRect = faceRect;
         

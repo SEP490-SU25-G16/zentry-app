@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -42,10 +43,16 @@ import vn.edu.fpt.zentryapp.faceid.data.service.FaceTracker;
 import vn.edu.fpt.zentryapp.faceid.ui.components.CameraView;
 import vn.edu.fpt.zentryapp.faceid.ui.components.OvalFaceOverlayView;
 import vn.edu.fpt.zentryapp.faceid.ui.setting.detection.SpoofDetectionManager;
+import vn.edu.fpt.zentryapp.faceid.ui.setting.controller.SpoofDetectionController;
 import vn.edu.fpt.zentryapp.faceid.ui.setting.state.FaceRegistrationState;
 import vn.edu.fpt.zentryapp.faceid.ui.setting.state.FaceRegistrationStateManager;
 import vn.edu.fpt.zentryapp.faceid.ui.setting.success.FaceIdSuccessActivity;
 import vn.edu.fpt.zentryapp.faceid.ui.FaceRegistrationUIController;
+import vn.edu.fpt.zentryapp.faceid.ui.setting.controller.CameraPipelineController;
+import vn.edu.fpt.zentryapp.faceid.ui.setting.action.FaceRegistrationAction;
+import vn.edu.fpt.zentryapp.faceid.ui.setting.controller.LivenessVerificationController;
+import vn.edu.fpt.zentryapp.faceid.ui.setting.controller.FaceAnalysisController;
+import vn.edu.fpt.zentryapp.faceid.ui.setting.controller.FaceIdRegistrationOrchestrator;
 
 public class StudentSettingRegisterFaceIdFragment extends Fragment
         implements FaceIdEnhancer.FaceIdEnhancerCallback {
@@ -57,6 +64,7 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
     private FragmentStudentSettingRegisterFaceIdBinding binding;
     private FaceRegistrationStateManager stateManager;
     private SpoofDetectionManager spoofDetectionManager;
+    private SpoofDetectionController spoofController;
     private FaceRegistrationUIController uiController;
     private FaceTracker faceTracker;
     private FaceIdService faceIdService;
@@ -72,6 +80,10 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
     private CameraView cameraView;
     private OvalFaceOverlayView faceOverlayView;
     private boolean isCameraStarted = false;
+    private CameraPipelineController cameraPipelineController;
+    private FaceIdRegistrationOrchestrator orchestrator;
+    private LivenessVerificationController livenessController;
+    private FaceAnalysisController analysisController;
 
     // 💾 CURRENT DATA
     private Bitmap currentFrameBitmap;
@@ -104,8 +116,7 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
         initializeComponents();
         setupClickListeners();
 
-        // Đảm bảo biến analysisOverlay ban đầu là null để thiết lập UI phân tích khi cần
-        analysisOverlay = null;
+        // Analysis UI do FaceAnalysisController quản lý - không tự thao tác ở fragment
 
         Log.d(TAG, "✅ Fragment initialized with clean architecture");
     }
@@ -128,6 +139,68 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
         // 4. Face Tracker with optimized settings for stability
         faceTracker = new FaceTracker(10); // Increased from 8 to 10 frames for better stability (~ 0.33 seconds)
 
+        // 5. Liveness controller (delegate liveness to controller; fallback to legacy if null)
+        livenessController = new LivenessVerificationController(
+                requireContext(),
+                binding,
+                faceOverlayView,
+                stateManager,
+                new LivenessVerificationController.LivenessVerificationCallback() {
+                    @Override
+                    public void onLivenessVerified() {
+                        if (!isAdded()) return;
+                        // Mirror legacy behavior when VERIFIED
+                        livenessVerified = true;
+                        stateManager.transitionTo(FaceRegistrationState.FACE_REAL, "Liveness verified!");
+                        if (binding != null && binding.llLivenessProgress != null) {
+                            binding.llLivenessProgress.setVisibility(View.GONE);
+                        }
+                        if (faceOverlayView != null) {
+                            faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.success_green));
+                        }
+                        if (currentFaceRect != null) {
+                            stateManager.transitionTo(FaceRegistrationState.FACE_STABLE, "Perfect! Processing...");
+                            if (!isAnalyzing) startAnalysis();
+                        } else {
+                            stateManager.transitionTo(FaceRegistrationState.FACE_DETECTED, "Face detected");
+                        }
+                    }
+
+                    @Override
+                    public void onLivenessFailed(String reason) {
+                        // Keep current flow; errors will be handled by spoof/analysis states
+                        android.util.Log.w(TAG, "Liveness failed: " + reason);
+                    }
+                }
+        );
+
+        // 6. Analysis controller wiring (keep same thresholds/behavior)
+        analysisController = new FaceAnalysisController(
+                binding.flStudentSettingRegisterFaceIdCameraContainer,
+                stateManager,
+                (isHighQuality, feedback) -> {
+                    if (!isAdded()) return;
+                    if (isHighQuality) {
+                        captureAndRegisterFace();
+                    } else {
+                        // Already transitioned to FAILED_* in controller; no-op
+                    }
+                }
+        );
+
+        // Wire orchestrator DI (no behavior change yet)
+        if (orchestrator != null) {
+            orchestrator
+                    .setMode(FaceIdRegistrationOrchestrator.OperationMode.REGISTER)
+                    .withLiveness(livenessController)
+                    .withAnalysis(analysisController)
+                    .withService(() -> faceIdService)
+                    .withOval(() -> faceOverlayView != null ? new RectF(faceOverlayView.getOvalRect()) : null)
+                    .withRegistrationAction(this::captureAndRegisterFace)
+                    .withStateManager(stateManager)
+                    .withLivenessVerified(() -> livenessVerified);
+        }
+
         Log.d(TAG, "📦 All components initialized successfully");
     }
 
@@ -137,6 +210,10 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
 
         faceOverlayView = new OvalFaceOverlayView(requireContext());
         binding.flStudentSettingRegisterFaceIdCameraContainer.addView(faceOverlayView);
+
+        // Initialize camera pipeline controller (thin wrapper around CameraView)
+        cameraPipelineController = new CameraPipelineController(cameraView);
+        orchestrator = new FaceIdRegistrationOrchestrator(cameraPipelineController);
     }
 
     private void setupClickListeners() {
@@ -299,28 +376,29 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
                 break;
 
             case ANALYZING:
-                // Đảm bảo UI phân tích được hiển thị
-                if (analysisOverlay != null && analysisOverlay.getVisibility() != View.VISIBLE) {
-                    analysisOverlay.setVisibility(View.VISIBLE);
-                }
+                // Analysis UI is now managed by FaceAnalysisController
                 break;
 
             case LIVENESS_CHALLENGE:
                 // Hiển thị UI cho liveness challenge
                 Log.d(TAG, "🔄 Kích hoạt Liveness Challenge");
-                if (binding != null && binding.tvStatusMessage != null) {
-                    binding.tvStatusMessage.setText("Hãy nhìn vào camera và nhấp mắt");
+                if (livenessController != null) {
+                    livenessController.initialize();
+                    livenessController.updateUI();
+                } else {
+                    if (binding != null && binding.tvStatusMessage != null) {
+                        binding.tvStatusMessage.setText("Hãy nhìn vào camera và nhấp mắt");
+                    }
+                    if (faceOverlayView != null) {
+                        faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.primary));
+                    }
+                    // Initialize FaceIdEnhancer if not already done (legacy)
+                    initializeFaceIdEnhancer();
                 }
-                if (faceOverlayView != null) {
-                    faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.primary));
-                }
-
-                // Initialize FaceIdEnhancer if not already done
-                initializeFaceIdEnhancer();
 
                 // Reset liveness state in spoof manager to start a fresh challenge
-                if (spoofDetectionManager != null) {
-                    spoofDetectionManager.resetLivenessState();
+                if (spoofController != null) {
+                    spoofController.resetLivenessState();
                 }
 
                 // Ensure liveness overlay is visible and above camera
@@ -371,10 +449,7 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
                 if (uiController != null) {
                     uiController.showLoadingIndicator(true);
                 }
-                // Đảm bảo ẩn overlay phân tích
-                if (analysisOverlay != null) {
-                    analysisOverlay.setVisibility(View.GONE);
-                }
+                // Analysis UI handled by FaceAnalysisController
                 break;
         }
     }
@@ -456,11 +531,12 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
     private void initializeSpoofDetection() {
         if (faceIdService != null && faceIdService.getFaceSpoofDetector() != null) {
             spoofDetectionManager = new SpoofDetectionManager(faceIdService.getFaceSpoofDetector(), requireContext());
+            spoofController = new SpoofDetectionController(spoofDetectionManager);
             // Set the oval boundary for enhanced security validation
             if (faceOverlayView != null) {
                 spoofDetectionManager.setOvalBoundary(faceOverlayView.getOvalRect());
             }
-            Log.d(TAG, "✅ SpoofDetectionManager initialized with oval boundary");
+            Log.d(TAG, "✅ Spoof detection initialized with oval boundary");
         } else {
             Log.w(TAG, "⚠️ FaceSpoofDetector not available, using fallback detection");
         }
@@ -502,8 +578,13 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
             }
 
             try {
-                Log.d(TAG, "Starting camera after delay...");
-                cameraView.startCamera(getViewLifecycleOwner(), this::processFrame);
+                Log.d(TAG, "Starting camera after delay via CameraPipelineController...");
+                if (orchestrator != null) {
+                    orchestrator.startCamera(getViewLifecycleOwner(), this::processFrame);
+                } else {
+                    // Fallback just in case controller wasn't initialized
+                    cameraView.startCamera(getViewLifecycleOwner(), this::processFrame);
+                }
                 isCameraStarted = true;
 
                 // Check again before updating UI
@@ -600,24 +681,8 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
         }
 
         if (isAnalyzing) {
-            faceIdService.processContinuousFrame(bitmap, faceOverlayView.getOvalRect(), new FaceIdService.ContinuousProcessingCallback() {
-                @Override
-                public void onFaceDetected(Rect boundingBox, boolean isSpoof, float spoofScore) {
-                    // During analysis, if liveness has been verified, accept frames regardless of spoof flag
-                    if (!isSpoof || livenessVerified) {
-                        frameScores.add(spoofScore);
-                    }
-                }
-
-                @Override
-                public void onNoFaceDetected() {}
-
-                @Override
-                public void onMultipleFacesDetected() {}
-
-                @Override
-                public void onError(String errorMessage) {}
-            });
+            RectF oval = faceOverlayView != null ? new RectF(faceOverlayView.getOvalRect()) : null;
+            analysisController.processFrame(faceIdService, bitmap, oval);
             return;
         }
 
@@ -662,8 +727,8 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
                         }
 
                         // 🔧 Use enhanced spoof detection if available
-                        if (spoofDetectionManager != null) {
-                            spoofDetectionManager.analyzeFrame(bitmap, boundingBox, result -> {
+                        if (spoofController != null) {
+                            spoofController.analyzeFrame(bitmap, boundingBox, result -> {
                                 handleEnhancedSpoofResult(result, boundingBox);
                             });
                         } else {
@@ -899,25 +964,22 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
         // 🔧 NEW: Show progress updates
         stateManager.transitionTo(FaceRegistrationState.PROCESSING, "Generating face embedding...");
 
-        // Kiểm tra và ẩn overlay phân tích nếu đang hiển thị
-        if (analysisOverlay != null && analysisOverlay.getVisibility() == View.VISIBLE) {
-            analysisOverlay.setVisibility(View.GONE);
-        }
+        // Analysis UI handled by FaceAnalysisController
 
-        // 🎯 Register face with enhanced security validation
-        faceIdService.captureAndRegisterFace(
+        // 🎯 Register face with enhanced security validation via action wrapper
+        registrationAction.execute(
+                faceIdService,
                 capturedBitmap,
                 capturedFaceRect,
                 faceOverlayView != null ? faceOverlayView.getOvalRect() : null,
                 finalUserId,
-                new FaceIdService.FaceIdCallback() {
+                new FaceRegistrationAction.Callback() {
                     @Override
                     public void onSuccess(String message) {
                         if (!isAdded()) {
                             Log.w(TAG, "Fragment not attached during success callback");
                             return;
                         }
-
                         Log.d(TAG, "✅ Registration successful: " + message);
                         stateManager.transitionTo(FaceRegistrationState.SUCCESS, message);
                     }
@@ -928,14 +990,10 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
                             Log.w(TAG, "Fragment not attached during failure callback");
                             return;
                         }
-
                         Log.e(TAG, "❌ Registration failed: " + errorMessage);
-
                         // Store detailed error information for UI display
                         lastDetailedErrorMessage = "Registration failure details:\n" + errorMessage;
                         hasDetailedError = true;
-
-                        // 🔧 NEW: Enhanced error categorization
                         if (errorMessage.contains("timeout") || errorMessage.contains("Timeout")) {
                             lastDetailedErrorMessage += "\n\nError type: Network Timeout";
                             handleNetworkError("Request timeout. Please try again.");
@@ -960,7 +1018,8 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
                                     "Registration failed: " + errorMessage);
                         }
                     }
-                });
+                }
+        );
     }
 
     /**
@@ -977,7 +1036,8 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
             stopCamera();
 
             // Save bitmap for background sync
-            String bitmapPath = saveBitmapToTempFile(currentFrameBitmap);
+            String bitmapPath = vn.edu.fpt.zentryapp.faceid.ui.setting.util.TempFileStorage
+                    .saveBitmapToTempFile(requireContext(), currentFrameBitmap, "face_registration");
             String userId = AuthManager.getInstance(requireContext()).getCurrentUserId();
             String successMessage = "Face ID has been registered successfully!";
 
@@ -987,10 +1047,9 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
                 return;
             }
 
-            // 🚀 Launch Success Activity
-            Intent successIntent = FaceIdSuccessActivity.createIntent(
-                    requireContext(), userId, successMessage, bitmapPath);
-            startActivityForResult(successIntent, SUCCESS_ACTIVITY_REQUEST_CODE);
+            // 🚀 Launch Success Activity via SuccessNavigator
+            vn.edu.fpt.zentryapp.faceid.ui.setting.util.SuccessNavigator
+                    .navigateToSuccess(requireContext(), userId, successMessage, bitmapPath);
 
             Log.d(TAG, "🎉 Navigating to Success Activity");
 
@@ -1015,33 +1074,13 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
     private void handleNetworkError(String errorMessage) {
         if (!isAdded()) return;
 
-        // Create alert dialog with retry option
-        new AlertDialog.Builder(requireContext())
-                .setTitle("Network Connection Issue")
-                .setMessage("Cannot connect to the server. Please check your internet connection and try again.")
-                .setPositiveButton("Try Again", (dialog, which) -> {
-                    // Check if fragment is still attached before proceeding
-                    if (!isAdded()) {
-                        Log.w(TAG, "Fragment not attached, cannot retry registration");
-                        return;
-                    }
-
-                    // Reset and try again
-                    resetComponents();
-                    startFaceRegistration();
-                })
-                .setNegativeButton("Cancel", (dialog, which) -> {
-                    // Check if fragment is still attached before proceeding
-                    if (!isAdded()) {
-                        Log.w(TAG, "Fragment not attached, cannot handle cancel");
-                        return;
-                    }
-
-                    // Go back
-                    requireActivity().onBackPressed();
-                })
-                .setCancelable(false)
-                .show();
+        vn.edu.fpt.zentryapp.faceid.ui.setting.util.ErrorPresenter.showRetry(
+                requireContext(),
+                "Network Connection Issue",
+                "Cannot connect to the server. Please check your internet connection and try again.",
+                () -> { if (!isAdded()) return; resetComponents(); startFaceRegistration(); },
+                () -> { if (!isAdded()) return; requireActivity().onBackPressed(); }
+        );
     }
 
     /**
@@ -1081,81 +1120,33 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
         Log.e(TAG, "Detailed error information: " + detailedMessage);
 
         // For other errors, show regular retry dialog with detailed information
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext())
-                .setTitle(title)
-                .setMessage(detailedMessage)
-                .setPositiveButton("Retry", (dialog, which) -> {
-                    // Check if fragment is still attached before proceeding
-                    if (!isAdded()) {
-                        Log.w(TAG, "Fragment not attached, cannot retry");
-                        return;
-                    }
-
-                    // Reset error tracking
+        vn.edu.fpt.zentryapp.faceid.ui.setting.util.ErrorPresenter.showRetry(
+                requireContext(),
+                title,
+                detailedMessage,
+                () -> {
+                    if (!isAdded()) { return; }
                     hasDetailedError = false;
                     lastDetailedErrorMessage = "";
-
-
-                    // Make sure everything is fully reset before retry
                     resetComponents();
-                    // Small delay to ensure complete reset
                     new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                        // Check again if fragment is attached before starting camera
-                        if (!isAdded()) {
-                            Log.w(TAG, "Fragment not attached, cannot start registration");
-                            return;
-                        }
+                        if (!isAdded()) return;
                         startFaceRegistration();
                     }, 500);
-                })
-                // No neutral button - removed offline mode and copy error options
-                .setNegativeButton("Cancel", (dialog, which) -> {
-                    // Check if fragment is still attached before proceeding
-                    if (!isAdded()) {
-                        Log.w(TAG, "Fragment not attached, cannot handle cancel");
-                        return;
-                    }
-
-                    // Reset error tracking
+                },
+                () -> {
+                    if (!isAdded()) { return; }
                     hasDetailedError = false;
                     lastDetailedErrorMessage = "";
                     requireActivity().onBackPressed();
-                })
-                .setCancelable(false);
-
-        // Create and show the dialog
-        AlertDialog dialog = builder.create();
-        dialog.show();
-
-        // Make the message scrollable for long detailed errors
-        TextView messageView = dialog.findViewById(android.R.id.message);
-        if (messageView != null) {
-            messageView.setMovementMethod(new ScrollingMovementMethod());
-        }
+                }
+        );
     }
 
     /**
      * Save bitmap to temp file for background sync
      */
-    private String saveBitmapToTempFile(Bitmap bitmap) throws IOException {
-        // Check if fragment is still attached
-        if (!isAdded()) {
-            throw new IllegalStateException("Fragment not attached, cannot save bitmap");
-        }
-
-        File tempDir = new File(requireContext().getCacheDir(), "face_registration");
-        if (!tempDir.exists()) {
-            tempDir.mkdirs();
-        }
-
-        File tempFile = new File(tempDir, "face_" + System.currentTimeMillis() + ".jpg");
-
-        try (FileOutputStream fos = new FileOutputStream(tempFile)) {
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos);
-        }
-
-        return tempFile.getAbsolutePath();
-    }
+    // Temp file save is delegated to TempFileStorage
 
     /**
      * Back to setup screen
@@ -1178,9 +1169,12 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
     private void stopCamera() {
         try {
             // Make sure camera is fully stopped
-            if (cameraView != null) {
+            if (orchestrator != null) {
+                orchestrator.stopCamera();
+                Log.d(TAG, "Camera stopped via CameraPipelineController");
+            } else if (cameraView != null) {
                 cameraView.stopCamera();
-                Log.d(TAG, "Camera stopped");
+                Log.d(TAG, "Camera stopped (fallback)");
             }
         } catch (Exception e) {
             Log.e(TAG, "Error stopping camera: " + e.getMessage(), e);
@@ -1230,10 +1224,14 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
      * Update the frame processing to use FaceIdEnhancer when in LIVENESS_CHALLENGE state
      */
     private void processFrameForLivenessChallenge(Bitmap bitmap, Rect faceRect) {
+        if (livenessController != null) {
+            livenessController.processFrame(bitmap, faceRect);
+            return;
+        }
         if (faceIdEnhancer != null && faceIdEnhancerInitialized) {
             faceIdEnhancer.processFaceFrame(bitmap, faceRect);
         } else {
-            Log.w(TAG, "Attempted to process liveness frame but FaceIdEnhancer not initialized");
+            Log.w(TAG, "Attempted to process liveness frame but controller/enhancer not initialized");
         }
     }
 
@@ -1288,8 +1286,8 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
             // Transition to the next state in registration
             stateManager.transitionTo(FaceRegistrationState.FACE_REAL, "Liveness verified!");
             // Mark success and hide liveness overlay
-            if (spoofDetectionManager != null) {
-                spoofDetectionManager.markLivenessSuccess();
+            if (spoofController != null) {
+                spoofController.markLivenessSuccess();
             }
             if (binding != null && binding.llLivenessProgress != null) {
                 binding.llLivenessProgress.setVisibility(View.GONE);
@@ -1470,10 +1468,7 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
         isAnalyzing = false;
         frameScores.clear();
 
-        // Ẩn overlay phân tích nếu đang hiển thị
-        if (analysisOverlay != null) {
-            analysisOverlay.setVisibility(View.GONE);
-        }
+        // Analysis UI handled by FaceAnalysisController
 
         // Hide liveness overlay if visible
         if (binding != null && binding.llLivenessProgress != null) {
@@ -1548,251 +1543,28 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
 
         Log.d(TAG, "🧹 Fragment cleaned up");
     }
-    // Thêm các biến UI cần thiết
-    private ProgressBar analysisProgressBar;
-    private TextView analysisCountdownText;
-    private View analysisOverlay;
+    // Analysis UI is controlled by FaceAnalysisController
 
     // Thêm biến theo dõi xem faceIdService đã khởi tạo thành công chưa
     private boolean faceIdServiceInitialized = false;
+    private final FaceRegistrationAction registrationAction = new FaceRegistrationAction();
 
     /**
      * Start a 5-second analysis of face quality before proceeding with registration
      * Collects frame scores to ensure consistent high-quality face detection
      */
     private void startAnalysis() {
-        // Kiểm tra nếu đã đang phân tích
         if (isAnalyzing) {
             Log.d(TAG, "Đã đang phân tích, bỏ qua yêu cầu mới");
             return;
         }
-
         isAnalyzing = true;
-        frameScores.clear();
-
-        // Kiểm tra fragment tồn tại
-        if (!isAdded() || binding == null) return;
-
-        // Khởi tạo và hiển thị UI phân tích nếu chưa tồn tại
-        setupAnalysisUI();
-
-        // Hiện overlay phân tích
-        if (analysisOverlay != null) {
-            analysisOverlay.setVisibility(View.VISIBLE);
-        }
-
-        // Start with initial analyzing state message
-        stateManager.transitionTo(FaceRegistrationState.ANALYZING, "Đang phân tích... Giữ nguyên");
-
-        // Hiển thị và cập nhật progressBar
-        if (analysisProgressBar != null) {
-            analysisProgressBar.setVisibility(View.VISIBLE);
-            analysisProgressBar.setMax(ANALYSIS_DURATION_MS);
-            analysisProgressBar.setProgress(0);
-
-            // Animator để cập nhật progress một cách mượt mà
-            final ValueAnimator progressAnimator = ValueAnimator.ofInt(0, ANALYSIS_DURATION_MS);
-            progressAnimator.setDuration(ANALYSIS_DURATION_MS);
-            progressAnimator.setInterpolator(new LinearInterpolator());
-            progressAnimator.addUpdateListener(animation -> {
-                if (analysisProgressBar != null && isAdded()) {
-                    analysisProgressBar.setProgress((Integer) animation.getAnimatedValue());
-                }
-            });
-            progressAnimator.start();
-        }
-
-        // Start countdown feedback
-        final int[] secondsLeft = {ANALYSIS_DURATION_MS / 1000};
-        final int countdownInterval = 1000; // 1 second
-
-        // Countdown handler to update UI every second
-        final Handler countdownHandler = new Handler(Looper.getMainLooper());
-        final Runnable countdownRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (!isAdded() || !isAnalyzing) return;
-
-                secondsLeft[0]--;
-                if (secondsLeft[0] > 0) {
-                    // Update countdown message and UI
-                    String message = "Đang phân tích... " + secondsLeft[0] + "s";
-                    stateManager.transitionTo(FaceRegistrationState.ANALYZING, message);
-
-                    // Cập nhật text đếm ngược
-                    if (analysisCountdownText != null) {
-                        analysisCountdownText.setText(message);
-                    }
-
-                    countdownHandler.postDelayed(this, countdownInterval);
-                }
-            }
-        };
-
-        // Start countdown updates
-        countdownHandler.postDelayed(countdownRunnable, countdownInterval);
-
-        // Schedule analysis completion
-        mainHandler.postDelayed(() -> {
-            // Stop analyzing
-            isAnalyzing = false;
-            countdownHandler.removeCallbacks(countdownRunnable);
-
-            // Ẩn overlay phân tích
-            if (analysisOverlay != null && isAdded()) {
-                analysisOverlay.setVisibility(View.GONE);
-            }
-
-            // Check if fragment is still valid
-            if (!isAdded()) {
-                Log.w(TAG, "Fragment not attached during analysis completion");
-                return;
-            }
-
-            // Check if we collected enough data
-            if (frameScores.isEmpty()) {
-                stateManager.transitionTo(FaceRegistrationState.FAILED_OTHER,
-                        "Không thể lấy được dữ liệu ổn định. Vui lòng thử lại.");
-                return;
-            }
-
-            // Reduce the minimum required frames after liveness to avoid false negatives
-            int minRequiredFrames = livenessVerified ? 6 : 10;
-            if (frameScores.size() < minRequiredFrames) {
-                stateManager.transitionTo(FaceRegistrationState.FAILED_OTHER,
-                        "Không đủ dữ liệu chất lượng. Cần cải thiện ánh sáng và giữ vị trí ổn định.");
-                return;
-            }
-
-            // Calculate statistics
-            float sum = 0;
-            float min = Float.MAX_VALUE;
-            float max = Float.MIN_VALUE;
-
-            for (float score : frameScores) {
-                sum += score;
-                min = Math.min(min, score);
-                max = Math.max(max, score);
-            }
-
-            float averageScore = sum / frameScores.size();
-            float variance = calculateVariance(frameScores, averageScore);
-
-            Log.d(TAG, "Analysis complete: " + frameScores.size() + " frames analyzed");
-            Log.d(TAG, "Scores - Avg: " + averageScore + ", Min: " + min + ", Max: " + max + ", Variance: " + variance);
-
-            // Quality assessment
-            boolean isConsistent = variance < 0.03; // Low variance indicates consistent detection
-            boolean isHighQuality = averageScore >= MIN_AVERAGE_SCORE_FOR_REGISTRATION;
-            boolean isAcceptableQuality = averageScore >= (MIN_AVERAGE_SCORE_FOR_REGISTRATION - 0.1f);
-
-            // Log detailed quality information
-            String qualityLog = String.format(Locale.US,
-                    "Face Analysis Results - Frames: %d, Average Score: %.3f, Min: %.3f, Max: %.3f, Variance: %.5f, " +
-                            "isConsistent: %b, isHighQuality: %b, isAcceptableQuality: %b",
-                    frameScores.size(), averageScore, min, max, variance,
-                    isConsistent, isHighQuality, isAcceptableQuality);
-            Log.d(TAG, qualityLog);
-
-            // Different paths based on quality assessment
-            if (isHighQuality && isConsistent) {
-                // High quality and consistent - proceed with registration
-                stateManager.transitionTo(FaceRegistrationState.PROCESSING,
-                        "Kiểm tra chất lượng đạt. Đang đăng ký...");
-                captureAndRegisterFace();
-            } else if (isAcceptableQuality) {
-                // Acceptable but not ideal - warn user but proceed
-                stateManager.transitionTo(FaceRegistrationState.PROCESSING,
-                        "Chất lượng chấp nhận được. Đang tiến hành đăng ký...");
-                captureAndRegisterFace();
-            } else {
-                // Low quality - provide specific feedback based on issues
-                String feedbackMessage = generateQualityFeedback(averageScore, variance);
-                lastDetailedErrorMessage = qualityLog + "\n\nDetailed Analysis: " + feedbackMessage;
-                hasDetailedError = true;
-                Log.e(TAG, "❌ Analysis failed: " + lastDetailedErrorMessage);
-                stateManager.transitionTo(FaceRegistrationState.FAILED_OTHER, feedbackMessage);
-            }
-        }, ANALYSIS_DURATION_MS);
+        // Ủy quyền cho controller quản lý UI + countdown + chất lượng
+        RectF oval = faceOverlayView != null ? new RectF(faceOverlayView.getOvalRect()) : null;
+        analysisController.startAnalysis(faceIdService, oval, livenessVerified);
     }
 
-    /**
-     * Thiết lập UI cho phân tích
-     */
-    private void setupAnalysisUI() {
-        if (binding == null || !isAdded()) return;
-
-        // Kiểm tra nếu đã tạo UI trước đó
-        if (analysisOverlay != null) {
-            // Đảm bảo hiển thị UI chính xác
-            analysisOverlay.setVisibility(View.VISIBLE);
-            return;
-        }
-
-        // Tạo overlay cho phân tích
-        analysisOverlay = LayoutInflater.from(requireContext())
-                .inflate(R.layout.overlay_face_analysis, binding.flStudentSettingRegisterFaceIdCameraContainer, false);
-
-        // Thêm vào container
-        binding.flStudentSettingRegisterFaceIdCameraContainer.addView(analysisOverlay);
-
-        // Lấy reference đến các thành phần UI
-        analysisProgressBar = analysisOverlay.findViewById(R.id.progressBarAnalysis);
-        analysisCountdownText = analysisOverlay.findViewById(R.id.tvAnalysisCountdown);
-
-        // Đảm bảo progressBar ở trạng thái mặc định ban đầu
-        if (analysisProgressBar != null) {
-            analysisProgressBar.setProgress(0);
-        }
-
-        // Đặt text ban đầu cho countdown
-        if (analysisCountdownText != null) {
-            analysisCountdownText.setText("Analyzing...");
-        }
-
-        // Hiển thị UI
-        analysisOverlay.setVisibility(View.VISIBLE);
-
-        Log.d(TAG, "Analysis UI initialized and shown");
-    }
-
-    /**
-     * Calculate variance of collected scores to assess consistency
-     */
-    private float calculateVariance(java.util.List<Float> scores, float mean) {
-        float sumSquaredDiff = 0;
-        for (float score : scores) {
-            float diff = score - mean;
-            sumSquaredDiff += diff * diff;
-        }
-        return sumSquaredDiff / scores.size();
-    }
-
-    /**
-     * Generate specific feedback based on detected quality issues
-     */
-    private String generateQualityFeedback(float averageScore, float variance) {
-        StringBuilder feedback = new StringBuilder();
-
-        if (variance > 0.05) {
-            feedback.append("Phát hiện khuôn mặt không ổn định. Vui lòng giữ khuôn mặt ổn định hơn và thử lại.");
-            feedback.append("\n\nLỗi chi tiết: Chỉ số biến thiên (variance) = ").append(String.format(Locale.US, "%.5f", variance));
-            feedback.append(" (vượt quá ngưỡng 0.05)");
-        } else if (averageScore < 0.4f) {
-            feedback.append("Chất lượng phát hiện rất thấp. Vui lòng thử lại trong điều kiện ánh sáng tốt hơn.");
-            feedback.append("\n\nLỗi chi tiết: Điểm trung bình = ").append(String.format(Locale.US, "%.3f", averageScore));
-            feedback.append(" (thấp hơn ngưỡng tối thiểu 0.4)");
-        } else if (averageScore < 0.6f) {
-            feedback.append("Chất lượng phát hiện thấp. Cải thiện ánh sáng và giảm chuyển động khuôn mặt.");
-            feedback.append("\n\nLỗi chi tiết: Điểm trung bình = ").append(String.format(Locale.US, "%.3f", averageScore));
-            feedback.append(" (thấp hơn ngưỡng khuyến nghị 0.6)");
-        } else {
-            feedback.append("Không thể có được hình ảnh đủ rõ ràng. Vui lòng thử lại với ánh sáng và vị trí tốt hơn.");
-            feedback.append("\n\nLỗi chi tiết: Kết hợp giữa điểm phát hiện và độ ổn định không đáp ứng yêu cầu");
-        }
-
-        return feedback.toString();
-    }
+    // Analysis UI/logic fully delegated to FaceAnalysisController
 }
 
 

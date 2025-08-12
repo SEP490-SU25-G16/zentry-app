@@ -17,6 +17,9 @@ import vn.edu.fpt.zentryapp.faceid.data.service.FaceIdConfig;
 import vn.edu.fpt.zentryapp.faceid.ui.common.BaseFaceIdFragment;
 import vn.edu.fpt.zentryapp.faceid.ui.common.FaceIdProcessingCallback;
 import vn.edu.fpt.zentryapp.faceid.ui.common.FaceIdProcessor;
+import vn.edu.fpt.zentryapp.faceid.ui.setting.action.FaceUpdateAction;
+import vn.edu.fpt.zentryapp.faceid.ui.setting.controller.FaceIdRegistrationOrchestrator;
+import android.graphics.RectF;
 
 /**
  * Fragment for updating Face ID
@@ -28,6 +31,7 @@ public class StudentSettingUpdateFaceIdFragment extends BaseFaceIdFragment {
     private FragmentStudentSettingUpdateFaceIdBinding binding;
     private FaceIdProcessor faceIdProcessor;
     private boolean isProcessing = false;
+    private FaceIdRegistrationOrchestrator orchestrator;
     
     @Nullable
     @Override
@@ -68,6 +72,12 @@ public class StudentSettingUpdateFaceIdFragment extends BaseFaceIdFragment {
         if (binding == null) return;
         binding.tvStatus.setText(message);
     }
+
+    @Override
+    protected void showErrorDialog(String title, String message) {
+        if (!isAdded()) return;
+        vn.edu.fpt.zentryapp.faceid.ui.setting.util.ErrorPresenter.showError(requireContext(), title, message);
+    }
     
     @Override
     protected void setActionButtonEnabled(boolean enabled) {
@@ -83,6 +93,12 @@ public class StudentSettingUpdateFaceIdFragment extends BaseFaceIdFragment {
     @Override
     protected void onFaceIdServiceInitialized() {
         faceIdProcessor = new FaceIdProcessor(faceIdService);
+        // Wire orchestrator (safe: only analysis routing if later added)
+        orchestrator = new FaceIdRegistrationOrchestrator(null)
+                .withService(() -> faceIdService)
+                .withOval(() -> faceOverlayView != null ? new RectF(faceOverlayView.getOvalRect()) : null);
+        setFrameRouter((bitmap, faceRect, isValidPosition, isSpoof, statusMessage) ->
+                orchestrator.routeProcessedFrame(bitmap, faceRect, isValidPosition, isSpoof, statusMessage));
     }
     
     /**
@@ -121,37 +137,30 @@ public class StudentSettingUpdateFaceIdFragment extends BaseFaceIdFragment {
         String updateTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
                 .format(new Date());
         
-        // Update face ID with enhanced security validation using oval boundary
-        faceIdProcessor.registerFace(
+        // Update face ID via action wrapper (SRP)
+        new FaceUpdateAction().execute(
+                faceIdProcessor,
                 currentFrameBitmap,
                 currentFaceRect,
                 faceOverlayView != null ? faceOverlayView.getOvalRect() : null,
                 userId,
-                new FaceIdProcessingCallback() {
+                new FaceUpdateAction.Callback() {
                     @Override
                     public void onSuccess(String message, Object metadata) {
                         if (!isAdded()) return;
-                        
                         isProcessing = false;
                         showLoading(false, "Update successful");
-                        
                         showSuccessDialog("Face ID Updated",
                                 "Your Face ID was successfully updated on " + updateTime,
                                 "OK",
-                                () -> {
-                                    if (isAdded()) {
-                                        requireActivity().onBackPressed();
-                                    }
-                                });
+                                () -> { if (isAdded()) requireActivity().onBackPressed(); });
                     }
-                    
+
                     @Override
                     public void onFailure(String errorMessage) {
                         if (!isAdded()) return;
-                        
                         isProcessing = false;
                         showLoading(false, "Update failed");
-                        
                         if (errorMessage.contains("spoof") || errorMessage.contains("Spoof")) {
                             showErrorDialog("Security Alert",
                                     "Spoof detection triggered. Please ensure you're using a real face.");
@@ -161,11 +170,10 @@ public class StudentSettingUpdateFaceIdFragment extends BaseFaceIdFragment {
                         } else {
                             showErrorDialog("Update Failed", errorMessage);
                         }
-                        
-                        // Restart camera
                         startCamera();
                     }
-                });
+                }
+        );
     }
     
     @Override
