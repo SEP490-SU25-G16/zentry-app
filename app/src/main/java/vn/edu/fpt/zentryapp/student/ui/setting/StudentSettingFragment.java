@@ -17,6 +17,12 @@ import android.view.ViewGroup;
 
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
+import vn.edu.fpt.zentryapp.auth.client.ApiClient;
+import vn.edu.fpt.zentryapp.student.data.api.UserApiService;
+import vn.edu.fpt.zentryapp.student.data.model.response.UserProfileDto;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentSettingBinding;
 
 public class StudentSettingFragment extends Fragment {
@@ -51,6 +57,9 @@ public class StudentSettingFragment extends Fragment {
         // Khởi tạo trạng thái đăng ký thiết bị và Face ID từ lưu trữ hoặc API
         hasDevice = checkIfDeviceRegistered();
         hasFaceId = checkIfFaceIdRegistered();
+
+        // Fetch latest HasFaceId from API and update cache
+        refreshUserProfileHasFaceId();
 
         // Xử lý click Device: điều hướng dựa trên trạng thái đăng ký thiết bị
         binding.llStudentSettingRowDevice.setOnClickListener(v -> {
@@ -135,6 +144,35 @@ public class StudentSettingFragment extends Fragment {
     private boolean checkIfFaceIdRegistered() {
         return getContext().getSharedPreferences("prefs", 0)
                 .getBoolean("faceid_registered", false);
+    }
+
+    private void refreshUserProfileHasFaceId() {
+        try {
+            String userId = AuthManager.getInstance(requireContext()).getCurrentUserId();
+            if (userId == null || userId.isEmpty()) return;
+
+            UserApiService api = ApiClient.getClient(requireContext()).create(UserApiService.class);
+            api.getUser(userId).enqueue(new Callback<UserProfileDto>() {
+                @Override
+                public void onResponse(@NonNull Call<UserProfileDto> call, @NonNull Response<UserProfileDto> response) {
+                    if (!isAdded()) return;
+                    if (response.isSuccessful() && response.body() != null) {
+                        boolean latestHasFaceId = response.body().isHasFaceId();
+                        hasFaceId = latestHasFaceId;
+                        // cache
+                        requireContext().getSharedPreferences("prefs", 0)
+                                .edit()
+                                .putBoolean("faceid_registered", latestHasFaceId)
+                                .apply();
+                    }
+                }
+
+                @Override
+                public void onFailure(@NonNull Call<UserProfileDto> call, @NonNull Throwable t) {
+                    // ignore; fallback to cached value
+                }
+            });
+        } catch (Exception ignored) {}
     }
 
     @Override

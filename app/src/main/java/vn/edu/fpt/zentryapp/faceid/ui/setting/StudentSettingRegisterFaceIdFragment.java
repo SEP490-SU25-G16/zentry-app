@@ -89,11 +89,10 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
     private Bitmap currentFrameBitmap;
     private Rect currentFaceRect;
 
-    // 5-Second Analysis
+    // 5-Second Analysis (thresholds now handled in FaceAnalysisController)
     private final java.util.List<Float> frameScores = new java.util.ArrayList<>();
     private boolean isAnalyzing = false;
     private static final int ANALYSIS_DURATION_MS = 5000;
-    private static final float MIN_AVERAGE_SCORE_FOR_REGISTRATION = 0.75f;
     // After liveness is verified, we trust the face is live and should not filter out frames as spoof
     private boolean livenessVerified = false;
 
@@ -1050,6 +1049,12 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
             // 🚀 Launch Success Activity via SuccessNavigator
             vn.edu.fpt.zentryapp.faceid.ui.setting.util.SuccessNavigator
                     .navigateToSuccess(requireContext(), userId, successMessage, bitmapPath);
+
+            // Mark local cache that Face ID is registered
+            requireContext().getSharedPreferences("prefs", 0)
+                    .edit()
+                    .putBoolean("faceid_registered", true)
+                    .apply();
 
             Log.d(TAG, "🎉 Navigating to Success Activity");
 

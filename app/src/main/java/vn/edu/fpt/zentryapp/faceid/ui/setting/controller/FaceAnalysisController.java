@@ -30,7 +30,7 @@ public class FaceAnalysisController {
     private static final String TAG = "FaceAnalysisController";
     
     private static final int ANALYSIS_DURATION_MS = 5000;
-    private static final float MIN_AVERAGE_SCORE_FOR_REGISTRATION = 0.75f;
+    private static final float MIN_AVERAGE_SCORE_FOR_REGISTRATION = 0.65f; // was 0.75f
     
     private final ViewGroup cameraContainer;
     private final FaceRegistrationStateManager stateManager;
@@ -43,6 +43,7 @@ public class FaceAnalysisController {
     private View analysisOverlay;
     private final List<Float> frameScores = new ArrayList<>();
     private boolean isAnalyzing = false;
+    private boolean livenessVerifiedDuringAnalysis = false;
     
     public interface FaceAnalysisCallback {
         void onAnalysisComplete(boolean isHighQuality, String feedback);
@@ -68,6 +69,7 @@ public class FaceAnalysisController {
         }
 
         isAnalyzing = true;
+        livenessVerifiedDuringAnalysis = livenessVerified;
         frameScores.clear();
 
         // Initialize and show analysis UI
@@ -149,7 +151,7 @@ public class FaceAnalysisController {
             }
 
             // Reduce the minimum required frames after liveness to avoid false negatives
-            int minRequiredFrames = livenessVerified ? 6 : 10;
+            int minRequiredFrames = livenessVerified ? 4 : 8;
             if (frameScores.size() < minRequiredFrames) {
                 stateManager.transitionTo(FaceRegistrationState.FAILED_OTHER,
                         "Not enough quality data. Improve lighting and keep position stable.");
@@ -175,9 +177,9 @@ public class FaceAnalysisController {
             Log.d(TAG, "Scores - Avg: " + averageScore + ", Min: " + min + ", Max: " + max + ", Variance: " + variance);
 
             // Quality assessment
-            boolean isConsistent = variance < 0.03; // Low variance indicates consistent detection
+            boolean isConsistent = variance < 0.05f; // was 0.03 - allow slightly more movement
             boolean isHighQuality = averageScore >= MIN_AVERAGE_SCORE_FOR_REGISTRATION;
-            boolean isAcceptableQuality = averageScore >= (MIN_AVERAGE_SCORE_FOR_REGISTRATION - 0.1f);
+            boolean isAcceptableQuality = averageScore >= (MIN_AVERAGE_SCORE_FOR_REGISTRATION - 0.15f);
 
             // Log detailed quality information
             String qualityLog = String.format(Locale.US,
@@ -216,9 +218,9 @@ public class FaceAnalysisController {
         faceIdService.processContinuousFrame(bitmap, ovalRect, new FaceIdService.ContinuousProcessingCallback() {
             @Override
             public void onFaceDetected(Rect boundingBox, boolean isSpoof, float spoofScore) {
-                // During analysis, we collect frame scores for all frames
-                // that are not flagged as spoof (or regardless of spoof if liveness verified)
-                if (!isSpoof) {
+                // During analysis, if liveness was verified, accept frames even if flagged as spoof
+                // to avoid penalizing real users after liveness.
+                if (!isSpoof || livenessVerifiedDuringAnalysis) {
                     frameScores.add(spoofScore);
                 }
             }

@@ -17,8 +17,8 @@ public class SpoofDetectionManager {
     // Counters
     private int realStreak = 0;
     private int suspicionScore = 0;
-    private static final int SUSPICION_THRESHOLD = 10;
-    private static final int LIVENESS_CHALLENGE_SUSPICION_THRESHOLD = 5;
+    private static final int SUSPICION_THRESHOLD = 14; // was 10 - reduce false positives
+    private static final int LIVENESS_CHALLENGE_SUSPICION_THRESHOLD = 6; // was 5
 
     // Liveness Challenge
     private boolean livenessChallengeActive = false;
@@ -27,7 +27,7 @@ public class SpoofDetectionManager {
     private boolean blinkDetectedInChallenge = false;
 
     // Frame history for temporal analysis
-    private static final int FRAME_HISTORY_SIZE = 15; // Increased for more robust analysis
+    private static final int FRAME_HISTORY_SIZE = 20; // give more temporal context
     private final java.util.Queue<FrameData> frameHistory = new java.util.LinkedList<>();
 
     private android.graphics.RectF ovalBoundary;
@@ -147,7 +147,7 @@ public class SpoofDetectionManager {
     private void updateSuspicionScore(boolean rawIsSpoof, float rawConfidence) {
         if (rawIsSpoof) {
             suspicionScore += 2;
-        } else if (rawConfidence < config.lowConfidenceThreshold) {
+        } else if (rawConfidence < (config.lowConfidenceThreshold - 0.05f)) { // be less sensitive
             suspicionScore++;
         } else {
             suspicionScore = Math.max(0, suspicionScore - 1); // Decrease suspicion for real faces
@@ -164,7 +164,7 @@ public class SpoofDetectionManager {
         }
         // Simplified check for abnormal patterns
         float confidenceVariance = calculateConfidenceVariance();
-        return confidenceVariance < 0.001f || confidenceVariance > 0.1f;
+        return confidenceVariance < 0.0005f || confidenceVariance > 0.15f; // widen bounds
     }
 
     private float calculateConfidenceVariance() {
