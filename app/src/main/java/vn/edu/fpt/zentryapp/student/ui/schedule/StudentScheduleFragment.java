@@ -103,8 +103,7 @@ public class StudentScheduleFragment extends Fragment implements StudentSchedule
     private void setupClickListeners() {
         // Calendar click
         binding.tvStudentScheduleCalendar.setOnClickListener(v -> {
-            Toast.makeText(requireContext(), "Calendar clicked", Toast.LENGTH_SHORT).show();
-            // TODO: Navigate to calendar
+            navController.navigate(R.id.action_studentSchedule_to_calendar);
         });
 
         // Notification click

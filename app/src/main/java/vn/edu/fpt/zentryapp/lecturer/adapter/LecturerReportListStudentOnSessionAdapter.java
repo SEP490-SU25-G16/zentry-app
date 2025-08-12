@@ -35,7 +35,6 @@ public class LecturerReportListStudentOnSessionAdapter
         this.listener = l;
     }
 
-    /* Cho fragment gọi để enable/disable nút chỉnh sửa */
     public void setCanEditAttendance(boolean canEdit) {   // <── KHÔNG BỊ LỖI NỮA
         this.canEditAttendance = canEdit;
         notifyDataSetChanged();
@@ -75,7 +74,7 @@ public class LecturerReportListStudentOnSessionAdapter
 
         void bind(Student s) {
             binding.tvStudentName.setText(s.getDisplayName());
-            binding.tvStudentId.setText("ID: " + s.getStudentCode());
+            binding.tvStudentId.setText("ID: " + s.getStudentId().substring(0, 6));
 
             binding.tvStudentStatus.setText(s.getAttendanceStatus());
             binding.tvStudentStatus.setTextColor(s.getAttendanceStatusColor());

@@ -1,27 +1,28 @@
 package vn.edu.fpt.zentryapp.lecturer.data.model.response;
 
 import com.google.gson.annotations.SerializedName;
-
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Getter
+@NoArgsConstructor
 @AllArgsConstructor
 public class FinalAttendance {
     @SerializedName("StudentId")
     private String studentId;
 
-    @SerializedName("StudentFullName")
-    private String studentFullName;
+    @SerializedName("StudentCode")
+    private String studentCode;
+
+    @SerializedName("FullName")
+    private String fullName;
 
     @SerializedName("Email")
     private String email;
 
-    @SerializedName("PhoneNumber")
-    private String phoneNumber;
-
-    @SerializedName("Status")
-    private String status;
+    @SerializedName("AttendanceStatus")
+    private String attendanceStatus;
 
     @SerializedName("EnrollmentId")
     private String enrollmentId;
@@ -50,10 +51,12 @@ public class FinalAttendance {
     @SerializedName("SessionStartTime")
     private String sessionStartTime;
 
-    @SerializedName("LastAttendanceRecordId")
-    private String lastAttendanceRecordId;
+    // Helper methods để backward compatibility với code cũ
+    public String getStudentFullName() {
+        return fullName;
+    }
 
-    @SerializedName("LastAttendanceTime")
-    private String lastAttendanceTime;
-
+    public String getStatus() {
+        return attendanceStatus;
+    }
 }

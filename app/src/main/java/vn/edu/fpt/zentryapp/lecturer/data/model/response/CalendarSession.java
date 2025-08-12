@@ -26,14 +26,17 @@ public class CalendarSession {
     private String status;
     private String sessionType;
 
-    // Helper methods
     public String getStartTimeDisplay() {
-        SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
-        return timeFormat.format(startTime);
+        if (startTime != null) {
+            SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+            return timeFormat.format(startTime);
+        }
+        return "";
     }
 
     public String getSessionDescription() {
-        return courseName + ": " + className + " - " + room;
+        return courseName + " - " + sectionCode + " - " + room;
+
     }
 
     public int getTypeColor() {

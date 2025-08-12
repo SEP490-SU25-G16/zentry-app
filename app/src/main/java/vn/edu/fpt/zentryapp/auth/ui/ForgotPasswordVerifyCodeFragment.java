@@ -1,6 +1,8 @@
 package vn.edu.fpt.zentryapp.auth.ui;
 
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -70,6 +72,29 @@ public class ForgotPasswordVerifyCodeFragment extends Fragment {
 
     private void setupUI() {
        binding.tvVerifyCodeMessage.setText("Code sent to " + userEmail);
+        // Thêm TextWatcher thay vì dựa vào button click
+        binding.pvVerifyCodeInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                android.util.Log.d("PINVIEW_INPUT", "Text changed: '" + s + "', Length: " + (s != null ? s.length() : 0));
+
+                if (s != null && s.length() == 6) {
+                    String code = s.toString().trim();
+                    android.util.Log.d("PINVIEW_INPUT", "Auto-verifying code: " + code);
+                    Toast.makeText(requireContext(), "Verifying: " + code, Toast.LENGTH_SHORT).show();
+                    viewModel.verifyCode(code);
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+
+            }
+
+        });
     }
 
     private void setupClickListeners() {
@@ -78,10 +103,35 @@ public class ForgotPasswordVerifyCodeFragment extends Fragment {
 
         // Verify button
         binding.btnVerifyCodeVerify.setOnClickListener(v -> {
-            String code = binding.pvVerifyCodeInput.getText() != null
-                    ? binding.pvVerifyCodeInput.getText().toString().trim()
-                    : "";
+            android.util.Log.d("VerifyButton", "=== BUTTON CLICKED ===");
 
+            String code = "";
+
+            // Debug: Check if PinView exists
+            if (binding.pvVerifyCodeInput != null) {
+                android.util.Log.d("VerifyButton", "PinView is not null");
+
+                if (binding.pvVerifyCodeInput.getText() != null) {
+                    code = binding.pvVerifyCodeInput.getText().toString().trim();
+                    android.util.Log.d("VerifyButton", "Code retrieved: '" + code + "'");
+                } else {
+                    android.util.Log.e("VerifyButton", "PinView getText() returns null");
+                    Toast.makeText(requireContext(), "PinView getText() returns null", Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                android.util.Log.e("VerifyButton", "PinView is null!");
+                Toast.makeText(requireContext(), "PinView is null", Toast.LENGTH_SHORT).show();
+            }
+
+            android.util.Log.d("VerifyButton", "Final code: '" + code + "', Length: " + code.length());
+
+            if (code.isEmpty()) {
+                android.util.Log.w("VerifyButton", "Code is empty, showing toast");
+                Toast.makeText(requireContext(), "Please enter verification code", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            android.util.Log.d("VerifyButton", "Calling viewModel.verifyCode()");
             viewModel.verifyCode(code);
         });
 
