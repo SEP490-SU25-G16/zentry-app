@@ -297,12 +297,35 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
     }
     
     private void scheduleFaceIdVerification(int totalSeconds) {
-        // Implement the logic to schedule face ID verification with the provided time
-        String message = String.format("Face ID verification scheduled for %d minutes and %d seconds", 
-                totalSeconds / 60, totalSeconds % 60);
-        Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show();
-        
-        // Here you would typically call your ViewModel to save this configuration
-        // viewModel.scheduleFaceIdVerification(totalSeconds);
+        int minutes = (totalSeconds + 59) / 60; // round up to minutes
+        if (minutes <= 0) minutes = 1;
+        String title = "Yêu cầu xác thực Face ID";
+        String body = "Vui lòng xác thực khuôn mặt để tiếp tục.";
+
+        Toast.makeText(requireContext(), "Đang gửi yêu cầu Face ID...", Toast.LENGTH_SHORT).show();
+        viewModel.createFaceIdRequest(minutes, title, body);
+        // Attach observers if not yet (idempotent safety)
+        attachFaceIdObservers();
+    }
+
+    private boolean faceIdObserversAttached = false;
+    private void attachFaceIdObservers() {
+        if (faceIdObserversAttached) return;
+        faceIdObserversAttached = true;
+        viewModel.faceIdRequestSuccess().observe(getViewLifecycleOwner(), msg -> {
+            if (msg != null) {
+                Toast.makeText(requireContext(), msg, Toast.LENGTH_LONG).show();
+            }
+        });
+        viewModel.faceIdRequestError().observe(getViewLifecycleOwner(), err -> {
+            if (err != null) {
+                Toast.makeText(requireContext(), "Face ID request error: " + err, Toast.LENGTH_LONG).show();
+            }
+        });
+        viewModel.isCreatingFaceIdRequest().observe(getViewLifecycleOwner(), loading -> {
+            if (loading != null) {
+                binding.btnScheduleClassDetailRequestFaceId.setEnabled(!loading);
+            }
+        });
     }
 }
