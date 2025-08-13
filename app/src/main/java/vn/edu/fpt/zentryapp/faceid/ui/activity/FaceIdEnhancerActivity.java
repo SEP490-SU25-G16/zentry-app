@@ -119,6 +119,7 @@ public class FaceIdEnhancerActivity extends AppCompatActivity implements
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .setTargetRotation(rotation)
                         .setTargetResolution(new android.util.Size(640, 480))
+                        .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                         .build();
                 
                 imageAnalysis.setAnalyzer(cameraExecutor, this::analyzeFace);
@@ -180,9 +181,70 @@ public class FaceIdEnhancerActivity extends AppCompatActivity implements
     private Bitmap imageToBitmap(ImageProxy image) {
         try {
             Bitmap bmp = vn.edu.fpt.zentryapp.faceid.util.YuvToRgbConverter.convert(image, image.getImageInfo().getRotationDegrees());
-            return bmp;
+            if (bmp != null) return bmp;
+            // Fallback for OUTPUT_IMAGE_FORMAT_RGBA_8888 path
+            return rgbaImageProxyToBitmap(image);
         } catch (Exception e) {
             Log.e(TAG, "Error converting image to bitmap", e);
+            return null;
+        }
+    }
+
+    private Bitmap rgbaImageProxyToBitmap(ImageProxy image) {
+        try {
+            if (image.getPlanes().length == 0) return null;
+            java.nio.ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+            int pixelStride = image.getPlanes()[0].getPixelStride();
+            int rowStride = image.getPlanes()[0].getRowStride();
+            int width = image.getWidth();
+            int height = image.getHeight();
+            if (pixelStride == 4) {
+                Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                buffer.rewind();
+                bitmap.copyPixelsFromBuffer(buffer);
+                int rotation = image.getImageInfo().getRotationDegrees();
+                if (rotation != 0) {
+                    android.graphics.Matrix m = new android.graphics.Matrix();
+                    m.postRotate(rotation);
+                    Bitmap rotated = Bitmap.createBitmap(bitmap, 0, 0, width, height, m, true);
+                    if (rotated != bitmap) bitmap.recycle();
+                    return rotated;
+                }
+                return bitmap;
+            }
+            // Manual copy fallback
+            int bufferSize = buffer.remaining();
+            byte[] data = new byte[bufferSize];
+            buffer.get(data);
+            int[] pixels = new int[width * height];
+            int offset = 0;
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    int idx = y * rowStride + x * pixelStride;
+                    if (idx + 3 < data.length) {
+                        int r = data[idx] & 0xff;
+                        int g = data[idx + 1] & 0xff;
+                        int b = data[idx + 2] & 0xff;
+                        int a = data[idx + 3] & 0xff;
+                        pixels[offset++] = (a << 24) | (r << 16) | (g << 8) | b;
+                    } else {
+                        pixels[offset++] = 0;
+                    }
+                }
+            }
+            Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            bitmap.setPixels(pixels, 0, width, 0, 0, width, height);
+            int rotation = image.getImageInfo().getRotationDegrees();
+            if (rotation != 0) {
+                android.graphics.Matrix m = new android.graphics.Matrix();
+                m.postRotate(rotation);
+                Bitmap rotated = Bitmap.createBitmap(bitmap, 0, 0, width, height, m, true);
+                if (rotated != bitmap) bitmap.recycle();
+                return rotated;
+            }
+            return bitmap;
+        } catch (Exception e) {
+            Log.e(TAG, "rgbaImageProxyToBitmap failed", e);
             return null;
         }
     }
