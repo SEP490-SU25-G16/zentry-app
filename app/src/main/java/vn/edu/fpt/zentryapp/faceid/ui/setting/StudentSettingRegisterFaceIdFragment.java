@@ -45,7 +45,7 @@ import vn.edu.fpt.zentryapp.faceid.ui.setting.detection.SpoofDetectionManager;
 import vn.edu.fpt.zentryapp.faceid.ui.setting.state.FaceRegistrationState;
 import vn.edu.fpt.zentryapp.faceid.ui.setting.state.FaceRegistrationStateManager;
 import vn.edu.fpt.zentryapp.faceid.ui.setting.success.FaceIdSuccessActivity;
-import vn.edu.fpt.zentryapp.faceid.ui.setting.ui.FaceRegistrationUIController;
+import vn.edu.fpt.zentryapp.faceid.ui.setting.controller.FaceRegistrationUIController;
 
 
 public class StudentSettingRegisterFaceIdFragment extends Fragment
@@ -1023,7 +1023,8 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
 
             // 🚀 Launch Success Activity
             Intent successIntent = FaceIdSuccessActivity.createIntent(
-                    requireContext(), userId, successMessage, bitmapPath);
+                    requireContext(), userId, successMessage, bitmapPath,
+                    vn.edu.fpt.zentryapp.faceid.adapter.workers.FaceEmbeddingSyncWorker.ACTION_REGISTER);
             startActivityForResult(successIntent, SUCCESS_ACTIVITY_REQUEST_CODE);
 
             Log.d(TAG, "🎉 Navigating to Success Activity");

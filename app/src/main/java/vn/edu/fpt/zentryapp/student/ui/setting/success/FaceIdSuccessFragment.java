@@ -32,7 +32,7 @@ public class FaceIdSuccessFragment extends Fragment {
 			ivBack.setOnClickListener(v -> navController.popBackStack());
 		}
 		if (btnUpdateFaceId != null) {
-			btnUpdateFaceId.setOnClickListener(v -> navController.navigate(R.id.action_studentSetting_to_updateFaceId));
+			btnUpdateFaceId.setOnClickListener(v -> navController.navigate(R.id.action_faceIdSuccess_to_updateFaceId));
 		}
 	}
 }

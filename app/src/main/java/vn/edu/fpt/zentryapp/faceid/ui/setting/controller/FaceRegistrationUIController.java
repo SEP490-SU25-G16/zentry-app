@@ -1,4 +1,4 @@
-package vn.edu.fpt.zentryapp.faceid.ui.setting.ui;
+package vn.edu.fpt.zentryapp.faceid.ui.setting.controller;
 
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
@@ -17,7 +17,6 @@ import vn.edu.fpt.zentryapp.faceid.ui.setting.state.FaceRegistrationState;
  * Tách riêng UI logic khỏi business logic
  */
 public class FaceRegistrationUIController {
-    private static final String TAG = "FaceRegUIController";
 
     private final FragmentStudentSettingRegisterFaceIdBinding binding;
     private final OvalFaceOverlayView faceOverlayView;

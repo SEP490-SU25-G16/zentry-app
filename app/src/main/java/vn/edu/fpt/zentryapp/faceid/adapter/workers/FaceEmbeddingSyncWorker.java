@@ -26,6 +26,9 @@ public class FaceEmbeddingSyncWorker extends Worker {
     
     public static final String KEY_USER_ID = "user_id";
     public static final String KEY_BITMAP_PATH = "bitmap_path";
+    public static final String KEY_ACTION = "action"; // "register" | "update"
+    public static final String ACTION_REGISTER = "register";
+    public static final String ACTION_UPDATE = "update";
     
     public FaceEmbeddingSyncWorker(@NonNull Context context, @NonNull WorkerParameters workerParams) {
         super(context, workerParams);
@@ -38,6 +41,7 @@ public class FaceEmbeddingSyncWorker extends Worker {
         
         String userId = getInputData().getString(KEY_USER_ID);
         String bitmapPath = getInputData().getString(KEY_BITMAP_PATH);
+        String action = getInputData().getString(KEY_ACTION);
         
         if (userId == null || bitmapPath == null) {
             Log.e(TAG, "Missing required input data");
@@ -60,7 +64,7 @@ public class FaceEmbeddingSyncWorker extends Worker {
             }
             
             // Sync embedding with server
-            boolean syncResult = syncEmbeddingWithServer(faceIdService, bitmap, userId);
+            boolean syncResult = syncEmbeddingWithServer(faceIdService, bitmap, userId, action);
             
             // Cleanup bitmap file
             cleanupBitmapFile(bitmapPath);
@@ -128,25 +132,44 @@ public class FaceEmbeddingSyncWorker extends Worker {
         return null;
     }
     
-    private boolean syncEmbeddingWithServer(FaceIdService faceIdService, Bitmap bitmap, String userId) {
+    private boolean syncEmbeddingWithServer(FaceIdService faceIdService, Bitmap bitmap, String userId, String action) {
         final AtomicBoolean syncSuccess = new AtomicBoolean(false);
         final CountDownLatch latch = new CountDownLatch(1);
         
-        // Call registerFaceId which sends embedding to server
-        faceIdService.registerFaceId(bitmap, userId, new FaceIdService.FaceIdCallback() {
-            @Override
-            public void onSuccess(String message) {
-                Log.d(TAG, "Face embedding sync successful: " + message);
-                syncSuccess.set(true);
-                latch.countDown();
-            }
-            
-            @Override
-            public void onFailure(String errorMessage) {
-                Log.e(TAG, "Face embedding sync failed: " + errorMessage);
-                latch.countDown();
-            }
-        });
+        // Branch by action: after register -> verify; after update -> update
+        boolean isUpdate = ACTION_UPDATE.equalsIgnoreCase(action);
+        if (isUpdate) {
+            faceIdService.updateFaceId(bitmap, userId, new FaceIdService.FaceIdCallback() {
+                @Override
+                public void onSuccess(String message) {
+                    Log.d(TAG, "Face embedding sync successful: " + message);
+                    syncSuccess.set(true);
+                    latch.countDown();
+                }
+                
+                @Override
+                public void onFailure(String errorMessage) {
+                    Log.e(TAG, "Face embedding sync failed: " + errorMessage);
+                    latch.countDown();
+                }
+            });
+        } else {
+            // Default to verify to avoid duplicate register calls
+            faceIdService.verifyFaceId(bitmap, userId, new FaceIdService.FaceIdCallback() {
+                @Override
+                public void onSuccess(String message) {
+                    Log.d(TAG, "Face embedding verify successful: " + message);
+                    syncSuccess.set(true);
+                    latch.countDown();
+                }
+                
+                @Override
+                public void onFailure(String errorMessage) {
+                    Log.e(TAG, "Face embedding verify failed: " + errorMessage);
+                    latch.countDown();
+                }
+            });
+        }
         
         try {
             // Wait up to 30 seconds for sync completion

@@ -645,6 +645,48 @@ public class FaceIdService {
             }
         });
     }
+
+    /**
+     * Capture and update face embedding with spoof/oval validations (Update flow)
+     */
+    public void captureAndUpdateFace(Bitmap bitmap, Rect boundingBox, android.graphics.RectF ovalRect,
+                                     String userId, FaceIdCallback callback) {
+        executor.execute(() -> {
+            try {
+                // Validate oval if provided
+                if (ovalRect != null) {
+                    boolean isWithinOval = checkFaceWithinOval(boundingBox, ovalRect);
+                    if (!isWithinOval) {
+                        runOnMainThread(() -> callback.onFailure("Please position your face within the oval guide"));
+                        return;
+                    }
+                }
+
+                // Crop face bitmap
+                Bitmap faceBitmap = Bitmap.createBitmap(
+                        bitmap,
+                        boundingBox.left,
+                        boundingBox.top,
+                        boundingBox.width(),
+                        boundingBox.height()
+                );
+
+                // Final spoof check before update
+                faceSpoofDetector.detectSpoofAsync(bitmap, boundingBox, ovalRect, spoofResult -> {
+                    if (spoofResult.isSpoof()) {
+                        runOnMainThread(() -> callback.onFailure("Spoof detected! Please use a real face for update."));
+                        return;
+                    }
+
+                    // Proceed with update API
+                    updateFaceId(faceBitmap, userId, callback);
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error capturing face for update", e);
+                runOnMainThread(() -> callback.onFailure("Error capturing face: " + e.getMessage()));
+            }
+        });
+    }
     
     /**
      * Legacy method for backward compatibility

@@ -126,5 +126,8 @@
         android:id="@+id/faceIdSuccessFragment"
         android:name="vn.edu.fpt.zentryapp.student.ui.setting.success.FaceIdSuccessFragment"
         android:label="Face ID Registered">
+        <action
+            android:id="@+id/action_faceIdSuccess_to_updateFaceId"
+            app:destination="@id/studentSettingUpdateFaceIdFragment" />
     </fragment>
 </navigation>
