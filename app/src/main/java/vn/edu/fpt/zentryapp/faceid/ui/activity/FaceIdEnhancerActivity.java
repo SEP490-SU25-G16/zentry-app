@@ -9,6 +9,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.View;
+import android.view.OrientationEventListener;
+import android.view.Surface;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -53,6 +55,10 @@ public class FaceIdEnhancerActivity extends AppCompatActivity implements
     // Camera processing
     private ExecutorService cameraExecutor;
     private FaceDetector faceDetector;
+    private Preview preview;
+    private ImageAnalysis imageAnalysis;
+    private ProcessCameraProvider cameraProvider;
+    private OrientationEventListener orientationEventListener;
     
     // Face ID enhancer
     private FaceIdEnhancer faceIdEnhancer;
@@ -105,17 +111,17 @@ public class FaceIdEnhancerActivity extends AppCompatActivity implements
         
         cameraProviderFuture.addListener(() -> {
             try {
-                ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
+                cameraProvider = cameraProviderFuture.get();
                 
                 int rotation = previewView.getDisplay().getRotation();
                 // Set up the preview use case
-                Preview preview = new Preview.Builder()
+                preview = new Preview.Builder()
                         .setTargetRotation(rotation)
                         .build();
                 preview.setSurfaceProvider(previewView.getSurfaceProvider());
                 
                 // Set up the image analysis use case
-                ImageAnalysis imageAnalysis = new ImageAnalysis.Builder()
+                imageAnalysis = new ImageAnalysis.Builder()
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .setTargetRotation(rotation)
                         .setTargetResolution(new android.util.Size(640, 480))
@@ -133,6 +139,38 @@ public class FaceIdEnhancerActivity extends AppCompatActivity implements
                 
                 // Bind use cases to camera
                 cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalysis);
+                
+                // Orientation listener to dynamically update targetRotation
+                if (orientationEventListener == null) {
+                    orientationEventListener = new OrientationEventListener(this) {
+                        @Override
+                        public void onOrientationChanged(int orientation) {
+                            if (orientation == ORIENTATION_UNKNOWN) return;
+                            int newRotation;
+                            if (orientation >= 45 && orientation < 135) {
+                                newRotation = Surface.ROTATION_270;
+                            } else if (orientation >= 135 && orientation < 225) {
+                                newRotation = Surface.ROTATION_180;
+                            } else if (orientation >= 225 && orientation < 315) {
+                                newRotation = Surface.ROTATION_90;
+                            } else {
+                                newRotation = Surface.ROTATION_0;
+                            }
+
+                            try {
+                                if (imageAnalysis != null) {
+                                    imageAnalysis.setTargetRotation(newRotation);
+                                }
+                                if (preview != null) {
+                                    preview.setTargetRotation(newRotation);
+                                }
+                            } catch (Exception ignored) { }
+                        }
+                    };
+                }
+                if (orientationEventListener != null) {
+                    orientationEventListener.enable();
+                }
                 
             } catch (ExecutionException | InterruptedException e) {
                 Log.e(TAG, "Error starting camera", e);
@@ -266,6 +304,18 @@ public class FaceIdEnhancerActivity extends AppCompatActivity implements
         super.onDestroy();
         cameraExecutor.shutdown();
         faceIdEnhancer.close();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (orientationEventListener != null) orientationEventListener.disable();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (orientationEventListener != null) orientationEventListener.enable();
     }
     
     //------------------------------------------------------------------------------

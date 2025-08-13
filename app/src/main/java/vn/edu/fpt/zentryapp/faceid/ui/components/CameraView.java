@@ -11,6 +11,8 @@ import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
 import android.view.ViewGroup;
+import android.view.OrientationEventListener;
+import android.view.Surface;
 import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
@@ -45,12 +47,14 @@ public class CameraView extends FrameLayout {
     private static final String TAG = "CameraView";
     
     private PreviewView previewView;
+    private Preview preview;
     private Camera camera;
     private ProcessCameraProvider cameraProvider;
     private ImageCapture imageCapture;
     private ImageAnalysis imageAnalysis;
     private final Executor executor = Executors.newSingleThreadExecutor();
     private AtomicBoolean processingFrame = new AtomicBoolean(false);
+    private OrientationEventListener orientationEventListener;
     
     // Biến để log info chỉ một lần
     private boolean hasLoggedImageInfo = false;
@@ -132,7 +136,7 @@ public class CameraView extends FrameLayout {
                 .build();
         
         // Preview use case
-        Preview preview = new Preview.Builder()
+        preview = new Preview.Builder()
                 .setTargetRotation(rotation)
                 .build();
         
@@ -196,21 +200,11 @@ public class CameraView extends FrameLayout {
                         Log.d(TAG, "Successfully converted frame #" + frameCount + " to bitmap: " + 
                                 bitmap.getWidth() + "x" + bitmap.getHeight());
                         
-                        // Apply rotation if needed
-                        int rotationDegrees = image.getImageInfo().getRotationDegrees();
-                        if (rotationDegrees != 0) {
-                            Log.d(TAG, "Applying rotation: " + rotationDegrees + " degrees");
-                            Matrix matrix = new Matrix();
-                            matrix.postRotate(rotationDegrees);
-                            bitmap = Bitmap.createBitmap(
-                                    bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
-                        }
-                        
-                        // Mirror image for front camera
-                        Matrix matrix = new Matrix();
-                        matrix.preScale(-1.0f, 1.0f);
+                        // Mirror image for front camera (rotation already handled in converter)
+                        Matrix mirrorMatrix = new Matrix();
+                        mirrorMatrix.preScale(-1.0f, 1.0f);
                         bitmap = Bitmap.createBitmap(
-                                bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+                                bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), mirrorMatrix, true);
                         
                         Log.d(TAG, "Final bitmap for frame #" + frameCount + ": " + 
                                 bitmap.getWidth() + "x" + bitmap.getHeight());
@@ -261,6 +255,31 @@ public class CameraView extends FrameLayout {
             
             // Connect preview to previewView
             preview.setSurfaceProvider(previewView.getSurfaceProvider());
+            
+            // Enable dynamic orientation updates
+            if (orientationEventListener == null) {
+                orientationEventListener = new OrientationEventListener(getContext()) {
+                    @Override
+                    public void onOrientationChanged(int orientation) {
+                        if (orientation == ORIENTATION_UNKNOWN) return;
+                        int newRotation;
+                        if (orientation >= 45 && orientation < 135) {
+                            newRotation = Surface.ROTATION_270;
+                        } else if (orientation >= 135 && orientation < 225) {
+                            newRotation = Surface.ROTATION_180;
+                        } else if (orientation >= 225 && orientation < 315) {
+                            newRotation = Surface.ROTATION_90;
+                        } else {
+                            newRotation = Surface.ROTATION_0;
+                        }
+                        try {
+                            if (imageAnalysis != null) imageAnalysis.setTargetRotation(newRotation);
+                            if (preview != null) preview.setTargetRotation(newRotation);
+                        } catch (Exception ignored) {}
+                    }
+                };
+            }
+            if (orientationEventListener != null) orientationEventListener.enable();
             Log.d(TAG, "Camera binding successful");
         } catch (Exception e) {
             Log.e(TAG, "Use case binding failed", e);
@@ -284,20 +303,11 @@ public class CameraView extends FrameLayout {
                     // Convert ImageProxy to Bitmap
                     Bitmap bitmap = imageToBitmap(imageProxy);
                     
-                    // Apply rotation if needed
-                    int rotationDegrees = imageProxy.getImageInfo().getRotationDegrees();
-                    if (rotationDegrees != 0) {
-                        Matrix matrix = new Matrix();
-                        matrix.postRotate(rotationDegrees);
-                        bitmap = Bitmap.createBitmap(
-                                bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
-                    }
-                    
-                    // Mirror image for front camera
-                    Matrix matrix = new Matrix();
-                    matrix.preScale(-1.0f, 1.0f);
+                    // Mirror image for front camera (rotation already handled in converter)
+                    Matrix mirrorMatrix = new Matrix();
+                    mirrorMatrix.preScale(-1.0f, 1.0f);
                     bitmap = Bitmap.createBitmap(
-                            bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+                            bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), mirrorMatrix, true);
                     
                     // Return bitmap
                     final Bitmap finalBitmap = bitmap;
