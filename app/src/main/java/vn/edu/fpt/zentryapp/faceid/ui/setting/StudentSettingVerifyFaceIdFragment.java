@@ -95,6 +95,27 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
     // 🔄 HANDLERS
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
+    // Verification window control
+    private long verifyDeadlineMs = 0L;
+    private final Runnable verifyCountdownRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!isAdded()) return;
+            long remaining = verifyDeadlineMs - System.currentTimeMillis();
+            if (remaining <= 0) {
+                // Expired: auto close and block further actions
+                handleVerificationExpired();
+                return;
+            }
+            // Update status message countdown if visible
+            if (binding != null && binding.tvStatusMessage != null) {
+                int sec = (int) Math.ceil(remaining / 1000.0);
+                binding.tvStatusMessage.setText("Verification window: " + sec + "s left");
+            }
+            mainHandler.postDelayed(this, 1000);
+        }
+    };
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -115,6 +136,74 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
         analysisOverlay = null;
 
         Log.d(TAG, "✅ Fragment initialized with clean architecture");
+
+        // Setup verification window from deeplink/args
+        setupVerificationWindowFromArgs();
+        startVerificationCountdown();
+    }
+
+    private void setupVerificationWindowFromArgs() {
+        long now = System.currentTimeMillis();
+        long deadline = 0L;
+        Bundle args = getArguments();
+        if (args != null) {
+            if (args.containsKey("verify_deadline_ms")) {
+                deadline = args.getLong("verify_deadline_ms", 0L);
+            } else if (args.containsKey("expires_in_sec")) {
+                int sec = args.getInt("expires_in_sec", 0);
+                if (sec > 0) deadline = now + sec * 1000L;
+            } else if (args.containsKey("durationMinutes")) {
+                int min = args.getInt("durationMinutes", 0);
+                if (min > 0) deadline = now + min * 60_000L;
+            } else if (args.containsKey("expires_at")) {
+                String iso = args.getString("expires_at");
+                try {
+                    java.time.Instant inst = java.time.Instant.parse(iso);
+                    deadline = inst.toEpochMilli();
+                } catch (Exception ignored) {}
+            }
+        }
+        if (deadline == 0L) {
+            // Fallback default 5 minutes
+            deadline = now + 5 * 60_000L;
+        }
+        verifyDeadlineMs = deadline;
+        Log.d(TAG, "Verify deadline set to: " + verifyDeadlineMs + " (in " + ((verifyDeadlineMs - now) / 1000) + "s)");
+    }
+
+    private void startVerificationCountdown() {
+        mainHandler.removeCallbacks(verifyCountdownRunnable);
+        if (verifyDeadlineMs > System.currentTimeMillis()) {
+            mainHandler.post(verifyCountdownRunnable);
+        } else {
+            handleVerificationExpired();
+        }
+    }
+
+    private String getRequestIdFromArgs() {
+        Bundle args = getArguments();
+        if (args == null) return null;
+        String id = args.getString("requestId", null);
+        return (id != null && !id.isEmpty()) ? id : null;
+    }
+
+    private boolean isVerificationWindowActive() {
+        return System.currentTimeMillis() < verifyDeadlineMs;
+    }
+
+    private void handleVerificationExpired() {
+        if (!isAdded()) return;
+        mainHandler.removeCallbacks(verifyCountdownRunnable);
+        // Stop camera and exit with message
+        stopCameraSafe();
+        Toast.makeText(requireContext(), "Verification window expired.", Toast.LENGTH_LONG).show();
+        requireActivity().onBackPressed();
+    }
+
+    private void stopCameraSafe() {
+        try {
+            if (cameraView != null) cameraView.stopCamera();
+        } catch (Exception ignored) {}
     }
 
     /**
@@ -543,6 +632,10 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
      * 🔍 Process camera frame with enhanced security logic
      */
     private void processFrame(Bitmap bitmap) {
+        if (!isVerificationWindowActive()) {
+            Log.w(TAG, "Verification window expired; ignoring frames");
+            return;
+        }
         currentFrameBitmap = bitmap;
 
         // Kiểm tra xem FaceIdService đã khởi tạo chưa
@@ -941,6 +1034,37 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
         }
 
         // 🎯 Verify face with enhanced security validation
+        String requestId = getRequestIdFromArgs();
+        if (requestId != null) {
+            // Use request-based verify path
+            faceIdService.verifyFaceIdForRequest(
+                    capturedBitmap,
+                    finalUserId,
+                    requestId,
+                    null,
+                    new FaceIdService.FaceIdCallback() {
+                        @Override
+                        public void onSuccess(String message) {
+                            if (!isAdded()) return;
+                            Log.d(TAG, "✅ Verification successful: " + message);
+                            stateManager.transitionTo(FaceRegistrationState.SUCCESS, message);
+                        }
+
+                        @Override
+                        public void onFailure(String errorMessage) {
+                            if (!isAdded()) return;
+                            Log.e(TAG, "❌ Verification failed: " + errorMessage);
+                            lastDetailedErrorMessage = "Verification failure details:\n" + errorMessage;
+                            hasDetailedError = true;
+                            stateManager.transitionTo(FaceRegistrationState.FAILED_OTHER,
+                                    "Verification failed: " + errorMessage);
+                        }
+                    }
+            );
+            return;
+        }
+
+        // Fallback to legacy capture+verify (ad-hoc) when no requestId
         faceIdService.captureAndVerifyFace(
                 capturedBitmap,
                 capturedFaceRect,

@@ -35,17 +35,28 @@ public class FcmMessagingService extends FirebaseMessagingService {
                 LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcast(i);
             }
 
-            // If push includes deeplink and app is foreground, optionally open it
+            // If push includes deeplink or server-side action, handle extras
             if (remoteMessage.getData() != null && !remoteMessage.getData().isEmpty()) {
                 String dataJson = remoteMessage.getData().get("Data");
                 if (dataJson != null) {
                     JSONObject json = new JSONObject(dataJson);
                     String type = json.optString("type", "");
                     String deeplink = json.optString("deeplink", "");
+                    String action = json.optString("action", "");
                     if ("FACE_VERIFICATION_REQUEST".equalsIgnoreCase(type) && !deeplink.isEmpty()) {
                         // Post a local broadcast or notification click intent can be configured to open deeplink.
                         // Here we just log; UI click will open deeplink.
                         Log.d(TAG, "Received face verification request deeplink: " + deeplink);
+                    } else if ("SESSION_ENDED".equalsIgnoreCase(type) || "END_SESSION".equalsIgnoreCase(action)) {
+                        // Stop BLE attendance for students on session end notification
+                        try {
+                            Intent stopBle = new Intent(getApplicationContext(), vn.edu.fpt.zentryapp.service.BLEAttendanceService.class);
+                            stopBle.setAction("STOP_ATTENDANCE");
+                            getApplicationContext().stopService(stopBle);
+                            Log.d(TAG, "Stopped BLEAttendanceService due to session end push");
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error stopping BLE service on session end push", e);
+                        }
                     }
                 }
             }

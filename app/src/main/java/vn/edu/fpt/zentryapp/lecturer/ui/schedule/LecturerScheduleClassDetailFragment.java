@@ -26,6 +26,8 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import com.google.android.material.button.MaterialButton;
+import android.content.res.ColorStateList;
+import androidx.core.content.ContextCompat;
 import com.google.android.material.tabs.TabLayoutMediator;
 
 import java.util.Objects;
@@ -50,6 +52,16 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
     private LecturerHistoryFragment historyFragment;
     private LecturerAttendanceFragment attendanceFragment;
     private GestureDetector gestureDetector;
+    // Face ID request lock state
+    private static final String PREFS_FACEID_LOCK = "faceid_request_prefs";
+    private static final String KEY_LOCK_PREFIX = "lock_until_";
+    private long faceRequestLockUntilMs = 0L;
+    private boolean isCreatingRequest = false;
+	// Store original button colors to restore after unlock
+	private ColorStateList originalRequestBtnTint;
+	private int originalRequestBtnTextColor;
+    private ColorStateList originalEndBtnTint;
+    private int originalEndBtnTextColor;
 
     @Nullable
     @Override
@@ -87,7 +99,22 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
         setupViewPager();
         setupClickListeners();
         setupDoubleTapDetection();
+        // Capture original colors of the request button for later restore (must happen before any state changes)
+        try {
+            originalRequestBtnTint = binding.btnScheduleClassDetailRequestFaceId.getBackgroundTintList();
+            originalRequestBtnTextColor = binding.btnScheduleClassDetailRequestFaceId.getCurrentTextColor();
+            originalEndBtnTint = binding.btnScheduleClassDetailEndSession.getBackgroundTintList();
+            originalEndBtnTextColor = binding.btnScheduleClassDetailEndSession.getCurrentTextColor();
+        } catch (Exception ignored) {}
+
         observeViewModel();
+
+        // Restore lock state from prefs and update button
+        restoreFaceRequestLock();
+        updateRequestButtonEnabled();
+
+        // Apply ended-state UI if session already ended
+        applySessionEndedUiIfNeeded();
     }
 
     private void setupViewPager() {
@@ -143,7 +170,13 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
     private void setupClickListeners() {
         binding.ivScheduleClassDetailBack.setOnClickListener(v -> navController.navigateUp());
 
-        binding.btnScheduleClassDetailRequestFaceId.setOnClickListener(v -> showFaceIdRequestDialog());
+        binding.btnScheduleClassDetailRequestFaceId.setOnClickListener(v -> {
+            if (isSessionEndedNow()) {
+                // Button will already be disabled/gray; no action
+                return;
+            }
+            showFaceIdRequestDialog();
+        });
 
         binding.btnScheduleClassDetailEndSession.setOnClickListener(v -> showEndSessionConfirmation());
 
@@ -177,6 +210,14 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
                 binding.tvScheduleClassDetailDuration.setText(sessionInfo.getDurationDisplay());
                 binding.tvScheduleClassDetailRoom.setText(sessionInfo.getRoom());
                 binding.tvScheduleClassDetailCourseName.setText(sessionInfo.getCourseName() + " - " + sessionInfo.getClassName());
+
+                // If status indicates ended, lock and gray buttons
+                try {
+                    String status = sessionInfo.getStatus();
+                    if (status != null && !"Active".equalsIgnoreCase(status)) {
+                        applySessionEndedUi();
+                    }
+                } catch (Exception ignored) {}
             }
         });
 
@@ -309,6 +350,14 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
         viewModel.createFaceIdRequest(minutes, title, body);
         // Attach observers if not yet (idempotent safety)
         attachFaceIdObservers();
+
+        // Persist lock and update button state
+        long lockMs = minutes * 60L * 1000L; // minutes to ms
+        faceRequestLockUntilMs = System.currentTimeMillis() + lockMs;
+        persistFaceRequestLock(faceRequestLockUntilMs);
+        updateRequestButtonEnabled();
+        // Schedule a re-check to re-enable later
+        binding.btnScheduleClassDetailRequestFaceId.postDelayed(this::updateRequestButtonEnabled, lockMs);
     }
 
     private boolean faceIdObserversAttached = false;
@@ -327,8 +376,101 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
         });
         viewModel.isCreatingFaceIdRequest().observe(getViewLifecycleOwner(), loading -> {
             if (loading != null) {
-                binding.btnScheduleClassDetailRequestFaceId.setEnabled(!loading);
+                isCreatingRequest = loading;
+                updateRequestButtonEnabled();
             }
         });
+    }
+
+    private void updateRequestButtonEnabled() {
+        if (binding == null) return;
+        boolean ended = isSessionEndedNow();
+        boolean locked = System.currentTimeMillis() < faceRequestLockUntilMs;
+        boolean enabled = !isCreatingRequest && !locked && !ended;
+        MaterialButton btn = binding.btnScheduleClassDetailRequestFaceId;
+        btn.setEnabled(enabled);
+        btn.setClickable(enabled);
+        btn.setAlpha(enabled ? 1.0f : 0.5f);
+
+        // Visual feedback: gray when locked/disabled, restore original on enable
+        if (!enabled) {
+            ColorStateList grayTint = ColorStateList.valueOf(ContextCompat.getColor(requireContext(), android.R.color.darker_gray));
+            btn.setBackgroundTintList(grayTint);
+            btn.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.white));
+        } else {
+            if (originalRequestBtnTint != null) {
+                btn.setBackgroundTintList(originalRequestBtnTint);
+            }
+            if (originalRequestBtnTextColor != 0) {
+                btn.setTextColor(originalRequestBtnTextColor);
+            }
+        }
+    }
+
+    private boolean isSessionEndedNow() {
+        boolean ended = false;
+        try {
+            if (session != null) {
+                String status = session.getSessionStatus();
+                if (status != null && !"Active".equalsIgnoreCase(status)) ended = true;
+                java.util.Date end = session.getEndTimeAsDate();
+                if (end != null && new java.util.Date().after(end)) ended = true;
+            } else {
+                ended = true;
+            }
+        } catch (Exception ignored) {}
+        return ended;
+    }
+
+    private void applySessionEndedUiIfNeeded() {
+        if (isSessionEndedNow()) {
+            applySessionEndedUi();
+        }
+    }
+
+    private void applySessionEndedUi() {
+        if (binding == null) return;
+        // Request Face Now button
+        MaterialButton reqBtn = binding.btnScheduleClassDetailRequestFaceId;
+        reqBtn.setEnabled(false);
+        reqBtn.setClickable(false);
+        reqBtn.setAlpha(0.5f);
+        ColorStateList grayTint = ColorStateList.valueOf(ContextCompat.getColor(requireContext(), android.R.color.darker_gray));
+        reqBtn.setBackgroundTintList(grayTint);
+        reqBtn.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.white));
+
+        // End Time button
+        MaterialButton endBtn = binding.btnScheduleClassDetailEndSession;
+        endBtn.setEnabled(false);
+        endBtn.setClickable(false);
+        endBtn.setAlpha(0.5f);
+        endBtn.setBackgroundTintList(grayTint);
+        endBtn.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.white));
+    }
+
+    private String getLockKey() {
+        String sessionId = session != null ? String.valueOf(session.getSessionId()) : "global";
+        return KEY_LOCK_PREFIX + sessionId;
+    }
+
+    private void persistFaceRequestLock(long untilMs) {
+        try {
+            requireContext().getSharedPreferences(PREFS_FACEID_LOCK, 0)
+                    .edit()
+                    .putLong(getLockKey(), untilMs)
+                    .apply();
+        } catch (Exception ignored) {}
+    }
+
+    private void restoreFaceRequestLock() {
+        try {
+            long saved = requireContext().getSharedPreferences(PREFS_FACEID_LOCK, 0)
+                    .getLong(getLockKey(), 0L);
+            faceRequestLockUntilMs = saved;
+            if (System.currentTimeMillis() < faceRequestLockUntilMs) {
+                long remaining = faceRequestLockUntilMs - System.currentTimeMillis();
+                binding.btnScheduleClassDetailRequestFaceId.postDelayed(this::updateRequestButtonEnabled, remaining);
+            }
+        } catch (Exception ignored) {}
     }
 }

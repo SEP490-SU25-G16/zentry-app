@@ -28,8 +28,9 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import vn.edu.fpt.zentryapp.auth.client.ApiClient;
-import vn.edu.fpt.zentryapp.faceid.data.api.FaceIdApi;
+import vn.edu.fpt.zentryapp.faceid.data.api.FaceIdApiController;
 import vn.edu.fpt.zentryapp.faceid.data.model.response.FaceIdResponse;
+import vn.edu.fpt.zentryapp.faceid.data.model.response.FaceIdVerifyResponse;
 
 
 public class FaceIdService {
@@ -49,7 +50,7 @@ public class FaceIdService {
     @Getter
     private MediaPipeFaceLandmarkExtractor mediaPipeFaceLandmarkExtractor;
 
-    private final FaceIdApi faceIdApi;
+    private final FaceIdApiController faceIdApiController;
     private final ExecutorService executor;
     private final Handler mainHandler;
     
@@ -71,7 +72,7 @@ public class FaceIdService {
         this.context = context.getApplicationContext();
         this.executor = Executors.newCachedThreadPool(); // Thay đổi thành thread pool
         this.mainHandler = new Handler(Looper.getMainLooper());
-        this.faceIdApi = ApiClient.getClient(context).create(FaceIdApi.class);
+        this.faceIdApiController = ApiClient.getClient(context).create(FaceIdApiController.class);
         
         // 🔧 NEW: Initialize configuration and managers
         this.configManager = new FaceIdConfig(context);
@@ -134,6 +135,9 @@ public class FaceIdService {
         executor.execute(() -> {
             try {
                 this.gazeEstimator = retryManager.executeWithRetry(() -> new GazeEstimator(context, null));
+                // Configure gaze estimator for front camera mirrored preview and reduced head pose weight
+                this.gazeEstimator.setFrontCameraMirrored(true);
+                this.gazeEstimator.setHeadPoseWeight(0.2f);
                 modelLoadLatch.countDown();
                 Log.d(TAG, "GazeEstimator initialized");
             } catch (ModelRetryManager.ModelRetryException e) {
@@ -714,13 +718,75 @@ public class FaceIdService {
                         return;
                     }
                     
-                    // Proceed with verify API
+                    // Proceed with legacy verify API (ad-hoc) by default
                     verifyFaceId(finalFaceBitmap, userId, callback);
                 });
             } catch (Exception e) {
                 Log.e(TAG, "Error capturing face for verify", e);
                 runOnMainThread(() -> callback.onFailure("Error capturing face: " + e.getMessage()));
             }
+        });
+    }
+
+    /**
+     * Verify face embedding for a specific request window
+     */
+    public void verifyFaceIdForRequest(Bitmap faceBitmap, String userId, String requestId, Float threshold, FaceIdCallback callback) {
+        if (!isInitialized()) {
+            awaitInitialization(5000,
+                () -> verifyFaceIdForRequest(faceBitmap, userId, requestId, threshold, callback),
+                () -> runOnMainThread(() -> callback.onFailure("Face embedding model not initialized yet"))
+            );
+            return;
+        }
+
+        faceEmbedding.getFaceEmbeddingAsync(faceBitmap, embedding -> {
+            executor.execute(() -> {
+                try {
+                    ByteBuffer buffer = ByteBuffer.allocate(embedding.length * 4);
+                    buffer.order(ByteOrder.LITTLE_ENDIAN);
+                    for (float v : embedding) buffer.putFloat(v);
+                    logEmbeddingDebug(embedding, buffer.array(), "verify_request");
+                    saveEmbeddingDebug(buffer.array(), "verify_request");
+
+                    RequestBody userIdPart = RequestBody.create(MediaType.parse("text/plain"), userId);
+                    RequestBody thresholdPart = threshold != null ?
+                            RequestBody.create(MediaType.parse("text/plain"), String.valueOf(threshold)) :
+                            null;
+                    RequestBody embeddingPart = RequestBody.create(MediaType.parse("application/octet-stream"), buffer.array());
+                    MultipartBody.Part filePart = MultipartBody.Part.createFormData("embedding", "embedding.bin", embeddingPart);
+
+                    FaceIdApiController api = ApiClient.getClient(context).create(FaceIdApiController.class);
+                    retrofit2.Call<FaceIdVerifyResponse> call =
+                            api.verifyFaceId(requestId, userIdPart, filePart, thresholdPart);
+                    call.enqueue(new retrofit2.Callback<FaceIdVerifyResponse>() {
+                        @Override
+                        public void onResponse(@NonNull retrofit2.Call<FaceIdVerifyResponse> c,
+                                               @NonNull retrofit2.Response<FaceIdVerifyResponse> resp) {
+                            if (resp.isSuccessful() && resp.body() != null) {
+                                if (resp.body().isSuccess()) {
+                                    runOnMainThread(() -> callback.onSuccess("Face ID verified successfully"));
+                                } else {
+                                    runOnMainThread(() -> callback.onFailure(resp.body().getMessage() != null ? resp.body().getMessage() : "Verification failed"));
+                                }
+                            } else if (resp.code() == 410) {
+                                runOnMainThread(() -> callback.onFailure("Verification window expired"));
+                            } else {
+                                runOnMainThread(() -> callback.onFailure("Failed to verify: HTTP " + resp.code())) ;
+                            }
+                        }
+
+                        @Override
+                        public void onFailure(@NonNull retrofit2.Call<FaceIdVerifyResponse> c,
+                                              @NonNull Throwable t) {
+                            runOnMainThread(() -> callback.onFailure("Network error: " + t.getMessage()));
+                        }
+                    });
+                } catch (Exception e) {
+                    Log.e(TAG, "Error in verifyFaceIdForRequest", e);
+                    runOnMainThread(() -> callback.onFailure("Error: " + e.getMessage()));
+                }
+            });
         });
     }
     
@@ -792,7 +858,7 @@ public class FaceIdService {
                 Log.d(TAG, "registerFaceId: Making API call to register face ID");
                 
                 // 🔧 NEW: Enhanced API call with better error handling and timeout
-                Call<FaceIdResponse> call = faceIdApi.registerFaceId(filePart, userIdPart);
+                Call<FaceIdResponse> call = faceIdApiController.registerFaceId(filePart, userIdPart);
                 
                 // 🔧 NEW: Add timeout to the call
                 call.enqueue(new Callback<FaceIdResponse>() {
@@ -944,7 +1010,7 @@ public class FaceIdService {
                     Log.d(TAG, "updateFaceId: sending userId=" + userId);
                     
                     // Make API call
-                    Call<FaceIdResponse> call = faceIdApi.updateFaceId(filePart, userIdPart);
+                    Call<FaceIdResponse> call = faceIdApiController.updateFaceId(filePart, userIdPart);
                     call.enqueue(new Callback<FaceIdResponse>() {
                         @Override
                         public void onResponse(@NonNull Call<FaceIdResponse> call, @NonNull Response<FaceIdResponse> response) {
@@ -1027,8 +1093,8 @@ public class FaceIdService {
                             MediaType.parse("text/plain"), userId);
                     Log.d(TAG, "verifyFace: sending userId=" + userId);
                     
-                    // Make API call
-                    Call<FaceIdResponse> call = faceIdApi.verifyFaceId(filePart, userIdPart);
+                    // Make API call (ad-hoc legacy)
+                    Call<FaceIdResponse> call = faceIdApiController.verifyFaceIdAdhoc(filePart, userIdPart);
                     call.enqueue(new Callback<FaceIdResponse>() {
                         @Override
                         public void onResponse(@NonNull Call<FaceIdResponse> call, @NonNull Response<FaceIdResponse> response) {
@@ -1099,8 +1165,8 @@ public class FaceIdService {
                             MediaType.parse("text/plain"), userId);
                     Log.d(TAG, "verifyFaceId: sending userId=" + userId);
                     
-                    // Make API call
-                    Call<FaceIdResponse> call = faceIdApi.verifyFaceId(filePart, userIdPart);
+                    // Make API call (ad-hoc legacy)
+                    Call<FaceIdResponse> call = faceIdApiController.verifyFaceIdAdhoc(filePart, userIdPart);
                     call.enqueue(new Callback<FaceIdResponse>() {
                         @Override
                         public void onResponse(@NonNull Call<FaceIdResponse> call, @NonNull Response<FaceIdResponse> response) {

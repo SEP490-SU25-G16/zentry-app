@@ -54,8 +54,8 @@ public class FaceIdEnhancer implements
     private java.util.List<Direction> requiredDirections = new java.util.ArrayList<>();
     private int currentDirectionIndex = 0;
     private int directionStableFrames = 0;
-    private static final int DIRECTION_STABLE_FRAMES_REQUIRED = 10; // frames of stable gaze to accept a direction
-    private static final float GAZE_THRESHOLD = 0.45f; // stricter threshold
+    private static final int DIRECTION_STABLE_FRAMES_REQUIRED = 7; // reduced for responsiveness
+    private static final float GAZE_THRESHOLD = 0.35f; // relaxed to improve detection at larger yaw
     
     // Processing flags
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
@@ -395,11 +395,10 @@ public class FaceIdEnhancer implements
             callback.onGazePrompt(currentRequired, currentDirectionIndex, requiredDirections.size());
         }
 
-        // Front camera preview is mirrored; adjust x so UI directions match what user sees
-        float adjX = -x;
-        float adjY = y; // vertical not mirrored in our preview transform
+        // GazeEstimator already outputs mirrored coordinates when front camera; use as-is
+        float adjX = x;
+        float adjY = y;
 
-        // Emit adjusted gaze update (for UI indicator), but verification will be gated by currentRequired
         if (callback != null) {
             callback.onGazeDirectionChanged(adjX, adjY);
         }
