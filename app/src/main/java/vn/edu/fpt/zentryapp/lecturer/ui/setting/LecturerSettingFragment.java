@@ -85,6 +85,8 @@ public class LecturerSettingFragment extends Fragment {
             performLogout();
         });
 
+        binding.tvSettingName.setText(authManager.getCurrentUserName());
+        binding.tvSettingEmail.setText(authManager.getCurrentUserEmail());
 
     }
 
@@ -94,13 +96,6 @@ public class LecturerSettingFragment extends Fragment {
             // Show/hide loading indicator if needed
             // For now, just disable interactions during loading
             setUIEnabled(!isLoading);
-        });
-
-        // Observe user profile
-        viewModel.userProfile().observe(getViewLifecycleOwner(), profile -> {
-            if (profile != null) {
-                updateUserProfileUI(profile);
-            }
         });
 
         // Observe app settings
@@ -123,15 +118,6 @@ public class LecturerSettingFragment extends Fragment {
                 Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
             }
         });
-    }
-
-    private void updateUserProfileUI(LecturerSettingViewModel.UserProfile profile) {
-        binding.tvSettingName.setText(profile.getDisplayName());
-        binding.tvSettingEmail.setText(profile.getDisplayEmail());
-
-        // Log user info for debugging
-        android.util.Log.d("LecturerSetting",
-                "Profile loaded: " + profile.getDisplayName() + " (" + profile.getRole() + ")");
     }
 
     private void updateSettingsUI(LecturerSettingViewModel.AppSettings settings) {

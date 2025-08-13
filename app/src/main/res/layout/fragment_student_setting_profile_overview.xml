@@ -7,181 +7,287 @@
     android:background="#F5F9FF"
     android:fitsSystemWindows="true">
 
-    <LinearLayout
+    <!-- ScrollView chứa content chính -->
+    <ScrollView
         android:id="@+id/svStudentSettingProfileOverviewContent"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@android:color/transparent"
-        android:orientation="vertical"
         android:padding="16dp"
         android:paddingTop="?attr/actionBarSize">
-        <!-- Avatar + overlay -->
 
-        <!-- Full name -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardStudentSettingProfileOverviewFullName"
+        <LinearLayout
+            android:id="@+id/llStudentSettingProfileOverviewContainer"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="100dp"
-            app:cardBackgroundColor="#FFFFFF"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp"
-            app:strokeColor="#FFFFFF">
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/tvStudentSettingProfileOverviewFullName"
+            <!-- Full Name -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardStudentSettingProfileOverviewFullName"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:fontFamily="@font/mulishbold"
-                android:gravity="center_vertical"
-                android:paddingStart="16dp"
-                android:text="Harsha Kumara"
-                android:textColor="#232B42"
-                android:textSize="16sp" />
-        </com.google.android.material.card.MaterialCardView>
+                android:layout_height="56dp"
+                android:layout_marginTop="48dp"
+                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:strokeColor="#FFFFFF">
 
-        <!-- Username -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardStudentSettingProfileOverviewUsername"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="12dp"
-            app:cardBackgroundColor="#FFFFFF"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp"
-            app:strokeColor="#FFFFFF">
-
-            <TextView
-                android:id="@+id/tvStudentSettingProfileOverviewUsername"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:fontFamily="@font/mulishbold"
-                android:gravity="center_vertical"
-                android:paddingStart="16dp"
-                android:text="Harsha"
-                android:textColor="#232B42"
-                android:textSize="16sp" />
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- Date of Birth -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardStudentSettingProfileOverviewDOB"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="12dp"
-            app:cardBackgroundColor="#FFFFFF"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp"
-            app:strokeColor="#FFFFFF">
-
-            <LinearLayout
-                android:id="@+id/llStudentSettingProfileOverviewDOBContent"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp">
-
-                <ImageView
-                    android:id="@+id/ivStudentSettingProfileOverviewDOBIcon"
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:src="@drawable/ic_calendar"
-                    app:tint="#666666" />
-
-                <TextView
-                    android:id="@+id/tvStudentSettingProfileOverviewDOB"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:fontFamily="@font/mulishbold"
-                    android:text="Date of Birth"
-                    android:textColor="#505050"
-                    android:textSize="16sp" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- Email -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardStudentSettingProfileOverviewEmail"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="12dp"
-            app:cardBackgroundColor="#FFFFFF"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp"
-            app:strokeColor="#FFFFFF">
-
-            <LinearLayout
-                android:id="@+id/llStudentSettingProfileOverviewEmailContent"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp">
-
-                <ImageView
-                    android:id="@+id/ivStudentSettingProfileOverviewEmailIcon"
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:src="@drawable/ic_email"
-                    app:tint="#666666" />
-
-                <TextView
-                    android:id="@+id/tvStudentSettingProfileOverviewEmail"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:fontFamily="@font/mulishbold"
-                    android:text="HarshaKumara98@gmail.com"
-                    android:textColor="#505050"
-                    android:textSize="16sp" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- Phone -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardStudentSettingProfileOverviewPhone"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="12dp"
-            android:layout_marginBottom="24dp"
-            app:cardBackgroundColor="#FFFFFF"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp"
-            app:strokeColor="#FFFFFF">
-
-            <LinearLayout
-                android:id="@+id/llStudentSettingProfileOverviewPhoneContent"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp">
-
-                <ImageView
-                    android:id="@+id/ivStudentSettingProfileOverviewPhoneIcon"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:src="@drawable/ic_phone" />
-
-                <TextView
-                    android:id="@+id/tvStudentSettingProfileOverviewPhone"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:layout_marginStart="8dp"
-                    android:fontFamily="@font/mulishbold"
                     android:gravity="center_vertical"
-                    android:text="+(91) 987-848-1225"
-                    android:textColor="#505050"
-                    android:textSize="16sp" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+                    android:orientation="horizontal"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp">
 
-    </LinearLayout>
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_profile"
+                        app:tint="#666666"/>
+                    <TextView
+                        android:id="@+id/tvStudentSettingProfileOverviewFullName"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:text="Loading..."
+                        android:textSize="16sp"
+                        android:textColor="#232B42"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Email -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardStudentSettingProfileOverviewEmail"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:strokeColor="#FFFFFF">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp">
+
+                    <ImageView
+                        android:id="@+id/ivStudentSettingProfileOverviewEmailIcon"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_email"
+                        app:tint="#666666"/>
+                    <TextView
+                        android:id="@+id/tvStudentSettingProfileOverviewEmail"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:text="Loading..."
+                        android:textSize="16sp"
+                        android:textColor="#505050"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Phone -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardStudentSettingProfileOverviewPhone"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:strokeColor="#FFFFFF">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp">
+
+                    <ImageView
+                        android:id="@+id/ivStudentSettingProfileOverviewPhoneIcon"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_phone"
+                        app:tint="#666666"/>
+                    <TextView
+                        android:id="@+id/tvStudentSettingProfileOverviewPhone"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:text="Loading..."
+                        android:textSize="16sp"
+                        android:textColor="#505050"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Role -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardStudentSettingProfileOverviewRole"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:strokeColor="#FFFFFF">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_student"
+                        app:tint="#666666"/>
+                    <TextView
+                        android:id="@+id/tvStudentSettingProfileOverviewRole"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:text="Loading..."
+                        android:textSize="16sp"
+                        android:textColor="#505050"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Status -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardStudentSettingProfileOverviewStatus"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:strokeColor="#FFFFFF">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_check_circle"
+                        app:tint="#4CAF50"/>
+                    <TextView
+                        android:id="@+id/tvStudentSettingProfileOverviewStatus"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:text="Loading..."
+                        android:textSize="16sp"
+                        android:textColor="#505050"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Created Date -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardStudentSettingProfileOverviewCreatedAt"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:strokeColor="#FFFFFF">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_calendar"
+                        app:tint="#666666"/>
+                    <TextView
+                        android:id="@+id/tvStudentSettingProfileOverviewCreatedAt"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:text="Loading..."
+                        android:textSize="16sp"
+                        android:textColor="#505050"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Face ID Status -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardStudentSettingProfileOverviewFaceId"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="24dp"
+                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:strokeColor="#FFFFFF">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp">
+
+                    <ImageView
+                        android:id="@+id/ivStudentSettingProfileOverviewFaceIdIcon"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_face_id"
+                        app:tint="#666666"/>
+                    <TextView
+                        android:id="@+id/tvStudentSettingProfileOverviewFaceId"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:text="Loading..."
+                        android:textSize="16sp"
+                        android:textColor="#505050"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Loading Progress -->
+    <ProgressBar
+        android:id="@+id/progressLoading"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:visibility="gone" />
 
     <!-- Toolbar custom overlay -->
     <LinearLayout

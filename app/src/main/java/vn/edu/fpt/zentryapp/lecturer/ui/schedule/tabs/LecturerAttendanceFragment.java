@@ -110,6 +110,7 @@ public class LecturerAttendanceFragment extends Fragment implements LecturerAtte
     }
 
     // ✅ Method để update header text
+    @SuppressLint("DefaultLocale")
     private void updateHeaderText(List<Attendance> attendanceList) {
         if (binding == null || attendanceList == null || attendanceList.isEmpty()) {
             binding.tvAttendanceHeader.setText("No attendance data");

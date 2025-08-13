@@ -37,11 +37,6 @@ public class LecturerSettingEditProfileFragment extends Fragment {
         // Xử lý nút back toolbar, gọi back của Activity
         binding.ivEditProfileBack.setOnClickListener(v -> requireActivity().onBackPressed());
 
-        // Xử lý click overlay avatar để chọn ảnh đại diện mới
-        binding.ivEditProfileAvatarOverlay.setOnClickListener(v -> {
-            // TODO: Mở gallery hoặc camera để chọn ảnh đại diện mới
-            Toast.makeText(requireContext(), "Open gallery or camera to select new avatar", Toast.LENGTH_SHORT).show();
-        });
 
         // Xử lý nút Save để lưu thay đổi
         binding.btnEditProfileSave.setOnClickListener(v -> {

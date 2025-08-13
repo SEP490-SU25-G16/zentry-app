@@ -1,7 +1,5 @@
 package vn.edu.fpt.zentryapp.student.adapter;
 
-import android.graphics.Color;
-import android.graphics.drawable.GradientDrawable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,20 +10,19 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.util.ArrayList;
 import java.util.List;
 
-import vn.edu.fpt.zentryapp.databinding.ItemCalendarEventBinding;
+import vn.edu.fpt.zentryapp.databinding.ItemCalendarSessionBinding;
 import vn.edu.fpt.zentryapp.student.data.model.response.CalendarEvent;
 
-public class CalendarEventAdapter extends RecyclerView.Adapter<CalendarEventAdapter.ViewHolder> {
+public class CalendarEventAdapter extends RecyclerView.Adapter<CalendarEventAdapter.CalendarEventViewHolder> {
 
     private List<CalendarEvent> events = new ArrayList<>();
-    private OnEventClickListener onEventClickListener;
+    private OnEventClickListener listener;
+
+    // Single pink color for all events
+    private static final int PINK_COLOR = 0xFFE91E63; // Material Pink
 
     public interface OnEventClickListener {
         void onEventClick(CalendarEvent event);
-    }
-
-    public void setOnEventClickListener(OnEventClickListener listener) {
-        this.onEventClickListener = listener;
     }
 
     public void setEvents(List<CalendarEvent> events) {
@@ -33,18 +30,21 @@ public class CalendarEventAdapter extends RecyclerView.Adapter<CalendarEventAdap
         notifyDataSetChanged();
     }
 
+    public void setOnEventClickListener(OnEventClickListener listener) {
+        this.listener = listener;
+    }
+
     @NonNull
     @Override
-    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        ItemCalendarEventBinding binding = ItemCalendarEventBinding.inflate(
+    public CalendarEventViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        ItemCalendarSessionBinding binding = ItemCalendarSessionBinding.inflate(
                 LayoutInflater.from(parent.getContext()), parent, false);
-        return new ViewHolder(binding);
+        return new CalendarEventViewHolder(binding);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        CalendarEvent event = events.get(position);
-        holder.bind(event, position == events.size() - 1); // Check if last item
+    public void onBindViewHolder(@NonNull CalendarEventViewHolder holder, int position) {
+        holder.bind(events.get(position), position == events.size() - 1);
     }
 
     @Override
@@ -52,41 +52,66 @@ public class CalendarEventAdapter extends RecyclerView.Adapter<CalendarEventAdap
         return events.size();
     }
 
-    class ViewHolder extends RecyclerView.ViewHolder {
-        private final ItemCalendarEventBinding binding;
+    class CalendarEventViewHolder extends RecyclerView.ViewHolder {
+        private final ItemCalendarSessionBinding binding;
 
-        public ViewHolder(@NonNull ItemCalendarEventBinding binding) {
+        public CalendarEventViewHolder(ItemCalendarSessionBinding binding) {
             super(binding.getRoot());
             this.binding = binding;
 
+            // Set click listener
             binding.getRoot().setOnClickListener(v -> {
                 int position = getAdapterPosition();
-                if (position != RecyclerView.NO_POSITION && onEventClickListener != null) {
-                    onEventClickListener.onEventClick(events.get(position));
+                if (position != RecyclerView.NO_POSITION && listener != null) {
+                    listener.onEventClick(events.get(position));
                 }
             });
         }
 
         public void bind(CalendarEvent event, boolean isLastItem) {
-            binding.tvEventTime.setText(event.getTime());
-            binding.tvEventDescription.setText(event.getDisplayDescription());
+            // Set event info
+            binding.tvSessionTime.setText(getFormattedTimeRange(event));
+            binding.tvSessionDescription.setText(event.getDisplayTitle() + " - " + event.getRoomInfo());
 
-            // Set timeline indicator color
-            try {
-                int color = Color.parseColor(event.getColor());
-                GradientDrawable circleDrawable = new GradientDrawable();
-                circleDrawable.setShape(GradientDrawable.OVAL);
-                circleDrawable.setColor(color);
-                binding.viewEventCircle.setBackground(circleDrawable);
-                binding.viewEventLine.setBackgroundColor(color);
-            } catch (IllegalArgumentException e) {
-                // Fallback to default color
-                binding.viewEventCircle.setBackgroundColor(Color.parseColor("#FF4081"));
-                binding.viewEventLine.setBackgroundColor(Color.parseColor("#FF4081"));
-            }
+            // Always use pink color for all events
+            binding.viewSessionCircle.getBackground().setTint(PINK_COLOR);
+            binding.viewSessionLine.setBackgroundColor(PINK_COLOR);
 
             // Hide line for last item
-            binding.viewEventLine.setVisibility(isLastItem ? View.GONE : View.VISIBLE);
+            if (isLastItem) {
+                binding.viewSessionLine.setVisibility(View.GONE);
+            } else {
+                binding.viewSessionLine.setVisibility(View.VISIBLE);
+            }
+
+            // Set alpha based on event status (if you want to differentiate past events)
+            float alpha = isPastEvent(event) ? 1.0f : 1.0f;
+            binding.getRoot().setAlpha(alpha);
+        }
+
+        /**
+         * Format time range without seconds
+         */
+        private String getFormattedTimeRange(CalendarEvent event) {
+            String timeRange = event.getTimeRange();
+
+            if (timeRange != null && !timeRange.isEmpty()) {
+                // Remove seconds from time format (e.g., "15:22:03" -> "15:22")
+                return timeRange.replaceAll(":\\d{2}(?=\\s|$|-)", "");
+            }
+
+            return timeRange;
+        }
+
+        /**
+         * Check if event is in the past
+         */
+        private boolean isPastEvent(CalendarEvent event) {
+            if (event.getEventDate() == null) return false;
+
+            // Simple check - if event date is before today
+            long currentTime = System.currentTimeMillis();
+            return event.getEventDate().getTime() < currentTime;
         }
     }
 }

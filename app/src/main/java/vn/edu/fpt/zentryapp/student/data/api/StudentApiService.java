@@ -7,9 +7,11 @@ import retrofit2.http.GET;
 import retrofit2.http.Path;
 import retrofit2.http.Query;
 import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.ApiResponseDto;
+import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.UserDto;
 import vn.edu.fpt.zentryapp.student.data.model.response.StudentDailyScheduleClassSectionResponse;
 import vn.edu.fpt.zentryapp.student.data.model.responsedto.StudentClassReportDto;
 import vn.edu.fpt.zentryapp.student.data.model.responsedto.StudentHomeDataDto;
+import vn.edu.fpt.zentryapp.student.data.model.responsedto.StudentMonthlyCalendarDataDto;
 import vn.edu.fpt.zentryapp.student.data.model.responsedto.StudentSessionsDataDto;
 
 // StudentScheduleApiService.java
@@ -27,4 +29,12 @@ public interface StudentApiService {
     Call<ApiResponseDto<List<StudentClassReportDto>>> getStudentClasses(@Path("student_id") String studentId);
     @GET("/api/attendance/students/{student_id}/sessions")
     Call<ApiResponseDto<StudentSessionsDataDto>> getStudentSessions(@Path("student_id") String studentId);
+    @GET("/api/user/{user_id}")
+    Call<ApiResponseDto<UserDto>> getUserProfile(@Path("user_id") String userId);
+    @GET("/api/schedules/student/{student_id}/monthly-calendar")
+    Call<ApiResponseDto<StudentMonthlyCalendarDataDto>> getStudentMonthlyCalendar(
+            @Path("student_id") String studentId,
+            @Query("month") int month,
+            @Query("year") int year
+    );
 }

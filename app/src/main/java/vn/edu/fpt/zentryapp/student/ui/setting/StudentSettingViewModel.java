@@ -33,7 +33,6 @@ public class StudentSettingViewModel extends ViewModel {
             if (authManager != null) {
                 String userEmail = authManager.getCurrentUserEmail();
                 authManager.logout();
-
                 _logoutSuccess.setValue(true);
                 Log.d(TAG, "User logged out successfully: " + (userEmail != null ? userEmail : "Unknown"));
             } else {

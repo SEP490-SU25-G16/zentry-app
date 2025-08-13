@@ -9,6 +9,8 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.navigation.NavController;
+import androidx.navigation.fragment.NavHostFragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
 import android.view.LayoutInflater;
@@ -26,6 +28,7 @@ public class StudentScheduleCalendarFragment extends Fragment implements Calenda
     private FragmentStudentScheduleCalendarBinding binding;
     private StudentScheduleCalendarViewModel viewModel;
     private CalendarEventAdapter eventAdapter;
+    private NavController navController;
 
     @Nullable
     @Override
@@ -41,10 +44,12 @@ public class StudentScheduleCalendarFragment extends Fragment implements Calenda
                               @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Initialize ViewModel
+        navController = NavHostFragment.findNavController(this);
+
+        // Initialize ViewModel với context
         viewModel = new ViewModelProvider(this).get(StudentScheduleCalendarViewModel.class);
         AuthManager authManager = AuthManager.getInstance(requireContext());
-        viewModel.init(authManager);
+        viewModel.init(requireContext(), authManager);
 
         setupRecyclerView();
         setupCalendar();
@@ -68,14 +73,16 @@ public class StudentScheduleCalendarFragment extends Fragment implements Calenda
 
     private void setupToolbar() {
         binding.ivStudentScheduleCalendarBack.setOnClickListener(v ->
-                requireActivity().onBackPressed());
+                navController.navigateUp());
     }
 
     private void observeViewModel() {
+        // Observe loading state
         viewModel.isLoading().observe(getViewLifecycleOwner(), isLoading -> {
             binding.progressLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
         });
 
+        // Observe events
         viewModel.events().observe(getViewLifecycleOwner(), events -> {
             if (events != null) {
                 eventAdapter.setEvents(events);
@@ -83,18 +90,31 @@ public class StudentScheduleCalendarFragment extends Fragment implements Calenda
                 boolean isEmpty = events.isEmpty();
                 binding.rvEvents.setVisibility(isEmpty ? View.GONE : View.VISIBLE);
                 binding.layoutEmptyState.setVisibility(isEmpty ? View.VISIBLE : View.GONE);
+
+                Log.d("StudentCalendar", "Loaded " + events.size() + " events");
             }
         });
 
+        // Observe selected date
+        viewModel.selectedDate().observe(getViewLifecycleOwner(), selectedDate -> {
+            if (selectedDate != null) {
+                // Update UI with selected date if needed
+                Log.d("StudentCalendar", "Selected date: " + selectedDate);
+            }
+        });
+
+        // Observe success messages
         viewModel.successMessage().observe(getViewLifecycleOwner(), message -> {
             if (message != null) {
                 Log.d("CalendarFragment", message);
             }
         });
 
+        // Observe errors
         viewModel.errorMessage().observe(getViewLifecycleOwner(), error -> {
             if (error != null) {
                 Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
+                Log.e("CalendarFragment", "Error: " + error);
 
                 if (error.contains("network") || error.contains("connection")) {
                     showRetryDialog();
@@ -108,7 +128,7 @@ public class StudentScheduleCalendarFragment extends Fragment implements Calenda
                 .setTitle("Connection Error")
                 .setMessage("Unable to load events. Would you like to retry?")
                 .setPositiveButton("Retry", (dialog, which) -> {
-                    viewModel.loadEventsForToday();
+                    viewModel.refreshCalendar();
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
@@ -116,7 +136,12 @@ public class StudentScheduleCalendarFragment extends Fragment implements Calenda
 
     @Override
     public void onEventClick(CalendarEvent event) {
-        Toast.makeText(requireContext(), "Clicked: " + event.getTitle(), Toast.LENGTH_SHORT).show();
+        String eventInfo = String.format("%s\n%s\n%s",
+                event.getDisplayTitle(),
+                event.getDisplaySubtitle(),
+                event.getFormattedDate());
+
+        Toast.makeText(requireContext(), eventInfo, Toast.LENGTH_LONG).show();
         viewModel.onEventClicked(event);
     }
 
@@ -124,5 +149,14 @@ public class StudentScheduleCalendarFragment extends Fragment implements Calenda
     public void onDestroyView() {
         super.onDestroyView();
         binding = null;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Refresh data when returning to this screen
+        if (viewModel != null) {
+            viewModel.refreshCalendar();
+        }
     }
 }
