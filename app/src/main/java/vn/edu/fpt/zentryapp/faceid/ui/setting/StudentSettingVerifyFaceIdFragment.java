@@ -52,7 +52,7 @@ import vn.edu.fpt.zentryapp.faceid.ui.setting.controller.FaceRegistrationUIContr
 
 public class StudentSettingVerifyFaceIdFragment extends Fragment
         implements FaceIdEnhancer.FaceIdEnhancerCallback {
-    private static final String TAG = "RegisterFaceIdFragment";
+    private static final String TAG = "VerifyFaceIdFragment";
     private static final int CAMERA_PERMISSION_REQUEST_CODE = 100;
     private static final int SUCCESS_ACTIVITY_REQUEST_CODE = 200;
 

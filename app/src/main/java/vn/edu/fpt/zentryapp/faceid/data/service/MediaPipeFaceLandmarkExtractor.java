@@ -68,6 +68,10 @@ public class MediaPipeFaceLandmarkExtractor {
     // Eye regions for gaze estimation
     private Bitmap lastLeftEyeRegion;
     private Bitmap lastRightEyeRegion;
+
+    // Last estimated eye centers for alignment
+    private PointF lastLeftEyeCenter;
+    private PointF lastRightEyeCenter;
     
     /**
      * Constructor - Initializes MediaPipe FaceLandmarker with real model
@@ -373,6 +377,10 @@ public class MediaPipeFaceLandmarkExtractor {
             // Left eye region (indices 33-46)
             PointF leftEyeCenter = calculateEyeCenter(landmarks, 33, 46);
             PointF rightEyeCenter = calculateEyeCenter(landmarks, 362, 375);
+
+            // Store for external access (alignment)
+            this.lastLeftEyeCenter = leftEyeCenter;
+            this.lastRightEyeCenter = rightEyeCenter;
             
             if (leftEyeCenter == null || rightEyeCenter == null) {
                 Log.w(TAG, "Eye centers not found");
@@ -554,6 +562,17 @@ public class MediaPipeFaceLandmarkExtractor {
      */
     public Bitmap getRightEyeRegion() {
         return lastRightEyeRegion;
+    }
+
+    /**
+     * Get last estimated eye centers (may be null if not available)
+     */
+    public PointF getLastLeftEyeCenter() {
+        return lastLeftEyeCenter;
+    }
+
+    public PointF getLastRightEyeCenter() {
+        return lastRightEyeCenter;
     }
     
     /**

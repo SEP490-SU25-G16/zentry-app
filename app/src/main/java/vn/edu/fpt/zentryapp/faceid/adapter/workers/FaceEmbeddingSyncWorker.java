@@ -140,6 +140,7 @@ public class FaceEmbeddingSyncWorker extends Worker {
         // Branch by action: after register -> verify; after update -> update
         boolean isUpdate = ACTION_UPDATE.equalsIgnoreCase(action);
         boolean isVerify = ACTION_VERIFY.equalsIgnoreCase(action);
+        boolean isRegister = ACTION_REGISTER.equalsIgnoreCase(action);
         if (isUpdate) {
             faceIdService.updateFaceId(bitmap, userId, new FaceIdService.FaceIdCallback() {
                 @Override
@@ -160,22 +161,16 @@ public class FaceEmbeddingSyncWorker extends Worker {
             Log.d(TAG, "Verify flow: no background sync needed, marking success");
             syncSuccess.set(true);
             latch.countDown();
+        } else if (isRegister) {
+            // After register, do not auto-verify in background. Defer to explicit verify flow/notification.
+            Log.d(TAG, "Register flow: skip background calls, marking success");
+            syncSuccess.set(true);
+            latch.countDown();
         } else {
-            // Default to verify to avoid duplicate register calls
-            faceIdService.verifyFaceId(bitmap, userId, new FaceIdService.FaceIdCallback() {
-                @Override
-                public void onSuccess(String message) {
-                    Log.d(TAG, "Face embedding verify successful: " + message);
-                    syncSuccess.set(true);
-                    latch.countDown();
-                }
-                
-                @Override
-                public void onFailure(String errorMessage) {
-                    Log.e(TAG, "Face embedding verify failed: " + errorMessage);
-                    latch.countDown();
-                }
-            });
+            // Unknown action: no-op but succeed to avoid retries
+            Log.w(TAG, "Unknown action in FaceEmbeddingSyncWorker: " + action + ". Skipping network call.");
+            syncSuccess.set(true);
+            latch.countDown();
         }
         
         try {

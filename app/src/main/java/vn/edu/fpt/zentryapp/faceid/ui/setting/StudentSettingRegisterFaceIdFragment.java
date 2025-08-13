@@ -1011,7 +1011,12 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
             stopCamera();
 
             // Save bitmap for background sync
-            String bitmapPath = saveBitmapToTempFile(currentFrameBitmap);
+            String bitmapPath = null;
+            try {
+                bitmapPath = saveBitmapToTempFile(currentFrameBitmap);
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to save bitmap for background sync, proceeding without worker", e);
+            }
             String userId = AuthManager.getInstance(requireContext()).getCurrentUserId();
             String successMessage = "Face ID has been registered successfully!";
 

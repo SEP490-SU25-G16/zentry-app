@@ -618,16 +618,14 @@ public class FaceIdService {
                     }
                 }
                 
-                // Crop the face from the bitmap
-                Bitmap faceBitmap = Bitmap.createBitmap(
-                        bitmap, 
-                        boundingBox.left, 
-                        boundingBox.top, 
-                        boundingBox.width(), 
-                        boundingBox.height()
-                );
+                // Crop the face using landmark-aware pipeline
+                Rect stableCrop = computeSquareCropWithMargin(bitmap, boundingBox, 1.25f);
+                Bitmap faceBitmap = Bitmap.createBitmap(bitmap, stableCrop.left, stableCrop.top, stableCrop.width(), stableCrop.height());
+                Bitmap aligned = tryAlignFace(faceBitmap);
+                if (aligned != null) faceBitmap = aligned;
                 
                 // Do one final spoof check with oval boundary
+                Bitmap finalFaceBitmap = faceBitmap;
                 faceSpoofDetector.detectSpoofAsync(bitmap, boundingBox, ovalRect, spoofResult -> {
                     if (spoofResult.isSpoof()) {
                         Log.d(TAG, "captureAndRegisterFace: Spoof detected during registration");
@@ -636,7 +634,7 @@ public class FaceIdService {
                     }
                     
                     // Register the face
-                    registerFaceId(faceBitmap, userId, callback);
+                    registerFaceId(finalFaceBitmap, userId, callback);
                 });
                 
             } catch (Exception e) {
@@ -662,16 +660,14 @@ public class FaceIdService {
                     }
                 }
 
-                // Crop face bitmap
-                Bitmap faceBitmap = Bitmap.createBitmap(
-                        bitmap,
-                        boundingBox.left,
-                        boundingBox.top,
-                        boundingBox.width(),
-                        boundingBox.height()
-                );
+                // Crop the face using landmark-aware pipeline
+                Rect stableCrop = computeSquareCropWithMargin(bitmap, boundingBox, 1.25f);
+                Bitmap faceBitmap = Bitmap.createBitmap(bitmap, stableCrop.left, stableCrop.top, stableCrop.width(), stableCrop.height());
+                Bitmap aligned = tryAlignFace(faceBitmap);
+                if (aligned != null) faceBitmap = aligned;
 
                 // Final spoof check before update
+                Bitmap finalFaceBitmap = faceBitmap;
                 faceSpoofDetector.detectSpoofAsync(bitmap, boundingBox, ovalRect, spoofResult -> {
                     if (spoofResult.isSpoof()) {
                         runOnMainThread(() -> callback.onFailure("Spoof detected! Please use a real face for update."));
@@ -679,7 +675,7 @@ public class FaceIdService {
                     }
 
                     // Proceed with update API
-                    updateFaceId(faceBitmap, userId, callback);
+                    updateFaceId(finalFaceBitmap, userId, callback);
                 });
             } catch (Exception e) {
                 Log.e(TAG, "Error capturing face for update", e);
@@ -704,16 +700,14 @@ public class FaceIdService {
                     }
                 }
                 
-                // Crop face bitmap
-                Bitmap faceBitmap = Bitmap.createBitmap(
-                        bitmap,
-                        boundingBox.left,
-                        boundingBox.top,
-                        boundingBox.width(),
-                        boundingBox.height()
-                );
+                // Crop the face using landmark-aware pipeline
+                Rect stableCrop = computeSquareCropWithMargin(bitmap, boundingBox, 1.25f);
+                Bitmap faceBitmap = Bitmap.createBitmap(bitmap, stableCrop.left, stableCrop.top, stableCrop.width(), stableCrop.height());
+                Bitmap aligned = tryAlignFace(faceBitmap);
+                if (aligned != null) faceBitmap = aligned;
                 
                 // Optional spoof check before verification (same gate as update)
+                Bitmap finalFaceBitmap = faceBitmap;
                 faceSpoofDetector.detectSpoofAsync(bitmap, boundingBox, ovalRect, spoofResult -> {
                     if (spoofResult.isSpoof()) {
                         runOnMainThread(() -> callback.onFailure("Spoof detected! Please use a real face for verification."));
@@ -721,7 +715,7 @@ public class FaceIdService {
                     }
                     
                     // Proceed with verify API
-                    verifyFaceId(faceBitmap, userId, callback);
+                    verifyFaceId(finalFaceBitmap, userId, callback);
                 });
             } catch (Exception e) {
                 Log.e(TAG, "Error capturing face for verify", e);
@@ -1223,6 +1217,87 @@ public class FaceIdService {
             Log.d(TAG, "embedding(" + action + ") len=" + n + ", bytes=" + bytes + ", head=[" + sb + "]");
         } catch (Exception e) {
             Log.w(TAG, "Failed to log embedding debug", e);
+        }
+    }
+
+    /**
+     * Compute a square crop around the detected face with an expansion margin for stability.
+     */
+    private Rect computeSquareCropWithMargin(Bitmap source, Rect faceRect, float marginScale) {
+        if (faceRect == null) return new Rect(0, 0, source.getWidth(), source.getHeight());
+        int cx = faceRect.centerX();
+        int cy = faceRect.centerY();
+        int size = Math.max(faceRect.width(), faceRect.height());
+        size = Math.round(size * marginScale);
+        int half = size / 2;
+        int left = Math.max(0, cx - half);
+        int top = Math.max(0, cy - half);
+        int right = Math.min(source.getWidth(), cx + half);
+        int bottom = Math.min(source.getHeight(), cy + half);
+        // Ensure square
+        int width = right - left;
+        int height = bottom - top;
+        int side = Math.min(Math.min(size, source.getWidth()), source.getHeight());
+        // Re-center if needed
+        left = Math.max(0, cx - side / 2);
+        top = Math.max(0, cy - side / 2);
+        right = Math.min(source.getWidth(), left + side);
+        bottom = Math.min(source.getHeight(), top + side);
+        // Adjust again if clamped
+        left = right - side;
+        top = bottom - side;
+        return new Rect(left, top, right, bottom);
+    }
+
+    /**
+     * Try to align face using eye centers. Returns aligned 160x160 bitmap or null if alignment not possible.
+     */
+    private Bitmap tryAlignFace(Bitmap faceBitmap) {
+        try {
+            if (mediaPipeFaceLandmarkExtractor == null || !mediaPipeFaceLandmarkExtractor.isModelAvailable()) {
+                return null;
+            }
+            // Extract landmarks synchronously (best-effort) using image mode
+            final CountDownLatch latch = new CountDownLatch(1);
+            final boolean[] ok = {false};
+            mediaPipeFaceLandmarkExtractor.extractLandmarks(faceBitmap, new Rect(0,0,faceBitmap.getWidth(), faceBitmap.getHeight()), success -> {
+                ok[0] = success;
+                latch.countDown();
+            });
+            latch.await(300, TimeUnit.MILLISECONDS);
+            if (!ok[0]) return null;
+
+            android.graphics.PointF left = mediaPipeFaceLandmarkExtractor.getLastLeftEyeCenter();
+            android.graphics.PointF right = mediaPipeFaceLandmarkExtractor.getLastRightEyeCenter();
+            if (left == null || right == null) return null;
+
+            // Compute angle and scale to align eyes horizontally to canonical distance
+            double dx = right.x - left.x;
+            double dy = right.y - left.y;
+            double angle = Math.atan2(dy, dx);
+            double eyeDist = Math.hypot(dx, dy);
+            if (eyeDist < 1.0) return null;
+
+            // Canonical eye positions in 160x160 (approx FaceNet canonical)
+            float cxLeft = 54f;  // tweakable
+            float cyLeft = 64f;
+            float cxRight = 106f;
+            float cyRight = 64f;
+            double targetDist = Math.hypot(cxRight - cxLeft, cyRight - cyLeft);
+            float scale = (float) (targetDist / eyeDist);
+
+            android.graphics.Matrix m = new android.graphics.Matrix();
+            m.postTranslate(-left.x, -left.y);
+            m.postRotate((float) (-Math.toDegrees(angle)));
+            m.postScale(scale, scale);
+            m.postTranslate(cxLeft, cyLeft);
+
+            Bitmap aligned = Bitmap.createBitmap(160, 160, Bitmap.Config.ARGB_8888);
+            android.graphics.Canvas c = new android.graphics.Canvas(aligned);
+            c.drawBitmap(faceBitmap, m, null);
+            return aligned;
+        } catch (Exception ignore) {
+            return null;
         }
     }
     

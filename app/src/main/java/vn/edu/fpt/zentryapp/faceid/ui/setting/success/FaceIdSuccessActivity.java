@@ -88,6 +88,22 @@ public class FaceIdSuccessActivity extends AppCompatActivity {
             Log.w(TAG, "Missing data for background sync");
             return;
         }
+        // Guard: ensure file exists before enqueueing work
+        try {
+            java.io.File f = new java.io.File(bitmapPath);
+            if (!f.exists()) {
+                Log.w(TAG, "Bitmap file not found, skip background sync: " + bitmapPath);
+                if (binding != null) {
+                    binding.progressSync.setVisibility(View.GONE);
+                    binding.tvSyncStatus.setText("Ready");
+                    binding.pbSync.setVisibility(View.GONE);
+                }
+                return;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Error checking bitmap file, skip background sync", e);
+            return;
+        }
         
         // Show sync progress
         binding.progressSync.setVisibility(View.VISIBLE);
