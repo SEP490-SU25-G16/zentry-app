@@ -63,7 +63,7 @@ public class FaceSpoofDetector {
         final float[] combinedResult;
         final Rect faceRect;
         final long timestamp;
-
+        
         TemporalFrameData(float[] combinedResult, Rect faceRect) {
             this.combinedResult = combinedResult.clone();
             this.faceRect = new Rect(faceRect);
@@ -380,7 +380,7 @@ public class FaceSpoofDetector {
 
             // Layer 2: Texture analysis
             boolean hasUniformTexture = checkUniformTexture(softmax1, softmax2);
-
+            
             // Layer 3: Oval boundary validation
             boolean isWithinOvalBoundary = true; // Default to true if no oval provided
             if (ovalRect != null) {
@@ -398,8 +398,8 @@ public class FaceSpoofDetector {
             } else {
                 confidence = isSpoof ? Math.max(0.70f, spoofProb) : Math.max(0.70f, realProb);
             }
-
-            Log.d(TAG, "🎯 FINAL RESULT: " + (isSpoof ? "SPOOF" : "REAL") +
+            
+            Log.d(TAG, "🎯 FINAL RESULT: " + (isSpoof ? "SPOOF" : "REAL") + 
                     " with confidence: " + String.format(java.util.Locale.US, "%.4f", confidence) +
                     ", realProb=" + String.format(java.util.Locale.US, "%.4f", realProb) +
                     ", spoofProb=" + String.format(java.util.Locale.US, "%.4f", spoofProb) +
@@ -593,7 +593,7 @@ public class FaceSpoofDetector {
         float sum = 0;
         float sumSq = 0;
         int count = 0;
-
+        
         // Calculate variance on REAL probability (index 1 in 2-class mapping)
         for (TemporalFrameData frame : frameHistory) {
             float realProb = frame.combinedResult.length >= 2 ? frame.combinedResult[1] : (1f - frame.combinedResult[0]);
@@ -601,7 +601,7 @@ public class FaceSpoofDetector {
             sumSq += realProb * realProb;
             count++;
         }
-
+        
         float mean = sum / count;
         float variance = (sumSq / count) - (mean * mean);
 
@@ -612,10 +612,10 @@ public class FaceSpoofDetector {
         if (frameHistory.size() < 4) {
             return false; // Not enough data
         }
-
+        
         // Convert queue to array for easier processing
         TemporalFrameData[] frames = frameHistory.toArray(new TemporalFrameData[0]);
-
+        
         // Count classification flips (real<->spoof) using 2-class mapping
         int classificationFlips = 0;
         for (int i = 1; i < frames.length; i++) {
@@ -629,18 +629,18 @@ public class FaceSpoofDetector {
                 classificationFlips++;
             }
         }
-
+        
         // Calculate confidence stability (suspicious if too stable)
         float confidenceVariance = calculateConfidenceVariance();
         boolean suspiciouslyStableConfidence = confidenceVariance < 0.001f;
-
+        
         // Calculate pattern score
         boolean abnormalPattern = classificationFlips > 2 || suspiciouslyStableConfidence;
-
-        Log.d(TAG, "📊 PATTERN ANALYSIS: flips=" + classificationFlips +
-                ", confVariance=" + confidenceVariance +
-                ", abnormal=" + abnormalPattern);
-
+        
+        Log.d(TAG, "📊 PATTERN ANALYSIS: flips=" + classificationFlips + 
+                  ", confVariance=" + confidenceVariance + 
+                  ", abnormal=" + abnormalPattern);
+                  
         return abnormalPattern;
     }
 
@@ -668,25 +668,25 @@ public class FaceSpoofDetector {
         // 1. Check for unusual texture
         boolean unusualTextureIndicator =
                 (softmax1[1] < 0.25f && softmax2[1] < 0.25f);
-
+        
         // 2. Check for inconsistency between models
         boolean modelInconsistency =
                 Math.abs(softmax1[0] - softmax2[0]) > 0.75f ||
                 Math.abs(softmax1[2] - softmax2[2]) > 0.70f;
-
+        
         // 3. Check for ambiguous classification
         boolean ambiguousClassification =
                 (softmax1[0] > 0.55f && softmax1[2] > 0.55f &&
                  softmax2[0] > 0.50f && softmax2[2] > 0.50f);
-
+        
         // 4. Check for abnormal pattern
         boolean abnormalPattern = checkAbnormalPatternAcrossFrames();
-
+        
         // 5. Check for low texture variance
         boolean lowTextureVariance = calculateConfidenceVariance() < 0.001f;
-
+        
         // 6. Check for suspiciously stable predictions
-        boolean suspiciouslyStablePredictions =
+        boolean suspiciouslyStablePredictions = 
                 Math.abs(softmax1[0] - softmax2[0]) < 0.03f &&
                 Math.abs(softmax1[1] - softmax2[1]) < 0.03f &&
                 Math.abs(softmax1[2] - softmax2[2]) < 0.03f;

@@ -7,13 +7,13 @@ import com.google.gson.annotations.SerializedName;
  */
 public class FaceIdResponse {
     
-    @SerializedName("success")
+    @SerializedName(value = "success", alternate = {"Success"})
     private boolean success;
     
-    @SerializedName("message")
+    @SerializedName(value = "message", alternate = {"Message"})
     private String message;
     
-    @SerializedName("timestamp")
+    @SerializedName(value = "timestamp", alternate = {"Timestamp"})
     private String timestamp;
     
     @SerializedName("similarity")

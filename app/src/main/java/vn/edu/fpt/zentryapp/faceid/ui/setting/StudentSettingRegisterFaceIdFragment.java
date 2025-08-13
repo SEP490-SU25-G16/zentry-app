@@ -791,10 +791,10 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
         // After liveness is verified, never flip to spoof. Provide guidance only.
         if (livenessVerified) {
             if (realness >= 0.50f) {
-                stateManager.transitionTo(FaceRegistrationState.FACE_REAL, "Real face detected");
-                trackFaceStability(boundingBox);
+            stateManager.transitionTo(FaceRegistrationState.FACE_REAL, "Real face detected");
+            trackFaceStability(boundingBox);
             } else {
-                stateManager.transitionTo(FaceRegistrationState.FACE_WARNING,
+            stateManager.transitionTo(FaceRegistrationState.FACE_WARNING,
                         "Improve lighting and hold still");
                 resetFaceTracker();
             }

@@ -10,9 +10,11 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -26,10 +28,9 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import vn.edu.fpt.zentryapp.auth.client.ApiClient;
-import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.faceid.data.api.FaceIdApi;
 import vn.edu.fpt.zentryapp.faceid.data.model.response.FaceIdResponse;
-import vn.edu.fpt.zentryapp.faceid.data.service.MediaPipeFaceLandmarkExtractor;
+
 
 public class FaceIdService {
     private static final String TAG = "FaceIdService";
@@ -685,11 +686,16 @@ public class FaceIdService {
                 float[] embedding = retryManager.executeWithRetry(() -> faceEmbedding.getFaceEmbedding(faceBitmap));
                 Log.d(TAG, "registerFaceId: Face embedding generated - length: " + embedding.length);
                 
-                // Convert embedding to byte array for API call
+                // Convert embedding to byte array for API call (float32 little-endian)
                 ByteBuffer buffer = ByteBuffer.allocate(embedding.length * 4);
+                buffer.order(ByteOrder.LITTLE_ENDIAN);
                 for (float value : embedding) {
                     buffer.putFloat(value);
                 }
+                // Log embedding preview + sizes
+                logEmbeddingDebug(embedding, buffer.array(), "register");
+                // Save a debug copy of the exact embedding being sent
+                saveEmbeddingDebug(buffer.array(), "register");
                 
                 Log.d(TAG, "registerFaceId: Creating multipart request - buffer size: " + buffer.array().length);
                 
@@ -704,6 +710,7 @@ public class FaceIdService {
                 RequestBody userIdPart = RequestBody.create(
                         MediaType.parse("text/plain"), userId);
                 
+                Log.d(TAG, "registerFaceId: sending userId=" + userId);
                 Log.d(TAG, "registerFaceId: Making API call to register face ID");
                 
                 // 🔧 NEW: Enhanced API call with better error handling and timeout
@@ -728,6 +735,26 @@ public class FaceIdService {
                             }
                         } else {
                             String errorMsg;
+                            String serverMessage = null;
+                            try {
+                                if (response.errorBody() != null) {
+                                    String raw = response.errorBody().string();
+                                    Log.e(TAG, "registerFaceId: errorBody= " + raw);
+                                    // Try to extract a simple message field if present
+                                    int idx = raw.indexOf("\"message\"");
+                                    if (idx >= 0) {
+                                        int colon = raw.indexOf(":", idx);
+                                        if (colon > 0) {
+                                            String tmp = raw.substring(colon + 1);
+                                            tmp = tmp.replace("{", "");
+                                            tmp = tmp.replace("}", "");
+                                            tmp = tmp.replace("\"", "");
+                                            tmp = tmp.replace("\n", "");
+                                            serverMessage = tmp.trim();
+                                        }
+                                    }
+                                }
+                            } catch (Exception ignored) {}
                             if (response.code() == 401) {
                                 errorMsg = "Authentication failed. Please login again.";
                             } else if (response.code() == 403) {
@@ -736,8 +763,20 @@ public class FaceIdService {
                                 errorMsg = "Service not found. Please contact support.";
                             } else if (response.code() >= 500) {
                                 errorMsg = "Server error. Please try again later.";
+                            } else if (response.code() == 400) {
+                                // Use server message when available
+                                errorMsg = serverMessage != null && !serverMessage.isEmpty()
+                                        ? serverMessage
+                                        : ("Bad Request");
+                                // Auto-fallback: user may already have a registered Face ID
+                                if (errorMsg.toLowerCase().contains("already has") || errorMsg.toLowerCase().contains("already registered")) {
+                                    Log.w(TAG, "registerFaceId: 400 indicates already registered; falling back to updateFaceId");
+                                    // Retry via update API
+                                    updateFaceId(faceBitmap, userId, callback);
+                                    return;
+                                }
                             } else {
-                                errorMsg = "Failed to register Face ID: " + response.message();
+                                errorMsg = "Failed to register Face ID: " + (serverMessage != null ? serverMessage : response.message());
                             }
                             Log.e(TAG, "registerFaceId: HTTP FAILURE - " + errorMsg + " (code: " + response.code() + ")");
                             runOnMainThread(() -> callback.onFailure(errorMsg));
@@ -801,11 +840,18 @@ public class FaceIdService {
         faceEmbedding.getFaceEmbeddingAsync(faceBitmap, embedding -> {
             executor.execute(() -> {
                 try {
-                    // Convert embedding to byte array for API call
+                    // Convert embedding to byte array for API call (float32 little-endian)
                     ByteBuffer buffer = ByteBuffer.allocate(embedding.length * 4);
+                    buffer.order(ByteOrder.LITTLE_ENDIAN);
                     for (float value : embedding) {
                         buffer.putFloat(value);
                     }
+                            // Log embedding preview + sizes
+                            logEmbeddingDebug(embedding, buffer.array(), "update");
+                            // Save a debug copy of the exact embedding being sent
+                            saveEmbeddingDebug(buffer.array(), "update");
+                    // Save a debug copy of the exact embedding being sent
+                    saveEmbeddingDebug(buffer.array(), "update");
                     
                     // Create multipart request
                     RequestBody embeddingPart = RequestBody.create(
@@ -817,6 +863,7 @@ public class FaceIdService {
                     
                     RequestBody userIdPart = RequestBody.create(
                             MediaType.parse("text/plain"), userId);
+                    Log.d(TAG, "updateFaceId: sending userId=" + userId);
                     
                     // Make API call
                     Call<FaceIdResponse> call = faceIdApi.updateFaceId(filePart, userIdPart);
@@ -877,11 +924,18 @@ public class FaceIdService {
         faceEmbedding.getFaceEmbeddingAsync(faceBitmap, embedding -> {
             executor.execute(() -> {
                 try {
-                    // Convert embedding to byte array for API call
+                                // Convert embedding to byte array for API call (float32 little-endian)
                     ByteBuffer buffer = ByteBuffer.allocate(embedding.length * 4);
+                    buffer.order(ByteOrder.LITTLE_ENDIAN);
                     for (float value : embedding) {
                         buffer.putFloat(value);
                     }
+                                // Log embedding preview + sizes
+                                logEmbeddingDebug(embedding, buffer.array(), "verify");
+                                // Save a debug copy of the exact embedding being sent
+                                saveEmbeddingDebug(buffer.array(), "verify");
+                    // Save a debug copy of the exact embedding being sent
+                    saveEmbeddingDebug(buffer.array(), "verify");
                     
                     // Create multipart request
                     RequestBody embeddingPart = RequestBody.create(
@@ -893,6 +947,7 @@ public class FaceIdService {
                     
                     RequestBody userIdPart = RequestBody.create(
                             MediaType.parse("text/plain"), userId);
+                    Log.d(TAG, "verifyFace: sending userId=" + userId);
                     
                     // Make API call
                     Call<FaceIdResponse> call = faceIdApi.verifyFaceId(filePart, userIdPart);
@@ -960,6 +1015,7 @@ public class FaceIdService {
                     
                     RequestBody userIdPart = RequestBody.create(
                             MediaType.parse("text/plain"), userId);
+                    Log.d(TAG, "verifyFaceId: sending userId=" + userId);
                     
                     // Make API call
                     Call<FaceIdResponse> call = faceIdApi.verifyFaceId(filePart, userIdPart);
@@ -1039,6 +1095,47 @@ public class FaceIdService {
     
     private void runOnMainThread(Runnable runnable) {
         mainHandler.post(runnable);
+    }
+
+    /**
+     * Save a copy of the embedding bytes to app cache for debugging/API testing
+     * File name format: embedding_{action}_<timestamp>.bin
+     */
+     private void saveEmbeddingDebug(byte[] bytes, String action) {
+         try {
+             File dir = new File(context.getCacheDir(), "face_registration");
+             if (!dir.exists()) {
+                 //noinspection ResultOfMethodCallIgnored
+                 dir.mkdirs();
+             }
+             File out = new File(dir, "embedding_" + action + "_" + System.currentTimeMillis() + ".bin");
+             try (FileOutputStream fos = new FileOutputStream(out)) {
+                 fos.write(bytes);
+             }
+             Log.d(TAG, "Saved embedding debug file: " + out.getAbsolutePath());
+         } catch (Exception e) {
+             Log.w(TAG, "Failed to save embedding debug file", e);
+         }
+     }
+
+    /**
+     * Log a short preview and sizes to help debugging embedding payload
+     */
+    private void logEmbeddingDebug(float[] embedding, byte[] rawBytes, String action) {
+        try {
+            int n = embedding != null ? embedding.length : -1;
+            int bytes = rawBytes != null ? rawBytes.length : -1;
+            // preview first up to 8 floats
+            StringBuilder sb = new StringBuilder();
+            int preview = Math.min(8, Math.max(0, n));
+            for (int i = 0; i < preview; i++) {
+                if (i > 0) sb.append(", ");
+                sb.append(String.format(java.util.Locale.US, "%.6f", embedding[i]));
+            }
+            Log.d(TAG, "embedding(" + action + ") len=" + n + ", bytes=" + bytes + ", head=[" + sb + "]");
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to log embedding debug", e);
+        }
     }
     
     /**
