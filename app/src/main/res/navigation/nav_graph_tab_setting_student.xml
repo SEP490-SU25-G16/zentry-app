@@ -30,6 +30,9 @@
         <action
             android:id="@+id/action_studentSetting_to_verifyFaceId"
             app:destination="@id/studentSettingVerifyFaceIdFragment" />
+        <action
+            android:id="@+id/action_studentSetting_to_faceIdSuccess"
+            app:destination="@id/faceIdSuccessFragment" />
     </fragment>
 
     <!-- 2. Device Info -->
@@ -116,5 +119,12 @@
             app:destination="@id/studentSettingFragment"
             app:popUpTo="@id/studentSettingFragment"
             app:popUpToInclusive="true" />
+    </fragment>
+
+    <!-- 9. Face ID Success Screen (Fragment variant) -->
+    <fragment
+        android:id="@+id/faceIdSuccessFragment"
+        android:name="vn.edu.fpt.zentryapp.student.ui.setting.success.FaceIdSuccessFragment"
+        android:label="Face ID Registered">
     </fragment>
 </navigation>

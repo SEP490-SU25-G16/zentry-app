@@ -36,8 +36,8 @@
         <!-- Success Icon -->
         <ImageView
             android:id="@+id/ivSuccessIcon"
-            android:layout_width="120dp"
-            android:layout_height="120dp"
+            android:layout_width="160dp"
+            android:layout_height="160dp"
             android:src="@drawable/ic_check_circle"
             android:scaleType="centerInside"
             app:layout_constraintBottom_toTopOf="@+id/tvSuccessTitle"
@@ -126,26 +126,14 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="@+id/guideline_60">
 
-        <!-- Continue Button -->
+        <!-- Update Face ID Button -->
         <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/btnContinue"
+            android:id="@+id/btnUpdateFaceId"
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:background="@drawable/bg_button_primary"
-            android:text="Continue"
+            android:text="Update Face ID"
             android:textColor="@color/white"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="16dp" />
-
-        <!-- Test Face ID Button -->
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/btnTestFaceId"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:background="@drawable/bg_button_secondary"
-            android:text="Test Face ID"
-            android:textColor="@color/primary"
             android:textSize="16sp"
             android:textStyle="bold" />
 

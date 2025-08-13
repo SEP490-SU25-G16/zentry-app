@@ -71,13 +71,6 @@ public class FaceIdSuccessActivity extends AppCompatActivity {
     
     private void setupClickListeners() {
         binding.ivBack.setOnClickListener(v -> finishWithResult());
-        
-        binding.btnContinue.setOnClickListener(v -> finishWithResult());
-        
-        binding.btnTestFaceId.setOnClickListener(v -> {
-            // TODO: Launch Face ID test activity
-            Toast.makeText(this, "Face ID test will be implemented", Toast.LENGTH_SHORT).show();
-        });
     }
     
     private void startBackgroundSync() {

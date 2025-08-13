@@ -7,7 +7,6 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.navigation.NavController;
-import androidx.navigation.Navigation;
 import androidx.navigation.fragment.NavHostFragment;
 
 import android.util.Log;
@@ -18,6 +17,7 @@ import android.view.ViewGroup;
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.auth.client.ApiClient;
+import vn.edu.fpt.zentryapp.auth.models.ApiResponse;
 import vn.edu.fpt.zentryapp.student.data.api.UserApiService;
 import vn.edu.fpt.zentryapp.student.data.model.response.UserProfileDto;
 import retrofit2.Call;
@@ -70,25 +70,48 @@ public class StudentSettingFragment extends Fragment {
             }
         });
 
-        // Xử lý click Face ID: điều hướng dựa trên trạng thái đăng ký Face ID
+        // Xử lý click Face ID: luôn xác nhận trạng thái mới nhất qua API trước khi điều hướng
         binding.llStudentSettingRowFaceId.setOnClickListener(v -> {
-            if (hasFaceId) {
-                // Show option dialog for verify or update
-                new androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                    .setTitle("Face ID Options")
-                    .setItems(new CharSequence[]{"Verify Face ID", "Update Face ID"}, (dialog, which) -> {
-                        if (which == 0) {
-                            // Navigate to verify Face ID
-                            navController.navigate(R.id.action_studentSetting_to_verifyFaceId);
-                        } else {
-                            // Navigate to update Face ID
-                            navController.navigate(R.id.action_studentSetting_to_updateFaceId);
-                        }
-                    })
-                    .show();
-            } else {
-                navController.navigate(R.id.action_studentSetting_to_registerFaceId);
-            }
+            String userId = AuthManager.getInstance(requireContext()).getCurrentUserId();
+            Log.d("StudentSettingFragment", "Face ID clicked, checking HasFaceId via API for userId=" + userId);
+            UserApiService api = ApiClient.getClient(requireContext()).create(UserApiService.class);
+            api.getUser(userId).enqueue(new Callback<ApiResponse<UserProfileDto>>() {
+                @Override
+                public void onResponse(@NonNull Call<ApiResponse<UserProfileDto>> call, @NonNull Response<ApiResponse<UserProfileDto>> response) {
+                    boolean latestHasFaceId = hasFaceId;
+                    Log.d("StudentSettingFragment", "GET /api/User response code=" + response.code() + ", success=" + response.isSuccessful());
+                    if (response.isSuccessful() && response.body() != null && response.body().getData() != null) {
+                        latestHasFaceId = response.body().getData().isHasFaceId();
+                        Log.d("StudentSettingFragment", "Parsed body: HasFaceId=" + latestHasFaceId);
+                        hasFaceId = latestHasFaceId;
+                        requireContext().getSharedPreferences("prefs", 0)
+                                .edit().putBoolean("faceid_registered", latestHasFaceId).apply();
+                    } else {
+                        try {
+                            String err = response.errorBody() != null ? response.errorBody().string() : null;
+                            Log.w("StudentSettingFragment", "Failed to parse user profile. errorBody=" + err);
+                        } catch (Exception ignored) {}
+                    }
+
+                    if (latestHasFaceId) {
+                        // Nếu đã có Face ID, chuyển tới màn hình success có nút update
+                        navController.navigate(R.id.action_studentSetting_to_faceIdSuccess);
+                    } else {
+                        navController.navigate(R.id.action_studentSetting_to_registerFaceId);
+                    }
+                }
+
+                @Override
+                public void onFailure(@NonNull Call<ApiResponse<UserProfileDto>> call, @NonNull Throwable t) {
+                    Log.e("StudentSettingFragment", "GET /api/User failed: " + t.getMessage(), t);
+                    // Nếu API lỗi, fallback theo cache
+                    if (hasFaceId) {
+                        navController.navigate(R.id.action_studentSetting_to_faceIdSuccess);
+                    } else {
+                        navController.navigate(R.id.action_studentSetting_to_registerFaceId);
+                    }
+                }
+            });
         });
 
         // Xử lý click Notifications để điều hướng sang màn hình cài đặt thông báo
@@ -152,12 +175,12 @@ public class StudentSettingFragment extends Fragment {
             if (userId == null || userId.isEmpty()) return;
 
             UserApiService api = ApiClient.getClient(requireContext()).create(UserApiService.class);
-            api.getUser(userId).enqueue(new Callback<UserProfileDto>() {
+            api.getUser(userId).enqueue(new Callback<ApiResponse<UserProfileDto>>() {
                 @Override
-                public void onResponse(@NonNull Call<UserProfileDto> call, @NonNull Response<UserProfileDto> response) {
+                public void onResponse(@NonNull Call<ApiResponse<UserProfileDto>> call, @NonNull Response<ApiResponse<UserProfileDto>> response) {
                     if (!isAdded()) return;
-                    if (response.isSuccessful() && response.body() != null) {
-                        boolean latestHasFaceId = response.body().isHasFaceId();
+                    if (response.isSuccessful() && response.body() != null && response.body().getData() != null) {
+                        boolean latestHasFaceId = response.body().getData().isHasFaceId();
                         hasFaceId = latestHasFaceId;
                         // cache
                         requireContext().getSharedPreferences("prefs", 0)
@@ -168,7 +191,7 @@ public class StudentSettingFragment extends Fragment {
                 }
 
                 @Override
-                public void onFailure(@NonNull Call<UserProfileDto> call, @NonNull Throwable t) {
+                public void onFailure(@NonNull Call<ApiResponse<UserProfileDto>> call, @NonNull Throwable t) {
                     // ignore; fallback to cached value
                 }
             });

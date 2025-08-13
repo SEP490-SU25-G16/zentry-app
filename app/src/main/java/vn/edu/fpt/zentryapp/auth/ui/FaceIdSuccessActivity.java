@@ -44,7 +44,6 @@ public class FaceIdSuccessActivity extends AppCompatActivity {
         ivBack = findViewById(R.id.ivBack);
         ivSuccessIcon = findViewById(R.id.ivSuccessIcon);
         btnContinue = findViewById(R.id.btnContinue);
-        btnTestFaceId = findViewById(R.id.btnTestFaceId);
         clSuccessContainer = findViewById(R.id.clSuccessContainer);
     }
     
