@@ -29,6 +29,7 @@ public class FaceEmbeddingSyncWorker extends Worker {
     public static final String KEY_ACTION = "action"; // "register" | "update"
     public static final String ACTION_REGISTER = "register";
     public static final String ACTION_UPDATE = "update";
+    public static final String ACTION_VERIFY = "verify";
     
     public FaceEmbeddingSyncWorker(@NonNull Context context, @NonNull WorkerParameters workerParams) {
         super(context, workerParams);
@@ -138,6 +139,7 @@ public class FaceEmbeddingSyncWorker extends Worker {
         
         // Branch by action: after register -> verify; after update -> update
         boolean isUpdate = ACTION_UPDATE.equalsIgnoreCase(action);
+        boolean isVerify = ACTION_VERIFY.equalsIgnoreCase(action);
         if (isUpdate) {
             faceIdService.updateFaceId(bitmap, userId, new FaceIdService.FaceIdCallback() {
                 @Override
@@ -153,6 +155,11 @@ public class FaceEmbeddingSyncWorker extends Worker {
                     latch.countDown();
                 }
             });
+        } else if (isVerify) {
+            // For verify flow, we have already verified in UI; avoid duplicate network call
+            Log.d(TAG, "Verify flow: no background sync needed, marking success");
+            syncSuccess.set(true);
+            latch.countDown();
         } else {
             // Default to verify to avoid duplicate register calls
             faceIdService.verifyFaceId(bitmap, userId, new FaceIdService.FaceIdCallback() {

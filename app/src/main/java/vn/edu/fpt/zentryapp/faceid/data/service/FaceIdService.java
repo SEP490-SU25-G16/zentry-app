@@ -689,6 +689,48 @@ public class FaceIdService {
     }
     
     /**
+     * Capture and verify face embedding with spoof/oval validations (Verify flow)
+     */
+    public void captureAndVerifyFace(Bitmap bitmap, Rect boundingBox, android.graphics.RectF ovalRect,
+                                     String userId, FaceIdCallback callback) {
+        executor.execute(() -> {
+            try {
+                // Validate oval if provided
+                if (ovalRect != null) {
+                    boolean isWithinOval = checkFaceWithinOval(boundingBox, ovalRect);
+                    if (!isWithinOval) {
+                        runOnMainThread(() -> callback.onFailure("Please position your face within the oval guide"));
+                        return;
+                    }
+                }
+                
+                // Crop face bitmap
+                Bitmap faceBitmap = Bitmap.createBitmap(
+                        bitmap,
+                        boundingBox.left,
+                        boundingBox.top,
+                        boundingBox.width(),
+                        boundingBox.height()
+                );
+                
+                // Optional spoof check before verification (same gate as update)
+                faceSpoofDetector.detectSpoofAsync(bitmap, boundingBox, ovalRect, spoofResult -> {
+                    if (spoofResult.isSpoof()) {
+                        runOnMainThread(() -> callback.onFailure("Spoof detected! Please use a real face for verification."));
+                        return;
+                    }
+                    
+                    // Proceed with verify API
+                    verifyFaceId(faceBitmap, userId, callback);
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error capturing face for verify", e);
+                runOnMainThread(() -> callback.onFailure("Error capturing face: " + e.getMessage()));
+            }
+        });
+    }
+    
+    /**
      * Legacy method for backward compatibility
      */
     public void captureAndRegisterFace(Bitmap bitmap, Rect boundingBox, String userId, FaceIdCallback callback) {
@@ -1041,11 +1083,15 @@ public class FaceIdService {
         faceEmbedding.getFaceEmbeddingAsync(faceBitmap, embedding -> {
             executor.execute(() -> {
                 try {
-                    // Convert embedding to byte array for API call
+                    // Convert embedding to byte array for API call (float32 little-endian)
                     ByteBuffer buffer = ByteBuffer.allocate(embedding.length * 4);
+                    buffer.order(ByteOrder.LITTLE_ENDIAN);
                     for (float value : embedding) {
                         buffer.putFloat(value);
                     }
+                    // Log and save debug copy
+                    logEmbeddingDebug(embedding, buffer.array(), "verify");
+                    saveEmbeddingDebug(buffer.array(), "verify");
                     
                     // Create multipart request
                     RequestBody embeddingPart = RequestBody.create(
