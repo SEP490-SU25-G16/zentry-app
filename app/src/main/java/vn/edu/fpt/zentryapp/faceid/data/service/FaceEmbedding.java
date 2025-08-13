@@ -29,7 +29,6 @@ import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import vn.edu.fpt.zentryapp.faceid.utils.SharedExecutors;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -50,7 +49,7 @@ public class FaceEmbedding {
     private ImageProcessor imageProcessor;
     private boolean useMockEmbedding = false;
     private final Random random = new Random();
-    private final Executor executor = SharedExecutors.getMlExecutor();
+    private final Executor executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Context context;
     
@@ -70,22 +69,13 @@ public class FaceEmbedding {
                     Log.d(TAG, "Đang tải model FaceNet...");
                     
                     // Initialize TFLiteInterpreter
-                    Interpreter.Options interpreterOptions = vn.edu.fpt.zentryapp.faceid.utils.InterpreterOptionsFactory.createBestOptions(context);
+                    Interpreter.Options interpreterOptions = TFLiteGpuDelegateManager.getInstance().getInterpreterOptions();
                     
                     // Tải model từ assets
                     MappedByteBuffer modelBuffer = FileUtil.loadMappedFile(context, MODEL_FILE);
                     
                     // Tạo interpreter
                     interpreter = new Interpreter(modelBuffer, interpreterOptions);
-                    try { interpreter.allocateTensors(); } catch (Throwable ignore) {}
-                    // Warmup: run one synthetic inference to compile kernels/allocate (match 4D input)
-                    try {
-                        float[][][][] dummy = new float[1][IMG_SIZE][IMG_SIZE][3];
-                        float[][] out = new float[1][EMBEDDING_DIM];
-                        interpreter.run(dummy, out);
-                    } catch (Throwable warmupErr) {
-                        Log.e(TAG, "Warmup ignored: " + warmupErr.getMessage(), warmupErr);
-                    }
                     
                     // Image processor cho tiền xử lý
                     imageProcessor = new ImageProcessor.Builder()
@@ -101,13 +91,16 @@ public class FaceEmbedding {
                     isInitialized = true;
                 } catch (Exception e) {
                     Log.e(TAG, "Lỗi khi khởi tạo model TensorFlow Lite: " + e.getMessage(), e);
-                    // Surface error via handler rather than Toast in service layer
-                    mainHandler.post(() -> Log.e(TAG, "Model load error: " + e.getMessage()));
+                    mainHandler.post(() -> 
+                        Toast.makeText(context, "Lỗi khi tải model face embedding: " + e.getMessage(), Toast.LENGTH_LONG).show()
+                    );
                     useMockEmbedding = true;
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Lỗi khi kiểm tra file model: " + e.getMessage(), e);
-                mainHandler.post(() -> Log.e(TAG, "Model check error: " + e.getMessage()));
+                mainHandler.post(() -> 
+                    Toast.makeText(context, "Lỗi khi kiểm tra model face embedding: " + e.getMessage(), Toast.LENGTH_LONG).show()
+                );
                 useMockEmbedding = true;
             } finally {
                 initLatch.countDown();

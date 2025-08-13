@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import vn.edu.fpt.zentryapp.faceid.utils.SharedExecutors;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -31,7 +30,7 @@ public class FaceDetector {
     
     private final Context context;
     private com.google.mediapipe.tasks.vision.facedetector.FaceDetector detector;
-    private final Executor executor = SharedExecutors.getMlExecutor();
+    private final Executor executor = Executors.newSingleThreadExecutor();
     private volatile boolean isInitialized = false;
     private final CountDownLatch initLatch = new CountDownLatch(1);
     

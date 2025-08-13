@@ -1,4 +1,4 @@
-package vn.edu.fpt.zentryapp.faceid.ui.setting.ui;
+package vn.edu.fpt.zentryapp.faceid.ui.setting.controller;
 
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
@@ -8,6 +8,7 @@ import androidx.core.content.ContextCompat;
 
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentSettingRegisterFaceIdBinding;
+import vn.edu.fpt.zentryapp.databinding.FragmentStudentSettingVerifyFaceIdBinding;
 import vn.edu.fpt.zentryapp.faceid.data.service.FaceProcessingState;
 import vn.edu.fpt.zentryapp.faceid.ui.components.OvalFaceOverlayView;
 import vn.edu.fpt.zentryapp.faceid.ui.setting.state.FaceRegistrationState;
@@ -16,10 +17,9 @@ import vn.edu.fpt.zentryapp.faceid.ui.setting.state.FaceRegistrationState;
  * UI Controller quản lý tất cả UI updates cho Face Registration
  * Tách riêng UI logic khỏi business logic
  */
-public class FaceRegistrationUIController {
-    private static final String TAG = "FaceRegUIController";
+public class FaceVerificationUIController {
 
-    private final FragmentStudentSettingRegisterFaceIdBinding binding;
+    private final FragmentStudentSettingVerifyFaceIdBinding binding;
     private final OvalFaceOverlayView faceOverlayView;
 
     // UI States
@@ -31,8 +31,8 @@ public class FaceRegistrationUIController {
 
     private UIScreenState currentScreenState = UIScreenState.SETUP;
 
-    public FaceRegistrationUIController(FragmentStudentSettingRegisterFaceIdBinding binding,
-                                         OvalFaceOverlayView faceOverlayView) {
+    public FaceVerificationUIController(FragmentStudentSettingVerifyFaceIdBinding binding,
+                                        OvalFaceOverlayView faceOverlayView) {
         this.binding = binding;
         this.faceOverlayView = faceOverlayView;
     }
@@ -80,12 +80,12 @@ public class FaceRegistrationUIController {
         boolean showProgress = state.isProcessingState() ||
                 state == FaceRegistrationState.PROCESSING ||
                 state == FaceRegistrationState.CAPTURING;
-                
+
         showLoadingIndicator(showProgress);
 
         // Update screen if needed
         updateScreenForState(state);
-        
+
         // Log cập nhật UI để debug
         System.out.println("UI đã cập nhật cho trạng thái: " + state + " với thông báo: " + message);
     }
@@ -123,7 +123,7 @@ public class FaceRegistrationUIController {
         }
 
         binding.tvStatusMessage.setTextColor(textColor);
-        
+
         // Make error messages scrollable if they're long
         if (state.isErrorState() && message.length() > 100) {
             binding.tvStatusMessage.setMovementMethod(new ScrollingMovementMethod());
@@ -132,7 +132,7 @@ public class FaceRegistrationUIController {
             binding.tvStatusMessage.setMovementMethod(null);
             binding.tvStatusMessage.setMaxHeight(Integer.MAX_VALUE);
         }
-        
+
         // Log status messages for debugging
         if (state.isErrorState()) {
             Log.e("FaceRegUIController", "Error state: " + state + " - " + message);
@@ -179,7 +179,7 @@ public class FaceRegistrationUIController {
                 faceOverlayView.updateState(FaceProcessingState.FACE_STABILIZING, state.getDefaultMessage());
                 faceOverlayView.startProgressAnimation(700); // 0.7 seconds
                 break;
-                
+
             case ANALYZING:
                 faceOverlayView.setOvalColor(ContextCompat.getColor(
                         faceOverlayView.getContext(), R.color.processing_blue));
@@ -216,8 +216,8 @@ public class FaceRegistrationUIController {
      * Hiển thị loading indicator
      */
     public void showLoadingIndicator(boolean show) {
-        if (binding.progressBarRegisterFaceId != null) {
-            binding.progressBarRegisterFaceId.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (binding.progressBarVerifyFaceId != null) {
+            binding.progressBarVerifyFaceId.setVisibility(show ? View.VISIBLE : View.GONE);
         }
     }
 
@@ -268,10 +268,10 @@ public class FaceRegistrationUIController {
     public void showLoadingOverlay(boolean show) {
         if (show) {
             binding.skeletonLayout.setVisibility(View.VISIBLE);
-            binding.flStudentSettingRegisterFaceIdCameraContainer.setVisibility(View.INVISIBLE);
+            binding.flStudentSettingVerifyFaceIdCameraContainer.setVisibility(View.INVISIBLE);
         } else {
             binding.skeletonLayout.setVisibility(View.GONE);
-            binding.flStudentSettingRegisterFaceIdCameraContainer.setVisibility(View.VISIBLE);
+            binding.flStudentSettingVerifyFaceIdCameraContainer.setVisibility(View.VISIBLE);
         }
     }
 

@@ -79,5 +79,8 @@
     <!-- Include nested graphs -->
     <include app:graph="@navigation/nav_graph_student" />
     <include app:graph="@navigation/nav_graph_lecturer" />
+    <include app:graph="@navigation/nav_graph_tab_setting_student" />
+
+    <!-- Note: deep links should be attached to destinations; the verify fragment contains its deep link. -->
 
 </navigation>

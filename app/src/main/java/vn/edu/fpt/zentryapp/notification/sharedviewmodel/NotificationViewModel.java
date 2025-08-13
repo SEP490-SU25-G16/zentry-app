@@ -1,5 +1,6 @@
 package vn.edu.fpt.zentryapp.notification.sharedviewmodel;
 
+import androidx.annotation.NonNull;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
@@ -7,6 +8,15 @@ import androidx.lifecycle.ViewModel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import android.util.Log;
+import android.content.Context;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import vn.edu.fpt.zentryapp.auth.client.ApiClient;
+import vn.edu.fpt.zentryapp.notification.data.api.NotificationApiService;
+import vn.edu.fpt.zentryapp.notification.data.model.NotificationDto;
 
 import lombok.Getter;
 import vn.edu.fpt.zentryapp.notification.data.NotificationItem;
@@ -18,6 +28,7 @@ public class NotificationViewModel extends ViewModel {
     private final MutableLiveData<Boolean> showSeeMoreButton = new MutableLiveData<>(false);
     private final MutableLiveData<Integer> unseenCount = new MutableLiveData<>(0);
     private boolean isDataLoaded = false;
+    private String lastLoadedUserId = null;
     
     // Pagination constants
     private static final int INITIAL_LOAD_COUNT = 6; // Số thông báo load lần đầu
@@ -46,79 +57,173 @@ public class NotificationViewModel extends ViewModel {
     }
 
     public void loadNotifications() {
-        // Chỉ load dữ liệu một lần
-        if (isDataLoaded) {
+        if (isDataLoaded) return;
+
+        String userId = null;
+        try {
+            // NotificationViewModel không có context, nên cần context từ nơi gọi (fragment/activity)
+            // Ở đây fallback: dùng ApiClient.getClient(null) vốn yêu cầu context cho AuthInterceptor.
+            // Lấy userId từ AuthManager cần context → tạm bỏ qua và để caller truyền userId vào hàm mới.
+        } catch (Exception ignored) {}
+
+        if (userId == null || userId.isEmpty()) {
+            allNotifications.setValue(new ArrayList<>());
+            applyFilter(currentFilter);
+            isDataLoaded = true;
+            updateUnseenCount();
             return;
         }
-        
-        // Tạo dữ liệu mock
-        List<NotificationItem> mockData = new ArrayList<>();
-        
-        // Mock notifications với một số chưa được seen
-        mockData.add(new NotificationItem("1", "Yêu cầu điểm danh", 
-            "Vui lòng thực hiện điểm danh bằng khuôn mặt cho buổi học SEP490 - Session 1", 
-            "2025-01-28 08:30", false, false)); // Chưa read, chưa seen
-        
-        mockData.add(new NotificationItem("2", "Vượt quá số buổi vắng", 
-            "Bạn đã vắng 3/4 buổi học cho môn SEP490. Vui lòng liên hệ giảng viên.", 
-            "2025-01-27 14:20", false, false)); // Chưa read, chưa seen
-        
-        mockData.add(new NotificationItem("3", "Thay đổi lịch học", 
-            "Lịch học môn SEP490 buổi 5 đã được chuyển từ 7:30 sang 9:00 ngày 30/01/2025", 
-            "2025-01-26 16:45", true, false)); // Đã read, chưa seen
-        
-        mockData.add(new NotificationItem("4", "Điểm danh thành công", 
-            "Bạn đã điểm danh thành công cho buổi học SEP490 - Session 2", 
-            "2025-01-25 08:35", true, true)); // Đã read, đã seen
-        
-        mockData.add(new NotificationItem("5", "Nhắc nhở điểm danh", 
-            "Còn 15 phút nữa hết thời gian điểm danh cho buổi học PRN231", 
-            "2025-01-25 07:45", false, false)); // Chưa read, chưa seen
-        
-        mockData.add(new NotificationItem("6", "Cập nhật điểm số", 
-            "Điểm Assignment 1 môn SEP490 đã được cập nhật: 8.5/10", 
-            "2025-01-24 15:30", true, true)); // Đã read, đã seen
-        
-        mockData.add(new NotificationItem("7", "Thông báo nghỉ học", 
-            "Buổi học PRN231 ngày 25/01/2025 được chuyển sang ngày 26/01/2025", 
-            "2025-01-23 10:15", true, false)); // Đã read, chưa seen
-        
-        mockData.add(new NotificationItem("8", "Yêu cầu xác thực Face ID", 
-            "Hệ thống yêu cầu bạn cập nhật dữ liệu Face ID để cải thiện độ chính xác", 
-            "2025-01-22 09:00", false, false)); // Chưa read, chưa seen
-        
-        mockData.add(new NotificationItem("9", "Điểm danh muộn", 
-            "Bạn đã điểm danh muộn 5 phút cho buổi học SWD392", 
-            "2025-01-21 08:05", true, true)); // Đã read, đã seen
-        
-        mockData.add(new NotificationItem("10", "Thông báo bài tập mới", 
-            "Bài tập Assignment 2 cho môn SEP490 đã được giao, hạn nộp: 05/02/2025", 
-            "2025-01-20 16:00", true, false)); // Đã read, chưa seen
-        
-        mockData.add(new NotificationItem("11", "Cảnh báo vắng học", 
-            "Bạn đã vắng 2 buổi học liên tiếp cho môn PRN231", 
-            "2025-01-19 14:30", false, false)); // Chưa read, chưa seen
-        
-        mockData.add(new NotificationItem("12", "Điểm danh thành công", 
-            "Bạn đã điểm danh thành công cho buổi học SWD392 - Session 3", 
-            "2025-01-18 08:32", true, true)); // Đã read, đã seen
-        
-        mockData.add(new NotificationItem("13", "Thay đổi phòng học", 
-            "Phòng học môn SEP490 buổi 8 đã được chuyển từ 501 sang 601", 
-            "2025-01-17 12:00", true, false)); // Đã read, chưa seen
-        
-        mockData.add(new NotificationItem("14", "Nhắc nhở nộp bài", 
-            "Còn 2 ngày để nộp Assignment 1 cho môn SWD392", 
-            "2025-01-16 18:45", true, true)); // Đã read, đã seen
-        
-        mockData.add(new NotificationItem("15", "Điểm danh bằng khuôn mặt", 
-            "Vui lòng thực hiện điểm danh bằng khuôn mặt cho buổi học PRN231 - Session 4", 
-            "2025-01-15 07:30", false, false)); // Chưa read, chưa seen
 
-        allNotifications.setValue(mockData);
-        applyFilter(currentFilter); // Áp dụng bộ lọc hiện tại
-        isDataLoaded = true; // Đánh dấu đã load dữ liệu
-        updateUnseenCount(); // Cập nhật số lượng thông báo chưa seen
+        // No context here; skip calling API in this overload
+        // Caller should use loadNotifications(userId, context)
+        NotificationApiService api = ApiClient.getClient(null).create(NotificationApiService.class);
+        api.getNotifications(userId).enqueue(new Callback<List<NotificationDto>>() {
+            @Override
+            public void onResponse(@NonNull Call<List<NotificationDto>> call, @NonNull Response<List<NotificationDto>> response) {
+                List<NotificationItem> items = new ArrayList<>();
+                if (response.isSuccessful() && response.body() != null) {
+                    for (NotificationDto dto : response.body()) {
+                        items.add(new NotificationItem(
+                                dto.getId(),
+                                dto.getTitle(),
+                                dto.getBody(),
+                                dto.getCreatedAt(),
+                                dto.isRead(),
+                                false,
+                                dto.getData()
+                        ));
+                    }
+                } else {
+                    Log.e("NotificationVM", "HTTP Error loading notifications: " + response.code());
+                }
+
+                allNotifications.setValue(items);
+                applyFilter(currentFilter);
+                isDataLoaded = true;
+                updateUnseenCount();
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<List<NotificationDto>> call, @NonNull Throwable t) {
+                Log.e("NotificationVM", "Network error loading notifications", t);
+                allNotifications.setValue(new ArrayList<>());
+                applyFilter(currentFilter);
+                isDataLoaded = true;
+                updateUnseenCount();
+            }
+        });
+    }
+
+    // Overload cho phép caller truyền vào userId (lấy từ AuthManager ở layer có context)
+    public void loadNotifications(String userId) {
+        // Reload if user changes
+        if (lastLoadedUserId == null || !lastLoadedUserId.equals(userId)) {
+            clearDataForNewUser();
+        } else if (isDataLoaded) {
+            return;
+        }
+        if (userId == null || userId.isEmpty()) {
+            allNotifications.setValue(new ArrayList<>());
+            applyFilter(currentFilter);
+            isDataLoaded = true;
+            updateUnseenCount();
+            return;
+        }
+
+        NotificationApiService api = ApiClient.getClient(null).create(NotificationApiService.class);
+        api.getNotifications(userId).enqueue(new Callback<List<NotificationDto>>() {
+            @Override
+            public void onResponse(@NonNull Call<List<NotificationDto>> call, @NonNull Response<List<NotificationDto>> response) {
+                List<NotificationItem> items = new ArrayList<>();
+                if (response.isSuccessful() && response.body() != null) {
+                    for (NotificationDto dto : response.body()) {
+                        items.add(new NotificationItem(
+                                dto.getId(),
+                                dto.getTitle(),
+                                dto.getBody(),
+                                dto.getCreatedAt(),
+                                dto.isRead(),
+                                false,
+                                dto.getData()
+                        ));
+                    }
+                } else {
+                    Log.e("NotificationVM", "HTTP Error loading notifications: " + response.code());
+                }
+
+                allNotifications.setValue(items);
+                applyFilter(currentFilter);
+                isDataLoaded = true;
+                lastLoadedUserId = userId;
+                updateUnseenCount();
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<List<NotificationDto>> call, @NonNull Throwable t) {
+                Log.e("NotificationVM", "Network error loading notifications", t);
+                allNotifications.setValue(new ArrayList<>());
+                applyFilter(currentFilter);
+                isDataLoaded = true;
+                lastLoadedUserId = userId;
+                updateUnseenCount();
+            }
+        });
+    }
+
+    // Preferred overload: caller supplies context (for AuthInterceptor) and userId
+    public void loadNotifications(String userId, Context context) {
+        // Reload if user changes
+        if (lastLoadedUserId == null || !lastLoadedUserId.equals(userId)) {
+            clearDataForNewUser();
+        } else if (isDataLoaded) {
+            return;
+        }
+        if (userId == null || userId.isEmpty()) {
+            allNotifications.setValue(new ArrayList<>());
+            applyFilter(currentFilter);
+            isDataLoaded = true;
+            updateUnseenCount();
+            return;
+        }
+
+        NotificationApiService api = ApiClient.getClient(context).create(NotificationApiService.class);
+        api.getNotifications(userId).enqueue(new Callback<List<NotificationDto>>() {
+            @Override
+            public void onResponse(@NonNull Call<List<NotificationDto>> call, @NonNull Response<List<NotificationDto>> response) {
+                List<NotificationItem> items = new ArrayList<>();
+                if (response.isSuccessful() && response.body() != null) {
+                    for (NotificationDto dto : response.body()) {
+                        items.add(new NotificationItem(
+                                dto.getId(),
+                                dto.getTitle(),
+                                dto.getBody(),
+                                dto.getCreatedAt(),
+                                dto.isRead(),
+                                false,
+                                dto.getData()
+                        ));
+                    }
+                } else {
+                    Log.e("NotificationVM", "HTTP Error loading notifications: " + response.code());
+                }
+
+                allNotifications.setValue(items);
+                applyFilter(currentFilter);
+                isDataLoaded = true;
+                lastLoadedUserId = userId;
+                updateUnseenCount();
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<List<NotificationDto>> call, @NonNull Throwable t) {
+                Log.e("NotificationVM", "Network error loading notifications", t);
+                allNotifications.setValue(new ArrayList<>());
+                applyFilter(currentFilter);
+                isDataLoaded = true;
+                lastLoadedUserId = userId;
+                updateUnseenCount();
+            }
+        });
     }
 
     public void applyFilter(FilterType filter) {
@@ -169,6 +274,14 @@ public class NotificationViewModel extends ViewModel {
     public void resetPagination() {
         currentDisplayCount = INITIAL_LOAD_COUNT;
         seeMoreClicked = false;
+    }
+
+    private void clearDataForNewUser() {
+        isDataLoaded = false;
+        allNotifications.setValue(new ArrayList<>());
+        filteredNotifications.setValue(new ArrayList<>());
+        resetPagination();
+        updateUnseenCount();
     }
     
     public boolean canLoadMoreByScroll() {

@@ -9,15 +9,6 @@ import android.util.Log;
  * Separates decision logic from FaceIdService for better maintainability
  */
 public class FaceDecisionEngine {
-    public static final class FaceDecision {
-        public enum Type { ACCEPT, REJECT, REVIEW }
-        public final Type type;
-        public final String reason;
-        private FaceDecision(Type type, String reason){ this.type=type; this.reason=reason; }
-        public static FaceDecision accept(String r){ return new FaceDecision(Type.ACCEPT, r);} 
-        public static FaceDecision reject(String r){ return new FaceDecision(Type.REJECT, r);} 
-        public static FaceDecision review(String r){ return new FaceDecision(Type.REVIEW, r);} 
-    }
     private static final String TAG = "FaceDecisionEngine";
     
     private final FaceDecisionConfig config;
@@ -105,35 +96,6 @@ public class FaceDecisionEngine {
             "Please position your face properly within the oval.",
             DecisionReason.DEFAULT_REJECTION
         );
-    }
-
-    // Context-aware overload per requirement
-    public FaceDecision evaluate(FaceDecisionInput in) {
-        FaceIdConfig.Thresholds th = FaceIdConfig.forScenario(in.scenario);
-
-        if (in.oval != null && !in.oval.isValid()) {
-            return FaceDecision.reject("OVAL_OR_QUALITY_FAIL");
-        }
-        if (in.spoof != null && in.spoof.getConfidence() >= th.SPOOF_STRONG) {
-            return FaceDecision.reject("SPOOF_STRONG");
-        }
-
-        boolean ambiguous = in.spoof != null && in.spoof.getConfidence() >= th.SPOOF_AMBIGUOUS;
-        if (ambiguous) {
-            if (in.livenessVerifiedRecently && in.straightGaze) {
-                return (in.scenario == FaceIdConfig.Scenario.REGISTRATION)
-                        ? FaceDecision.accept("PASS_AMBIGUOUS_WITH_LIVENESS_CONTEXT")
-                        : FaceDecision.review("NEED_STEADY_POSE");
-            }
-            return FaceDecision.review("AMBIGUOUS_NO_CONTEXT");
-        }
-
-        // spoof low
-        if (in.straightGaze || in.scenario == FaceIdConfig.Scenario.REGISTRATION) {
-            return FaceDecision.accept("PASS_NORMAL");
-        } else {
-            return FaceDecision.review("GAZE_NOT_CENTERED");
-        }
     }
     
     /**

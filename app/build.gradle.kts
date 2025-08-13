@@ -51,6 +51,7 @@ dependencies {
     // OkHttp cho HTTP client
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation(libs.firebase.messaging)
 
     // Lombok
     compileOnly("org.projectlombok:lombok:1.18.30")
@@ -88,4 +89,5 @@ dependencies {
     // Retrofit2
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation ("com.airbnb.android:lottie:6.4.0")
 }

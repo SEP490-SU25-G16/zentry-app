@@ -54,20 +54,6 @@ public class MediaPipeFaceLandmarkExtractor {
     // Add volatile flag to track executor state
     private volatile boolean isExecutorActive = true;
     
-    // Live stream support
-    private static final class PendingRequest {
-        final Bitmap faceBitmap;
-        final LandmarkExtractionCallback callback;
-        PendingRequest(Bitmap faceBitmap, LandmarkExtractionCallback callback) {
-            this.faceBitmap = faceBitmap;
-            this.callback = callback;
-        }
-    }
-    private volatile PendingRequest pendingRequest;
-    private volatile PendingRequest queuedRequest;
-    private final java.util.concurrent.atomic.AtomicBoolean inFlight = new java.util.concurrent.atomic.AtomicBoolean(false);
-    private long lastTimestampMs = 0L;
-
     // Landmark storage
     private List<PointF> leftEyePoints = new ArrayList<>();
     private List<PointF> rightEyePoints = new ArrayList<>();
@@ -82,6 +68,10 @@ public class MediaPipeFaceLandmarkExtractor {
     // Eye regions for gaze estimation
     private Bitmap lastLeftEyeRegion;
     private Bitmap lastRightEyeRegion;
+
+    // Last estimated eye centers for alignment
+    private PointF lastLeftEyeCenter;
+    private PointF lastRightEyeCenter;
     
     /**
      * Constructor - Initializes MediaPipe FaceLandmarker with real model
@@ -101,33 +91,7 @@ public class MediaPipeFaceLandmarkExtractor {
             
             FaceLandmarkerOptions options = FaceLandmarkerOptions.builder()
                     .setBaseOptions(baseOptions)
-                    .setRunningMode(RunningMode.LIVE_STREAM)
-                    .setResultListener((FaceLandmarkerResult result, MPImage input) -> {
-                        PendingRequest req = pendingRequest;
-                        try {
-                            if (result == null || result.faceLandmarks().isEmpty() || req == null) {
-                                if (req != null && req.callback != null) runOnMainThread(() -> req.callback.onLandmarksExtracted(false));
-                            } else {
-                                List<NormalizedLandmark> normalizedLandmarks = result.faceLandmarks().get(0);
-                                int w = req.faceBitmap.getWidth();
-                                int h = req.faceBitmap.getHeight();
-                                List<PointF> landmarks = convertNormalizedLandmarksToPointF(normalizedLandmarks, w, h);
-                                // Process and extract eyes using original face bitmap
-                                processFaceLandmarks(landmarks, req.faceBitmap);
-                                extractEyeRegions(req.faceBitmap, landmarks);
-                                if (req.callback != null) runOnMainThread(() -> req.callback.onLandmarksExtracted(true));
-                            }
-                        } catch (Exception e) {
-                            Log.e(TAG, "ResultListener error", e);
-                            if (req != null && req.callback != null) runOnMainThread(() -> req.callback.onLandmarksExtracted(false));
-                        } finally {
-                            pendingRequest = null;
-                            // If a queued request exists, schedule it next with monotonic ms timestamp
-                            if (!scheduleQueuedDetect()) {
-                                inFlight.set(false);
-                            }
-                        }
-                    })
+                    .setRunningMode(RunningMode.IMAGE)  // 🔧 FIXED: Use IMAGE mode instead of LIVE_STREAM
                     .setNumFaces(1)
                     .setOutputFaceBlendshapes(false)
                     .build();
@@ -246,30 +210,30 @@ public class MediaPipeFaceLandmarkExtractor {
                     return;
                 }
                 
-                // Convert bitmap to MPImage and run async for live-stream pipeline
-                // Serialize in-flight requests; queue the latest
-                if (!inFlight.compareAndSet(false, true)) {
-                    queuedRequest = new PendingRequest(faceBitmap, callback);
+                // Convert bitmap to MPImage for MediaPipe processing
+                MPImage mpImage = new BitmapImageBuilder(faceBitmap).build();
+                
+                // Process image with MediaPipe face landmarker (REAL DATA)
+                FaceLandmarkerResult result = faceLandmarker.detect(mpImage);
+                
+                if (result == null || result.faceLandmarks().isEmpty()) {
+                    Log.w(TAG, "No faces detected in real MediaPipe processing");
+                    runOnMainThread(() -> callback.onLandmarksExtracted(false));
                     return;
                 }
-                MPImage mpImage = new BitmapImageBuilder(faceBitmap).build();
-                pendingRequest = new PendingRequest(faceBitmap, callback);
-                long tsMs = android.os.SystemClock.elapsedRealtimeNanos() / 1_000_000L;
-                if (tsMs <= lastTimestampMs) tsMs = lastTimestampMs + 1L;
-                lastTimestampMs = tsMs;
-                try {
-                    if (faceLandmarker != null) {
-                        faceLandmarker.detectAsync(mpImage, tsMs);
-                    } else {
-                        Log.e(TAG, "FaceLandmarker not initialized");
-                        if (callback != null) runOnMainThread(() -> callback.onLandmarksExtracted(false));
-                        inFlight.set(false);
-                    }
-                } catch (Exception ex) {
-                    Log.e(TAG, "detectAsync error", ex);
-                    inFlight.set(false);
-                }
-                // Result will be delivered via resultListener
+                
+                // Get the first detected face and convert to PointF (REAL LANDMARKS)
+                List<NormalizedLandmark> normalizedLandmarks = result.faceLandmarks().get(0);
+                List<PointF> landmarks = convertNormalizedLandmarksToPointF(normalizedLandmarks, faceBitmap.getWidth(), faceBitmap.getHeight());
+                
+                // Process real face landmarks
+                processFaceLandmarks(landmarks, faceBitmap);
+                
+                // Extract real eye regions for gaze estimation
+                extractEyeRegions(faceBitmap, landmarks);
+                
+                Log.d(TAG, "Real MediaPipe landmarks extracted successfully. Landmarks: " + landmarks.size());
+                runOnMainThread(() -> callback.onLandmarksExtracted(true));
                 
             } catch (Exception e) {
                 Log.e(TAG, "Error extracting real MediaPipe landmarks", e);
@@ -413,6 +377,10 @@ public class MediaPipeFaceLandmarkExtractor {
             // Left eye region (indices 33-46)
             PointF leftEyeCenter = calculateEyeCenter(landmarks, 33, 46);
             PointF rightEyeCenter = calculateEyeCenter(landmarks, 362, 375);
+
+            // Store for external access (alignment)
+            this.lastLeftEyeCenter = leftEyeCenter;
+            this.lastRightEyeCenter = rightEyeCenter;
             
             if (leftEyeCenter == null || rightEyeCenter == null) {
                 Log.w(TAG, "Eye centers not found");
@@ -595,6 +563,17 @@ public class MediaPipeFaceLandmarkExtractor {
     public Bitmap getRightEyeRegion() {
         return lastRightEyeRegion;
     }
+
+    /**
+     * Get last estimated eye centers (may be null if not available)
+     */
+    public PointF getLastLeftEyeCenter() {
+        return lastLeftEyeCenter;
+    }
+
+    public PointF getLastRightEyeCenter() {
+        return lastRightEyeCenter;
+    }
     
     /**
      * Check if eyes are closed based on probabilities
@@ -621,29 +600,6 @@ public class MediaPipeFaceLandmarkExtractor {
         }
     }
     
-    private boolean scheduleQueuedDetect() {
-        PendingRequest next = queuedRequest;
-        if (next == null) return false;
-        queuedRequest = null;
-        pendingRequest = next;
-        long tsMs = android.os.SystemClock.elapsedRealtimeNanos() / 1_000_000L;
-        if (tsMs <= lastTimestampMs) tsMs = lastTimestampMs + 1L;
-        lastTimestampMs = tsMs;
-        try {
-            if (faceLandmarker != null) {
-                faceLandmarker.detectAsync(new BitmapImageBuilder(next.faceBitmap).build(), tsMs);
-                return true;
-            } else {
-                Log.e(TAG, "FaceLandmarker not initialized (queued)");
-                if (next.callback != null) runOnMainThread(() -> next.callback.onLandmarksExtracted(false));
-                return false;
-            }
-        } catch (Exception ex) {
-            Log.e(TAG, "detectAsync queued error", ex);
-            return false;
-        }
-    }
-
     /**
      * Close and release resources
      */

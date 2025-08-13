@@ -14,6 +14,9 @@
         <action
             android:id="@+id/action_studentReport_to_listSession"
             app:destination="@id/studentReportListSessionFragment" />
+        <action
+            android:id="@+id/action_studentReport_to_notification"
+            app:destination="@id/notificationFragment" />
     </fragment>
 
     <!-- 2. Student Session List -->
@@ -28,4 +31,11 @@
             app:popUpTo="@id/studentReportFragment"
             app:popUpToInclusive="false" />
     </fragment>
+    
+    <!-- 3. Notification Fragment (shared with other screens) -->
+    <fragment
+        android:id="@+id/notificationFragment"
+        android:name="vn.edu.fpt.zentryapp.notification.ui.NotificationFragment"
+        android:label="Notifications"
+        tools:layout="@layout/fragment_notification" />
 </navigation>

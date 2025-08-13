@@ -17,6 +17,8 @@ import androidx.navigation.NavController;
 import androidx.navigation.fragment.NavHostFragment;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
 
+import vn.edu.fpt.zentryapp.lecturer.ui.faceid.FaceIdRequestDialog;
+
 import android.view.GestureDetector;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -30,7 +32,6 @@ import java.util.Objects;
 
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
-import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.databinding.FragmentLecturerScheduleClassDetailBinding;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerScheduleClassSection;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.Round;
@@ -77,8 +78,11 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
         viewModel.init(requireContext(), authManager, session);
 
 
-        // Load notifications để có dữ liệu cho badge
-        notificationViewModel.loadNotifications();
+        // Load notifications từ API để có dữ liệu cho badge
+        String userId = authManager.getCurrentUserId();
+        if (userId != null) {
+            notificationViewModel.loadNotifications(userId, requireContext());
+        }
 
         setupViewPager();
         setupClickListeners();
@@ -139,15 +143,24 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
     private void setupClickListeners() {
         binding.ivScheduleClassDetailBack.setOnClickListener(v -> navController.navigateUp());
 
-        binding.btnScheduleClassDetailRequestFaceId.setOnClickListener(v ->
-                Toast.makeText(requireContext(), "Create face id", Toast.LENGTH_SHORT).show());
+        binding.btnScheduleClassDetailRequestFaceId.setOnClickListener(v -> showFaceIdRequestDialog());
 
         binding.btnScheduleClassDetailEndSession.setOnClickListener(v -> showEndSessionConfirmation());
 
         binding.btnScheduleClassDetailNotification.setOnClickListener(v -> {
             // Navigate đến NotificationFragment
             try {
-                navController.navigate(R.id.action_scheduleClassDetail_to_notification);
+                if (navController.getCurrentDestination() != null && 
+                    navController.getCurrentDestination().getAction(R.id.action_scheduleClassDetail_to_notification) != null) {
+                    navController.navigate(R.id.action_scheduleClassDetail_to_notification);
+                } else {
+                    // Fallback navigation if action isn't available
+                    android.util.Log.w("LecturerScheduleClassDetail", "Navigation action not available, using fallback");
+                    Toast.makeText(requireContext(), "Đang chuyển đến thông báo...", Toast.LENGTH_SHORT).show();
+                    
+                    // Try to find notificationFragment by ID
+                    navController.navigate(R.id.notificationFragment);
+                }
             } catch (Exception e) {
                 android.util.Log.e("LecturerScheduleClassDetail", "Navigation error: ", e);
                 Toast.makeText(requireContext(), "Chức năng thông báo đang được phát triển", Toast.LENGTH_SHORT).show();
@@ -278,5 +291,44 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
     public void onDestroyView() {
         super.onDestroyView();
         binding = null;
+    }
+    
+    private void showFaceIdRequestDialog() {
+        FaceIdRequestDialog dialog = new FaceIdRequestDialog();
+        dialog.setFaceIdRequestListener(this::scheduleFaceIdVerification);
+        dialog.show(getChildFragmentManager(), "FaceIdRequestDialog");
+    }
+    
+    private void scheduleFaceIdVerification(int totalSeconds) {
+        int minutes = (totalSeconds + 59) / 60; // round up to minutes
+        if (minutes <= 0) minutes = 1;
+        String title = "Yêu cầu xác thực Face ID";
+        String body = "Vui lòng xác thực khuôn mặt để tiếp tục.";
+
+        Toast.makeText(requireContext(), "Đang gửi yêu cầu Face ID...", Toast.LENGTH_SHORT).show();
+        viewModel.createFaceIdRequest(minutes, title, body);
+        // Attach observers if not yet (idempotent safety)
+        attachFaceIdObservers();
+    }
+
+    private boolean faceIdObserversAttached = false;
+    private void attachFaceIdObservers() {
+        if (faceIdObserversAttached) return;
+        faceIdObserversAttached = true;
+        viewModel.faceIdRequestSuccess().observe(getViewLifecycleOwner(), msg -> {
+            if (msg != null) {
+                Toast.makeText(requireContext(), msg, Toast.LENGTH_LONG).show();
+            }
+        });
+        viewModel.faceIdRequestError().observe(getViewLifecycleOwner(), err -> {
+            if (err != null) {
+                Toast.makeText(requireContext(), "Face ID request error: " + err, Toast.LENGTH_LONG).show();
+            }
+        });
+        viewModel.isCreatingFaceIdRequest().observe(getViewLifecycleOwner(), loading -> {
+            if (loading != null) {
+                binding.btnScheduleClassDetailRequestFaceId.setEnabled(!loading);
+            }
+        });
     }
 }

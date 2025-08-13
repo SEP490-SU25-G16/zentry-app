@@ -16,4 +16,7 @@ public class NotificationItem implements Serializable {
     private String timestamp;
     private boolean isRead;
     private boolean isSeen; // Đánh dấu thông báo đã được seen (xem qua) chưa
+
+    // Optional raw data for deep link or action parsing
+    private String rawData;
 }

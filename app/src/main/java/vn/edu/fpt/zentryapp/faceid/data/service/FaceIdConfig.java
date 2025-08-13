@@ -138,36 +138,6 @@ public class FaceIdConfig {
         }
     }
     
-    // Liveness thresholds and gaze tolerance per scenario
-    public static class Thresholds {
-        public final float SPOOF_STRONG;
-        public final float SPOOF_AMBIGUOUS;
-        public final float GAZE_CENTER_TOLERANCE;
-
-        public Thresholds(float strong, float ambiguous, float gazeTol) {
-            this.SPOOF_STRONG = strong;
-            this.SPOOF_AMBIGUOUS = ambiguous;
-            this.GAZE_CENTER_TOLERANCE = gazeTol;
-        }
-    }
-
-    public static Thresholds forScenario(Scenario scenario) {
-        switch (scenario) {
-            case REGISTRATION:
-                return new Thresholds(0.85f, 0.55f, 0.20f);
-            case VERIFICATION:
-                return new Thresholds(0.80f, 0.40f, 0.15f);
-            case UPDATE:
-                return new Thresholds(0.85f, 0.55f, 0.20f);
-            case SECURITY_CHECK:
-                return new Thresholds(0.90f, 0.60f, 0.12f);
-            default:
-                return new Thresholds(0.80f, 0.40f, 0.15f);
-        }
-    }
-
-    public static final long LIVENESS_BOOST_WINDOW_MS = 15_000L;
-
     // Main Configuration Class
     public static class Config {
         public final MemoryConfig memoryConfig;

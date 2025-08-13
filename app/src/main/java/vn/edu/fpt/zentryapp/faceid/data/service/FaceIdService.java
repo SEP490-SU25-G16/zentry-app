@@ -10,6 +10,9 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -52,11 +55,6 @@ public class FaceIdService {
     
     // 🔧 NEW: Improved components
     private final FaceDecisionEngine decisionEngine;
-    private final LivenessContext livenessContext = new LivenessContext();
-
-    public LivenessContext getLivenessContext() {
-        return livenessContext;
-    }
     private final ModelRetryManager retryManager;
     private final FaceProcessingErrorHandler errorHandler;
     
@@ -65,7 +63,7 @@ public class FaceIdService {
     private final FaceIdMemoryManager memoryManager;
     private final FaceIdPerformanceManager performanceManager;
     
-    private final CountDownLatch modelLoadLatch = new CountDownLatch(5); // consider timeouts to avoid deadlock
+    private final CountDownLatch modelLoadLatch = new CountDownLatch(5); // Update to 5 models (added MediaPipeFaceLandmarkExtractor)
     private volatile boolean isInitialized = false;
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
     
@@ -318,25 +316,22 @@ public class FaceIdService {
                 spoofResult.isSpoof(), spoofResult.getConfidence(), spoofResult.getScore()
             );
             
-            FaceDecisionInput in = new FaceDecisionInput(
-                detectionResult,
-                spoofDetectionResult,
-                ovalValidation,
-                livenessContext.livenessVerifiedRecently(),
-                livenessContext.straightGaze(),
-                configManager.getConfig().scenario
+            FaceDecisionEngine.FaceDecisionResult decision = decisionEngine.evaluate(
+                detectionResult, spoofDetectionResult, ovalValidation
             );
-            FaceDecisionEngine.FaceDecision ctxDecision = decisionEngine.evaluate(in);
-            Log.d(TAG, "processFaceWithOvalBoundary: CtxDecision result: " + ctxDecision.type + ", reason=" + ctxDecision.reason);
-            if (ctxDecision.type == FaceDecisionEngine.FaceDecision.Type.ACCEPT) {
-                Log.d(TAG, "processFaceWithOvalBoundary: SUCCESS - " + ctxDecision.reason);
+            
+            Log.d(TAG, "processFaceWithOvalBoundary: Decision result: " + decision);
+            
+            // 🔧 NEW: Handle decision result
+            if (decision.isAccepted()) {
+                Log.d(TAG, "processFaceWithOvalBoundary: SUCCESS - " + decision.getMessage());
                 runOnMainThread(() -> callback.onFaceDetected(faceBitmap, boundingBox));
-            } else if (ctxDecision.type == FaceDecisionEngine.FaceDecision.Type.REJECT) {
-                Log.e(TAG, "processFaceWithOvalBoundary: FAILED - " + ctxDecision.reason);
-                runOnMainThread(() -> callback.onError(ctxDecision.reason));
-            } else { // REVIEW / GUIDANCE
-                Log.w(TAG, "processFaceWithOvalBoundary: GUIDANCE - " + ctxDecision.reason);
-                runOnMainThread(() -> callback.onError(ctxDecision.reason));
+            } else if (decision.isRejected()) {
+                Log.e(TAG, "processFaceWithOvalBoundary: FAILED - " + decision.getMessage());
+                runOnMainThread(() -> callback.onError(decision.getMessage()));
+            } else if (decision.needsGuidance()) {
+                Log.w(TAG, "processFaceWithOvalBoundary: GUIDANCE - " + decision.getMessage());
+                runOnMainThread(() -> callback.onError(decision.getMessage()));
             }
             
             // 🔧 NEW: Memory management - release pooled objects
@@ -547,16 +542,11 @@ public class FaceIdService {
                         spoofResult.isSpoof(), spoofResult.getConfidence(), spoofResult.getScore()
                     );
                     
-                    FaceDecisionInput in = new FaceDecisionInput(
-                        detectionResult,
-                        spoofDetectionResult,
-                        ovalValidation,
-                        livenessContext.livenessVerifiedRecently(),
-                        livenessContext.straightGaze(),
-                        configManager.getConfig().scenario
+                    FaceDecisionEngine.FaceDecisionResult decision = decisionEngine.evaluate(
+                        detectionResult, spoofDetectionResult, ovalValidation
                     );
-                    FaceDecisionEngine.FaceDecision ctxDecision = decisionEngine.evaluate(in);
-                    Log.d(TAG, "processContinuousFrame: CtxDecision result: " + ctxDecision.type + ", reason=" + ctxDecision.reason);
+                    
+                    Log.d(TAG, "processContinuousFrame: Decision result: " + decision);
                     
                     runOnMainThread(() -> {
                         Log.d(TAG, "processContinuousFrame: Calling callback with isSpoof: " + 
@@ -628,16 +618,14 @@ public class FaceIdService {
                     }
                 }
                 
-                // Crop the face from the bitmap
-                Bitmap faceBitmap = Bitmap.createBitmap(
-                        bitmap, 
-                        boundingBox.left, 
-                        boundingBox.top, 
-                        boundingBox.width(), 
-                        boundingBox.height()
-                );
+                // Crop the face using landmark-aware pipeline
+                Rect stableCrop = computeSquareCropWithMargin(bitmap, boundingBox, 1.25f);
+                Bitmap faceBitmap = Bitmap.createBitmap(bitmap, stableCrop.left, stableCrop.top, stableCrop.width(), stableCrop.height());
+                Bitmap aligned = tryAlignFace(faceBitmap);
+                if (aligned != null) faceBitmap = aligned;
                 
                 // Do one final spoof check with oval boundary
+                Bitmap finalFaceBitmap = faceBitmap;
                 faceSpoofDetector.detectSpoofAsync(bitmap, boundingBox, ovalRect, spoofResult -> {
                     if (spoofResult.isSpoof()) {
                         Log.d(TAG, "captureAndRegisterFace: Spoof detected during registration");
@@ -646,11 +634,91 @@ public class FaceIdService {
                     }
                     
                     // Register the face
-                    registerFaceId(faceBitmap, userId, callback);
+                    registerFaceId(finalFaceBitmap, userId, callback);
                 });
                 
             } catch (Exception e) {
                 Log.e(TAG, "Error capturing face for registration", e);
+                runOnMainThread(() -> callback.onFailure("Error capturing face: " + e.getMessage()));
+            }
+        });
+    }
+
+    /**
+     * Capture and update face embedding with spoof/oval validations (Update flow)
+     */
+    public void captureAndUpdateFace(Bitmap bitmap, Rect boundingBox, android.graphics.RectF ovalRect,
+                                     String userId, FaceIdCallback callback) {
+        executor.execute(() -> {
+            try {
+                // Validate oval if provided
+                if (ovalRect != null) {
+                    boolean isWithinOval = checkFaceWithinOval(boundingBox, ovalRect);
+                    if (!isWithinOval) {
+                        runOnMainThread(() -> callback.onFailure("Please position your face within the oval guide"));
+                        return;
+                    }
+                }
+
+                // Crop the face using landmark-aware pipeline
+                Rect stableCrop = computeSquareCropWithMargin(bitmap, boundingBox, 1.25f);
+                Bitmap faceBitmap = Bitmap.createBitmap(bitmap, stableCrop.left, stableCrop.top, stableCrop.width(), stableCrop.height());
+                Bitmap aligned = tryAlignFace(faceBitmap);
+                if (aligned != null) faceBitmap = aligned;
+
+                // Final spoof check before update
+                Bitmap finalFaceBitmap = faceBitmap;
+                faceSpoofDetector.detectSpoofAsync(bitmap, boundingBox, ovalRect, spoofResult -> {
+                    if (spoofResult.isSpoof()) {
+                        runOnMainThread(() -> callback.onFailure("Spoof detected! Please use a real face for update."));
+                        return;
+                    }
+
+                    // Proceed with update API
+                    updateFaceId(finalFaceBitmap, userId, callback);
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error capturing face for update", e);
+                runOnMainThread(() -> callback.onFailure("Error capturing face: " + e.getMessage()));
+            }
+        });
+    }
+    
+    /**
+     * Capture and verify face embedding with spoof/oval validations (Verify flow)
+     */
+    public void captureAndVerifyFace(Bitmap bitmap, Rect boundingBox, android.graphics.RectF ovalRect,
+                                     String userId, FaceIdCallback callback) {
+        executor.execute(() -> {
+            try {
+                // Validate oval if provided
+                if (ovalRect != null) {
+                    boolean isWithinOval = checkFaceWithinOval(boundingBox, ovalRect);
+                    if (!isWithinOval) {
+                        runOnMainThread(() -> callback.onFailure("Please position your face within the oval guide"));
+                        return;
+                    }
+                }
+                
+                // Crop the face using landmark-aware pipeline
+                Rect stableCrop = computeSquareCropWithMargin(bitmap, boundingBox, 1.25f);
+                Bitmap faceBitmap = Bitmap.createBitmap(bitmap, stableCrop.left, stableCrop.top, stableCrop.width(), stableCrop.height());
+                Bitmap aligned = tryAlignFace(faceBitmap);
+                if (aligned != null) faceBitmap = aligned;
+                
+                // Optional spoof check before verification (same gate as update)
+                Bitmap finalFaceBitmap = faceBitmap;
+                faceSpoofDetector.detectSpoofAsync(bitmap, boundingBox, ovalRect, spoofResult -> {
+                    if (spoofResult.isSpoof()) {
+                        runOnMainThread(() -> callback.onFailure("Spoof detected! Please use a real face for verification."));
+                        return;
+                    }
+                    
+                    // Proceed with verify API
+                    verifyFaceId(finalFaceBitmap, userId, callback);
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error capturing face for verify", e);
                 runOnMainThread(() -> callback.onFailure("Error capturing face: " + e.getMessage()));
             }
         });
@@ -696,11 +764,16 @@ public class FaceIdService {
                 float[] embedding = retryManager.executeWithRetry(() -> faceEmbedding.getFaceEmbedding(faceBitmap));
                 Log.d(TAG, "registerFaceId: Face embedding generated - length: " + embedding.length);
                 
-                // Convert embedding to byte array for API call
+                // Convert embedding to byte array for API call (float32 little-endian)
                 ByteBuffer buffer = ByteBuffer.allocate(embedding.length * 4);
+                buffer.order(ByteOrder.LITTLE_ENDIAN);
                 for (float value : embedding) {
                     buffer.putFloat(value);
                 }
+                // Log embedding preview + sizes
+                logEmbeddingDebug(embedding, buffer.array(), "register");
+                // Save a debug copy of the exact embedding being sent
+                saveEmbeddingDebug(buffer.array(), "register");
                 
                 Log.d(TAG, "registerFaceId: Creating multipart request - buffer size: " + buffer.array().length);
                 
@@ -715,6 +788,7 @@ public class FaceIdService {
                 RequestBody userIdPart = RequestBody.create(
                         MediaType.parse("text/plain"), userId);
                 
+                Log.d(TAG, "registerFaceId: sending userId=" + userId);
                 Log.d(TAG, "registerFaceId: Making API call to register face ID");
                 
                 // 🔧 NEW: Enhanced API call with better error handling and timeout
@@ -739,6 +813,26 @@ public class FaceIdService {
                             }
                         } else {
                             String errorMsg;
+                            String serverMessage = null;
+                            try {
+                                if (response.errorBody() != null) {
+                                    String raw = response.errorBody().string();
+                                    Log.e(TAG, "registerFaceId: errorBody= " + raw);
+                                    // Try to extract a simple message field if present
+                                    int idx = raw.indexOf("\"message\"");
+                                    if (idx >= 0) {
+                                        int colon = raw.indexOf(":", idx);
+                                        if (colon > 0) {
+                                            String tmp = raw.substring(colon + 1);
+                                            tmp = tmp.replace("{", "");
+                                            tmp = tmp.replace("}", "");
+                                            tmp = tmp.replace("\"", "");
+                                            tmp = tmp.replace("\n", "");
+                                            serverMessage = tmp.trim();
+                                        }
+                                    }
+                                }
+                            } catch (Exception ignored) {}
                             if (response.code() == 401) {
                                 errorMsg = "Authentication failed. Please login again.";
                             } else if (response.code() == 403) {
@@ -747,8 +841,20 @@ public class FaceIdService {
                                 errorMsg = "Service not found. Please contact support.";
                             } else if (response.code() >= 500) {
                                 errorMsg = "Server error. Please try again later.";
+                            } else if (response.code() == 400) {
+                                // Use server message when available
+                                errorMsg = serverMessage != null && !serverMessage.isEmpty()
+                                        ? serverMessage
+                                        : ("Bad Request");
+                                // Auto-fallback: user may already have a registered Face ID
+                                if (errorMsg.toLowerCase().contains("already has") || errorMsg.toLowerCase().contains("already registered")) {
+                                    Log.w(TAG, "registerFaceId: 400 indicates already registered; falling back to updateFaceId");
+                                    // Retry via update API
+                                    updateFaceId(faceBitmap, userId, callback);
+                                    return;
+                                }
                             } else {
-                                errorMsg = "Failed to register Face ID: " + response.message();
+                                errorMsg = "Failed to register Face ID: " + (serverMessage != null ? serverMessage : response.message());
                             }
                             Log.e(TAG, "registerFaceId: HTTP FAILURE - " + errorMsg + " (code: " + response.code() + ")");
                             runOnMainThread(() -> callback.onFailure(errorMsg));
@@ -812,11 +918,18 @@ public class FaceIdService {
         faceEmbedding.getFaceEmbeddingAsync(faceBitmap, embedding -> {
             executor.execute(() -> {
                 try {
-                    // Convert embedding to byte array for API call
+                    // Convert embedding to byte array for API call (float32 little-endian)
                     ByteBuffer buffer = ByteBuffer.allocate(embedding.length * 4);
+                    buffer.order(ByteOrder.LITTLE_ENDIAN);
                     for (float value : embedding) {
                         buffer.putFloat(value);
                     }
+                            // Log embedding preview + sizes
+                            logEmbeddingDebug(embedding, buffer.array(), "update");
+                            // Save a debug copy of the exact embedding being sent
+                            saveEmbeddingDebug(buffer.array(), "update");
+                    // Save a debug copy of the exact embedding being sent
+                    saveEmbeddingDebug(buffer.array(), "update");
                     
                     // Create multipart request
                     RequestBody embeddingPart = RequestBody.create(
@@ -828,6 +941,7 @@ public class FaceIdService {
                     
                     RequestBody userIdPart = RequestBody.create(
                             MediaType.parse("text/plain"), userId);
+                    Log.d(TAG, "updateFaceId: sending userId=" + userId);
                     
                     // Make API call
                     Call<FaceIdResponse> call = faceIdApi.updateFaceId(filePart, userIdPart);
@@ -888,11 +1002,18 @@ public class FaceIdService {
         faceEmbedding.getFaceEmbeddingAsync(faceBitmap, embedding -> {
             executor.execute(() -> {
                 try {
-                    // Convert embedding to byte array for API call
+                                // Convert embedding to byte array for API call (float32 little-endian)
                     ByteBuffer buffer = ByteBuffer.allocate(embedding.length * 4);
+                    buffer.order(ByteOrder.LITTLE_ENDIAN);
                     for (float value : embedding) {
                         buffer.putFloat(value);
                     }
+                                // Log embedding preview + sizes
+                                logEmbeddingDebug(embedding, buffer.array(), "verify");
+                                // Save a debug copy of the exact embedding being sent
+                                saveEmbeddingDebug(buffer.array(), "verify");
+                    // Save a debug copy of the exact embedding being sent
+                    saveEmbeddingDebug(buffer.array(), "verify");
                     
                     // Create multipart request
                     RequestBody embeddingPart = RequestBody.create(
@@ -904,6 +1025,7 @@ public class FaceIdService {
                     
                     RequestBody userIdPart = RequestBody.create(
                             MediaType.parse("text/plain"), userId);
+                    Log.d(TAG, "verifyFace: sending userId=" + userId);
                     
                     // Make API call
                     Call<FaceIdResponse> call = faceIdApi.verifyFaceId(filePart, userIdPart);
@@ -955,11 +1077,15 @@ public class FaceIdService {
         faceEmbedding.getFaceEmbeddingAsync(faceBitmap, embedding -> {
             executor.execute(() -> {
                 try {
-                    // Convert embedding to byte array for API call
+                    // Convert embedding to byte array for API call (float32 little-endian)
                     ByteBuffer buffer = ByteBuffer.allocate(embedding.length * 4);
+                    buffer.order(ByteOrder.LITTLE_ENDIAN);
                     for (float value : embedding) {
                         buffer.putFloat(value);
                     }
+                    // Log and save debug copy
+                    logEmbeddingDebug(embedding, buffer.array(), "verify");
+                    saveEmbeddingDebug(buffer.array(), "verify");
                     
                     // Create multipart request
                     RequestBody embeddingPart = RequestBody.create(
@@ -971,6 +1097,7 @@ public class FaceIdService {
                     
                     RequestBody userIdPart = RequestBody.create(
                             MediaType.parse("text/plain"), userId);
+                    Log.d(TAG, "verifyFaceId: sending userId=" + userId);
                     
                     // Make API call
                     Call<FaceIdResponse> call = faceIdApi.verifyFaceId(filePart, userIdPart);
@@ -1050,6 +1177,128 @@ public class FaceIdService {
     
     private void runOnMainThread(Runnable runnable) {
         mainHandler.post(runnable);
+    }
+
+    /**
+     * Save a copy of the embedding bytes to app cache for debugging/API testing
+     * File name format: embedding_{action}_<timestamp>.bin
+     */
+     private void saveEmbeddingDebug(byte[] bytes, String action) {
+         try {
+             File dir = new File(context.getCacheDir(), "face_registration");
+             if (!dir.exists()) {
+                 //noinspection ResultOfMethodCallIgnored
+                 dir.mkdirs();
+             }
+             File out = new File(dir, "embedding_" + action + "_" + System.currentTimeMillis() + ".bin");
+             try (FileOutputStream fos = new FileOutputStream(out)) {
+                 fos.write(bytes);
+             }
+             Log.d(TAG, "Saved embedding debug file: " + out.getAbsolutePath());
+         } catch (Exception e) {
+             Log.w(TAG, "Failed to save embedding debug file", e);
+         }
+     }
+
+    /**
+     * Log a short preview and sizes to help debugging embedding payload
+     */
+    private void logEmbeddingDebug(float[] embedding, byte[] rawBytes, String action) {
+        try {
+            int n = embedding != null ? embedding.length : -1;
+            int bytes = rawBytes != null ? rawBytes.length : -1;
+            // preview first up to 8 floats
+            StringBuilder sb = new StringBuilder();
+            int preview = Math.min(8, Math.max(0, n));
+            for (int i = 0; i < preview; i++) {
+                if (i > 0) sb.append(", ");
+                sb.append(String.format(java.util.Locale.US, "%.6f", embedding[i]));
+            }
+            Log.d(TAG, "embedding(" + action + ") len=" + n + ", bytes=" + bytes + ", head=[" + sb + "]");
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to log embedding debug", e);
+        }
+    }
+
+    /**
+     * Compute a square crop around the detected face with an expansion margin for stability.
+     */
+    private Rect computeSquareCropWithMargin(Bitmap source, Rect faceRect, float marginScale) {
+        if (faceRect == null) return new Rect(0, 0, source.getWidth(), source.getHeight());
+        int cx = faceRect.centerX();
+        int cy = faceRect.centerY();
+        int size = Math.max(faceRect.width(), faceRect.height());
+        size = Math.round(size * marginScale);
+        int half = size / 2;
+        int left = Math.max(0, cx - half);
+        int top = Math.max(0, cy - half);
+        int right = Math.min(source.getWidth(), cx + half);
+        int bottom = Math.min(source.getHeight(), cy + half);
+        // Ensure square
+        int width = right - left;
+        int height = bottom - top;
+        int side = Math.min(Math.min(size, source.getWidth()), source.getHeight());
+        // Re-center if needed
+        left = Math.max(0, cx - side / 2);
+        top = Math.max(0, cy - side / 2);
+        right = Math.min(source.getWidth(), left + side);
+        bottom = Math.min(source.getHeight(), top + side);
+        // Adjust again if clamped
+        left = right - side;
+        top = bottom - side;
+        return new Rect(left, top, right, bottom);
+    }
+
+    /**
+     * Try to align face using eye centers. Returns aligned 160x160 bitmap or null if alignment not possible.
+     */
+    private Bitmap tryAlignFace(Bitmap faceBitmap) {
+        try {
+            if (mediaPipeFaceLandmarkExtractor == null || !mediaPipeFaceLandmarkExtractor.isModelAvailable()) {
+                return null;
+            }
+            // Extract landmarks synchronously (best-effort) using image mode
+            final CountDownLatch latch = new CountDownLatch(1);
+            final boolean[] ok = {false};
+            mediaPipeFaceLandmarkExtractor.extractLandmarks(faceBitmap, new Rect(0,0,faceBitmap.getWidth(), faceBitmap.getHeight()), success -> {
+                ok[0] = success;
+                latch.countDown();
+            });
+            latch.await(300, TimeUnit.MILLISECONDS);
+            if (!ok[0]) return null;
+
+            android.graphics.PointF left = mediaPipeFaceLandmarkExtractor.getLastLeftEyeCenter();
+            android.graphics.PointF right = mediaPipeFaceLandmarkExtractor.getLastRightEyeCenter();
+            if (left == null || right == null) return null;
+
+            // Compute angle and scale to align eyes horizontally to canonical distance
+            double dx = right.x - left.x;
+            double dy = right.y - left.y;
+            double angle = Math.atan2(dy, dx);
+            double eyeDist = Math.hypot(dx, dy);
+            if (eyeDist < 1.0) return null;
+
+            // Canonical eye positions in 160x160 (approx FaceNet canonical)
+            float cxLeft = 54f;  // tweakable
+            float cyLeft = 64f;
+            float cxRight = 106f;
+            float cyRight = 64f;
+            double targetDist = Math.hypot(cxRight - cxLeft, cyRight - cyLeft);
+            float scale = (float) (targetDist / eyeDist);
+
+            android.graphics.Matrix m = new android.graphics.Matrix();
+            m.postTranslate(-left.x, -left.y);
+            m.postRotate((float) (-Math.toDegrees(angle)));
+            m.postScale(scale, scale);
+            m.postTranslate(cxLeft, cyLeft);
+
+            Bitmap aligned = Bitmap.createBitmap(160, 160, Bitmap.Config.ARGB_8888);
+            android.graphics.Canvas c = new android.graphics.Canvas(aligned);
+            c.drawBitmap(faceBitmap, m, null);
+            return aligned;
+        } catch (Exception ignore) {
+            return null;
+        }
     }
     
     /**

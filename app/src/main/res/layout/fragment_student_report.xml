@@ -36,13 +36,37 @@
                 android:textSize="16sp"
                 android:maxLines="2" />
         </LinearLayout>
-            <ImageView
-                android:id="@+id/btnStudentNotification"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:padding="2dp"
-                android:src="@drawable/ic_notification" />
+        
+        <!-- Notification Icon with Background -->
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/btnStudentReportNotification"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/circle_background_white"
+            android:contentDescription="Notifications"
+            android:clickable="true"
+            android:focusable="true"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_notification" />
+
+        <!-- Notification Badge -->
+        <TextView
+            android:id="@+id/tvNotificationBadge"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginEnd="2dp"
+            android:layout_marginRight="2dp"
+            android:background="@drawable/bg_notification_badge"
+            android:gravity="center"
+            android:text=""
+            android:textColor="@android:color/white"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            android:layout_gravity="end"
+            android:translationX="-6dp"
+            android:translationY="6dp" />
     </LinearLayout>
 
     <!-- ===== SEMESTER TAGS CARD (placeholder giống lecturer) ===== -->

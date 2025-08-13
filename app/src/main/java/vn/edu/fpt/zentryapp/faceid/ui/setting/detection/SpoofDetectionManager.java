@@ -25,6 +25,10 @@ public class SpoofDetectionManager {
     private int framesSinceChallengeStarted = 0;
     private static final int LIVENESS_CHALLENGE_DURATION = 120; // ~4 seconds for more user-friendly challenge
     private boolean blinkDetectedInChallenge = false;
+    // Liveness bonus window after successful challenge to stabilize decisions
+    private static final int LIVENESS_BONUS_FRAMES = 90; // ~3 seconds @30fps
+    private static final float LIVENESS_CONFIDENCE_BONUS = 0.15f;
+    private int livenessBonusFramesRemaining = 0;
 
     // Frame history for temporal analysis
     private static final int FRAME_HISTORY_SIZE = 15; // Increased for more robust analysis
@@ -97,8 +101,20 @@ public class SpoofDetectionManager {
     }
 
     private SpoofDetectionResult enhanceDetectionResult(FaceSpoofDetector.SpoofResult rawResult) {
-        updateFrameHistory(rawResult.getScore(), rawResult.isSpoof());
-        return makeSecureDecision(rawResult.isSpoof(), rawResult.getScore());
+        // Apply temporary liveness bonus right after successful challenge
+        boolean adjustedIsSpoof = rawResult.isSpoof();
+        float adjustedScore = rawResult.getScore();
+        if (livenessBonusFramesRemaining > 0) {
+            // Boost confidence for real predictions and suppress borderline spoof flips
+            adjustedScore = Math.min(1.0f, adjustedScore + LIVENESS_CONFIDENCE_BONUS);
+            if (adjustedIsSpoof && adjustedScore < config.highConfidenceThreshold) {
+                adjustedIsSpoof = false;
+            }
+            livenessBonusFramesRemaining--;
+        }
+
+        updateFrameHistory(adjustedScore, adjustedIsSpoof);
+        return makeSecureDecision(adjustedIsSpoof, adjustedScore);
     }
 
     private SpoofDetectionResult makeSecureDecision(boolean rawIsSpoof, float rawConfidence) {
@@ -106,6 +122,16 @@ public class SpoofDetectionManager {
 
         if (livenessChallengeActive) {
             return handleLivenessChallenge(rawConfidence, level);
+        }
+
+        // Enforce liveness-first gating: require a recent liveness success before allowing proceed
+        boolean livenessVerifiedWindow = livenessBonusFramesRemaining > 0;
+        if (!livenessVerifiedWindow) {
+            // If we have decent signal and low suspicion, trigger liveness before proceeding
+            if (!rawIsSpoof && level != ConfidenceLevel.VERY_LOW) {
+                startLivenessChallenge();
+                return new SpoofDetectionResult(false, rawConfidence, level, "Please complete liveness (blink).", false, true);
+            }
         }
 
         updateSuspicionScore(rawIsSpoof, rawConfidence);
@@ -200,6 +226,7 @@ public class SpoofDetectionManager {
         suspicionScore = 0;
         livenessChallengeActive = false;
         frameHistory.clear();
+        livenessBonusFramesRemaining = 0;
     }
 
     /**
@@ -209,6 +236,7 @@ public class SpoofDetectionManager {
         livenessChallengeActive = false;
         framesSinceChallengeStarted = 0;
         blinkDetectedInChallenge = false;
+        // Do not clear bonus here; only cleared on full reset or after it decays per frame
     }
 
     /**
@@ -219,6 +247,12 @@ public class SpoofDetectionManager {
         framesSinceChallengeStarted = 0;
         blinkDetectedInChallenge = false;
         suspicionScore = 0;
+        // Activate a short bonus window to stabilize real-face decisions
+        livenessBonusFramesRemaining = LIVENESS_BONUS_FRAMES;
+		// Propagate liveness to detector so it trusts verified faces
+		if (detector != null) {
+			detector.setLivenessVerified(true);
+		}
     }
 
     private void startLivenessChallenge() {

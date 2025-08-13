@@ -37,6 +37,9 @@ import vn.edu.fpt.zentryapp.lecturer.data.model.response.LecturerScheduleClassSe
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.SessionDetailInfoRound;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.StudentAttendanceDto;
 import vn.edu.fpt.zentryapp.service.AttendanceApiService;
+import vn.edu.fpt.zentryapp.service.FaceIdApiService;
+import vn.edu.fpt.zentryapp.lecturer.data.model.request.FaceIdRequestCreateRequest;
+import vn.edu.fpt.zentryapp.lecturer.data.model.response.FaceIdRequestCreateResponse;
 import vn.edu.fpt.zentryapp.service.BLEAttendanceService;
 import vn.edu.fpt.zentryapp.student.data.model.response.ScheduleDetailDto;
 import vn.edu.fpt.zentryapp.student.data.model.response.ScheduleDetailResponse;
@@ -50,16 +53,23 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
     private final MutableLiveData<RoundResultDto> _roundResult = new MutableLiveData<>();
     private final MutableLiveData<Boolean> _isLoadingRoundDetail = new MutableLiveData<>(false);
     private final MutableLiveData<String> _errorMessage = new MutableLiveData<>();
-    private final MutableLiveData<Boolean> _canAddFaceId = new MutableLiveData<>(true);
+    private final MutableLiveData<Boolean> _canAddFaceId = new MutableLiveData<>(true); // Always enable for demo
     private final MutableLiveData<List<Attendance>> _listRoundAttendance = new MutableLiveData<>();
     private final MutableLiveData<Integer> _currentRoundNumber = new MutableLiveData<>();
     private final MutableLiveData<Boolean> _isEndingSession = new MutableLiveData<>(false);
     private final MutableLiveData<EndSessionResponse> _endSessionResult = new MutableLiveData<>();
+    private final MutableLiveData<Boolean> _isCreatingFaceIdRequest = new MutableLiveData<>(false);
+    private final MutableLiveData<String> _faceIdRequestSuccess = new MutableLiveData<>();
+    private final MutableLiveData<String> _faceIdRequestError = new MutableLiveData<>();
 
     public LiveData<Boolean> isEndingSession() { return _isEndingSession; }
     public LiveData<EndSessionResponse> endSessionResult() { return _endSessionResult; }
+    public LiveData<Boolean> isCreatingFaceIdRequest() { return _isCreatingFaceIdRequest; }
+    public LiveData<String> faceIdRequestSuccess() { return _faceIdRequestSuccess; }
+    public LiveData<String> faceIdRequestError() { return _faceIdRequestError; }
     // API Service
     private AttendanceApiService apiService;
+    private FaceIdApiService faceIdApiService;
     private AuthManager authManager;
     @SuppressLint("StaticFieldLeak")
     private Context context;
@@ -94,6 +104,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
         Log.d(TAG, "🔧 Creating API service...");
         try {
             this.apiService = ApiClient.getClient(context).create(AttendanceApiService.class);
+            this.faceIdApiService = ApiClient.getClient(context).create(FaceIdApiService.class);
             Log.d(TAG, "✅ API service created successfully");
         } catch (Exception e) {
             Log.e(TAG, "❌ Failed to create API service", e);
@@ -190,10 +201,8 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                                 SessionDetailInfoRound sessionInfo = mapScheduleToSessionInfo(apiResponse.getData());
                                 _sessionInfo.setValue(sessionInfo);
 
-                                // ✅ FIXED: Check session status từ API response
-                                boolean canAddFaceId = "Active".equalsIgnoreCase(apiResponse.getData().getSessionStatus());
-                                _canAddFaceId.setValue(canAddFaceId);
-
+                                // Always enable the face ID button for demo purposes
+                                _canAddFaceId.setValue(true);
                                 Log.d(TAG, "✅ Loaded schedule detail successfully");
                             } else {
                                 String error = apiResponse.getError() != null ? apiResponse.getError() : "Unknown API error";
@@ -906,5 +915,106 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
         } catch (Exception e) {
             Log.e(TAG, "Failed to stop BLE service", e);
         }
+    }
+
+    // ================= Face ID Request Creation =================
+    public void createFaceIdRequest(int expiresInMinutes, String title, String body) {
+        if (session == null) {
+            _faceIdRequestError.setValue("Session not available");
+            return;
+        }
+        if (authManager == null || !authManager.isLoggedIn()) {
+            _faceIdRequestError.setValue("Lecturer not authenticated");
+            return;
+        }
+        if (faceIdApiService == null) {
+            _faceIdRequestError.setValue("FaceId API service unavailable");
+            return;
+        }
+
+        _isCreatingFaceIdRequest.setValue(true);
+        _faceIdRequestError.setValue(null);
+        _faceIdRequestSuccess.setValue(null);
+
+        // Validate and resolve required identifiers
+        String lecturerId = session.getLecturerId();
+        if (lecturerId == null || lecturerId.trim().isEmpty()) {
+            // Fallback to current authenticated user as lecturer
+            String currentUserId = authManager != null ? authManager.getCurrentUserId() : null;
+            if (currentUserId != null && !currentUserId.trim().isEmpty()) {
+                lecturerId = currentUserId;
+                Log.w(TAG, "LecturerId missing in session. Falling back to current userId=" + lecturerId);
+            } else {
+                _isCreatingFaceIdRequest.setValue(false);
+                _faceIdRequestError.setValue("Lecturer ID not available");
+                Log.e(TAG, "Cannot create Face ID request: lecturerId is null/empty");
+                return;
+            }
+        }
+
+        String sessionId = session.getSessionId();
+        if (sessionId == null || sessionId.trim().isEmpty()) {
+            _isCreatingFaceIdRequest.setValue(false);
+            _faceIdRequestError.setValue("Session ID not available");
+            Log.e(TAG, "Cannot create Face ID request: sessionId is null/empty");
+            return;
+        }
+
+        String classSectionId = session.getClassSectionId();
+        if (classSectionId == null || classSectionId.trim().isEmpty()) {
+            _isCreatingFaceIdRequest.setValue(false);
+            _faceIdRequestError.setValue("Class section ID not available");
+            Log.e(TAG, "Cannot create Face ID request: classSectionId is null/empty");
+            return;
+        }
+
+        FaceIdRequestCreateRequest request = new FaceIdRequestCreateRequest(
+                lecturerId,
+                sessionId,
+                classSectionId,
+                expiresInMinutes,
+                title,
+                body
+        );
+
+        Log.d(TAG, "Creating Face ID request: session=" + session.getSessionId() + " expiresIn=" + expiresInMinutes + "m");
+        faceIdApiService.createFaceIdRequest(request)
+                .enqueue(new Callback<FaceIdRequestCreateResponse>() {
+                    @Override
+                    public void onResponse(Call<FaceIdRequestCreateResponse> call, Response<FaceIdRequestCreateResponse> response) {
+                        _isCreatingFaceIdRequest.setValue(false);
+                        if (response.isSuccessful() && response.body() != null) {
+                            FaceIdRequestCreateResponse apiResponse = response.body();
+                            if (apiResponse.isEffectiveSuccess()) {
+                                String msg = apiResponse.getMessage() != null ? apiResponse.getMessage() : "Face ID request created";
+                                _faceIdRequestSuccess.setValue(msg);
+                                Log.d(TAG, "Face ID request created successfully");
+                            } else {
+                                // Try to extract success from root-level fields even if Success=false
+                                if (apiResponse.getRequestId() != null && !apiResponse.getRequestId().isEmpty()) {
+                                    String msg = apiResponse.getMessage() != null ? apiResponse.getMessage() : "Face ID request created";
+                                    _faceIdRequestSuccess.setValue(msg);
+                                    Log.w(TAG, "Face ID request treated as success via root fields: requestId=" + apiResponse.getRequestId());
+                                    return;
+                                }
+                                String err = apiResponse.getError() != null ? apiResponse.getError() : "Failed to create Face ID request";
+                                _faceIdRequestError.setValue(err);
+                                Log.e(TAG, "Face ID request API error: " + err);
+                            }
+                        } else {
+                            String err = "HTTP Error: " + response.code();
+                            _faceIdRequestError.setValue(err);
+                            Log.e(TAG, "Face ID request " + err);
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<FaceIdRequestCreateResponse> call, Throwable t) {
+                        _isCreatingFaceIdRequest.setValue(false);
+                        String err = "Network Error: " + t.getMessage();
+                        _faceIdRequestError.setValue(err);
+                        Log.e(TAG, "Face ID request network error", t);
+                    }
+                });
     }
 }

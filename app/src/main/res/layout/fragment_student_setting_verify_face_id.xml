@@ -2,158 +2,495 @@
 <FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/flVerifyFaceIdRoot"
+    android:id="@+id/flStudentSettingVerifyFaceIdRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fitsSystemWindows="true"
-    android:background="#F5F9FF">
+    android:background="@color/background_light">
 
-    <!-- Content chính với paddingTop để lùi xuống dưới toolbar overlay -->
+    <!-- Setup Screen - Hiển thị đầu tiên -->
     <LinearLayout
-        android:id="@+id/llVerifyFaceIdContent"
+        android:id="@+id/llSetupScreen"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="16dp"
-        android:paddingTop="?attr/actionBarSize"
-        android:background="@android:color/transparent">
+        android:background="@color/background_light"
+        android:visibility="visible">
 
-        <!-- Status Text -->
+        <!-- Back button -->
+        <ImageView
+            android:id="@+id/ivStudentSettingVerifyFaceIdBack"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_margin="16dp"
+            android:padding="12dp"
+            android:src="@drawable/ic_arrow_back"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="@color/text_primary"/>
+
+        <!-- Title -->
         <TextView
-            android:id="@+id/tvStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="16dp"
-            android:gravity="center"
-            android:text="Position your face in the oval"
-            android:textSize="16sp"
-            android:textColor="#232B42"
-            android:padding="8dp"
-            android:background="@drawable/bg_rounded_light"
-            android:textStyle="bold"/>
+            android:layout_marginHorizontal="32dp"
+            android:layout_marginTop="32dp"
+            android:text="Set up Face ID"
+            android:textSize="32sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:fontFamily="@font/jostsemibold"/>
 
-        <!-- Camera Container -->
+        <!-- Subtitle -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="32dp"
+            android:layout_marginTop="8dp"
+            android:text="Scan your face to verify your identity"
+            android:textSize="16sp"
+            android:textColor="@color/text_secondary"
+            android:fontFamily="@font/jost"/>
+
+        <!-- Face Guide Container -->
         <FrameLayout
-            android:id="@+id/flCameraContainer"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:background="@drawable/bg_circle_white">
-            
-            <!-- Camera view and overlay will be added here programmatically -->
-            
+            android:layout_marginTop="48dp"
+            android:gravity="center">
+
+            <!-- Card for Face Guide -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="280dp"
+                android:layout_height="320dp"
+                android:layout_gravity="center"
+                app:cardCornerRadius="24dp"
+                app:cardElevation="12dp"
+                app:cardBackgroundColor="@color/white">
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="32dp">
+
+                    <!-- Face Oval Guide -->
+                    <FrameLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_gravity="center">
+
+                        <!-- Oval background with better styling -->
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:background="@drawable/bg_face_oval_guide_enhanced"/>
+
+                        <!-- Face icon overlay -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:orientation="vertical"
+                            android:gravity="center">
+
+                            <!-- Head outline -->
+                            <View
+                                android:layout_width="80dp"
+                                android:layout_height="3dp"
+                                android:layout_marginBottom="50dp"
+                                android:background="@drawable/bg_rounded_line"/>
+
+                            <!-- Eyes -->
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:layout_marginBottom="24dp">
+
+                                <View
+                                    android:layout_width="12dp"
+                                    android:layout_height="12dp"
+                                    android:layout_marginEnd="20dp"
+                                    android:background="@drawable/bg_circle_dark"/>
+
+                                <View
+                                    android:layout_width="12dp"
+                                    android:layout_height="12dp"
+                                    android:background="@drawable/bg_circle_dark"/>
+
+                            </LinearLayout>
+
+                            <!-- Mouth -->
+                            <View
+                                android:layout_width="24dp"
+                                android:layout_height="3dp"
+                                android:background="@drawable/bg_rounded_line"/>
+
+                        </LinearLayout>
+
+                    </FrameLayout>
+
+                </FrameLayout>
+
+            </androidx.cardview.widget.CardView>
+
         </FrameLayout>
-        
-        <!-- Instructions -->
-        <androidx.cardview.widget.CardView
+
+        <!-- Bottom Buttons -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="16dp"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="4dp"
-            app:cardBackgroundColor="#CECFFE">
-            
+            android:orientation="vertical"
+            android:layout_marginHorizontal="32dp"
+            android:layout_marginBottom="32dp">
+
+            <!-- Get Started Button -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/btnGetStarted"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="28dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="@color/text_primary"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:text="Get started"
+                    android:textColor="@color/background_light"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:fontFamily="@font/jostsemibold"/>
+
+            </androidx.cardview.widget.CardView>
+
+            <!-- Not Now Button -->
+            <TextView
+                android:id="@+id/btnNotNow"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:gravity="center"
+                android:text="Not now"
+                android:textColor="@color/text_secondary"
+                android:textSize="16sp"
+                android:fontFamily="@font/jost"
+                android:background="?attr/selectableItemBackground"/>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Camera Screen - Hiển thị khi đang scan -->
+    <FrameLayout
+        android:id="@+id/flCameraScreen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/background_light"
+        android:visibility="gone">
+
+        <!-- Back button -->
+        <ImageView
+            android:id="@+id/ivCameraBack"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_margin="16dp"
+            android:padding="12dp"
+            android:src="@drawable/ic_arrow_back"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="@color/text_primary"/>
+
+        <!-- Content -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:layout_marginTop="64dp">
+
+            <!-- Title -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="24dp"
+                android:layout_marginTop="16dp"
+                android:text="Hold still"
+                android:textSize="28sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:fontFamily="@font/jostsemibold"
+                android:textAlignment="center"/>
+
+            <!-- Subtitle -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="24dp"
+                android:layout_marginTop="8dp"
+                android:text="Look directly into the camera\nwhile we do the magic"
+                android:textSize="16sp"
+                android:textColor="@color/text_secondary"
+                android:fontFamily="@font/jost"
+                android:textAlignment="center"
+                android:lineSpacingExtra="4dp"/>
+
+            <!-- Camera Container with rounded corners -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginTop="32dp"
+                android:layout_marginHorizontal="24dp"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="24dp"
+                app:cardElevation="8dp"
+                app:cardBackgroundColor="@color/white">
+
+                <FrameLayout
+                    android:id="@+id/flStudentSettingVerifyFaceIdCameraContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <!-- Camera view and overlay will be added here programmatically -->
+
+                    <!-- Liveness Challenge Progress (moved here as overlay to avoid shrinking camera area) -->
+                    <LinearLayout
+                        android:id="@+id/llLivenessProgress"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="bottom"
+                        android:gravity="center"
+                        android:orientation="horizontal"
+                        android:paddingStart="16dp"
+                        android:paddingEnd="16dp"
+                        android:paddingBottom="16dp"
+                        android:visibility="gone"
+                        android:elevation="8dp">
+
+                        <!-- Blink Challenge Indicator -->
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="16dp"
+                            android:gravity="center"
+                            android:orientation="vertical">
+
+                            <ImageView
+                                android:id="@+id/ivBlinkIndicator"
+                                android:layout_width="32dp"
+                                android:layout_height="32dp"
+                                android:src="@drawable/ic_eye"
+                                app:tint="#CCCCCC" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="Blink"
+                                android:textSize="12sp"/>
+                        </LinearLayout>
+
+                        <!-- Progress Arrow -->
+                        <View
+                            android:layout_width="24dp"
+                            android:layout_height="2dp"
+                            android:background="#CCCCCC"/>
+
+                        <!-- Gaze Challenge Indicator -->
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp"
+                            android:gravity="center"
+                            android:orientation="vertical">
+
+                            <ImageView
+                                android:id="@+id/ivGazeIndicator"
+                                android:layout_width="32dp"
+                                android:layout_height="32dp"
+                                android:src="@drawable/ic_look_around"
+                                app:tint="#CCCCCC" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="Look Around"
+                                android:textSize="12sp"/>
+                        </LinearLayout>
+                    </LinearLayout>
+
+                </FrameLayout>
+
+            </androidx.cardview.widget.CardView>
+
+            <!-- Status Container -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="16dp">
-                
+                android:layout_marginHorizontal="24dp"
+                android:layout_marginBottom="32dp"
+                android:gravity="center">
+
+                <!-- Status Message -->
                 <TextView
-                    android:layout_width="match_parent"
+                    android:id="@+id/tvStatusMessage"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Instructions"
-                    android:textStyle="bold"
+                    android:layout_marginBottom="12dp"
+                    android:textAlignment="center"
                     android:textSize="18sp"
-                    android:textColor="#232B42"/>
-                
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:fontFamily="@font/jostsemibold"
+                    android:text="Position your face in the oval"/>
+
+                <!-- Instruction text -->
                 <TextView
-                    android:layout_width="match_parent"
+                    android:id="@+id/tvInstructionMessage"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="1. Position your face in the center\n2. Ensure good lighting\n3. Look directly at the camera\n4. Keep a neutral expression"
-                    android:textColor="#232B42"/>
-                
+                    android:textAlignment="center"
+                    android:textSize="14sp"
+                    android:textColor="@color/text_secondary"
+                    android:fontFamily="@font/jost"
+                    android:text="Keep your face centered and hold still"/>
+
+
+
             </LinearLayout>
-            
-        </androidx.cardview.widget.CardView>
-        
-        <!-- Action Buttons -->
+
+        </LinearLayout>
+
+        <!-- Loading Skeleton -->
+        <FrameLayout
+            android:id="@+id/skeletonLayout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/background_light"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:gravity="center">
+
+                <ProgressBar
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:indeterminateTint="@color/primary"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="Initializing camera..."
+                    android:textSize="16sp"
+                    android:textColor="@color/text_secondary"
+                    android:fontFamily="@font/jost"/>
+
+            </LinearLayout>
+        </FrameLayout>
+
+    </FrameLayout>
+
+    <!-- Success Screen -->
+    <LinearLayout
+        android:id="@+id/llSuccessScreen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:background="@color/text_primary"
+        android:visibility="gone">
+
+        <!-- Back button -->
+        <ImageView
+            android:id="@+id/ivSuccessBack"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_margin="16dp"
+            android:padding="12dp"
+            android:src="@drawable/ic_arrow_back"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="@color/background_light"/>
+
+        <!-- Content -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="16dp">
-            
-            <!-- Cancel Button -->
-            <Button
-                android:id="@+id/btnCancel"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="8dp"
-                android:text="Cancel"
-                android:textAllCaps="false"
-                android:textSize="16sp"
-                android:padding="12dp"
-                android:background="@drawable/bg_button_secondary"
-                android:textColor="#232B42"/>
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:layout_marginHorizontal="32dp">
 
-            <!-- Verify Button -->
-            <Button
-                android:id="@+id/btnVerify"
-                android:layout_width="0dp"
+            <!-- Title -->
+            <TextView
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="8dp"
-                android:text="Verify Face ID"
-                android:textAllCaps="false"
+                android:layout_marginBottom="16dp"
+                android:text="Success"
+                android:textSize="32sp"
+                android:textStyle="bold"
+                android:textColor="@color/background_light"
+                android:fontFamily="@font/jostsemibold"/>
+
+            <!-- Subtitle -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="64dp"
+                android:text="From now on you can use your face to do things quicker"
                 android:textSize="16sp"
-                android:padding="12dp"
-                android:background="@drawable/bg_button_primary"
-                android:textColor="#FFFFFF"/>
+                android:textColor="@color/background_light"
+                android:fontFamily="@font/jost"
+                android:alpha="0.8"/>
+
+            <!-- Success Icon -->
+            <FrameLayout
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:layout_marginBottom="32dp">
+
+                <!-- Circle background -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/bg_circle_white_stroke"/>
+
+                <!-- Checkmark -->
+                <ImageView
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_check"
+                    app:tint="@color/background_light"/>
+
+            </FrameLayout>
+
         </LinearLayout>
-        
-        <!-- Progress Bar -->
+
+        <!-- Progress bar at bottom -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginBottom="32dp"
+            android:layout_marginHorizontal="32dp"
+            android:background="@drawable/bg_progress_bar"/>
+
+        <!-- Processing indicator -->
         <ProgressBar
-            android:id="@+id/progressBar"
+            android:id="@+id/progressBarVerifyFaceId"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:layout_marginTop="16dp"
+            android:layout_marginBottom="32dp"
+            android:indeterminateTint="@color/background_light"
             android:visibility="gone"/>
-        
+
     </LinearLayout>
-    
-    <!-- Toolbar overlay -->
-    <LinearLayout
-        android:id="@+id/llVerifyFaceIdToolbar"
-        android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:background="#FFFFFF"
-        android:elevation="4dp">
-        
-        <ImageView
-            android:id="@+id/ivBack"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:padding="12dp"
-            android:src="@drawable/ic_arrow_back"
-            app:tint="#232B42"/>
-        
-        <TextView
-            android:id="@+id/tvVerifyFaceIdTitle"
-            android:fontFamily="@font/jostsemibold"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:text="Verify Face ID"
-            android:textStyle="bold"
-            android:textSize="20sp"
-            android:textColor="#232B42"/>
-    </LinearLayout>
-</FrameLayout> 
+
+</FrameLayout>

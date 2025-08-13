@@ -30,6 +30,7 @@ public class FaceIdSuccessActivity extends AppCompatActivity {
     private static final String EXTRA_USER_ID = "user_id";
     private static final String EXTRA_SUCCESS_MESSAGE = "success_message";
     private static final String EXTRA_BITMAP_PATH = "bitmap_path";
+    private static final String EXTRA_ACTION = "action"; // "register" | "update"
     
     private ActivityFaceIdSuccessBinding binding;
     private Handler handler = new Handler(Looper.getMainLooper());
@@ -40,6 +41,12 @@ public class FaceIdSuccessActivity extends AppCompatActivity {
         intent.putExtra(EXTRA_USER_ID, userId);
         intent.putExtra(EXTRA_SUCCESS_MESSAGE, successMessage);
         intent.putExtra(EXTRA_BITMAP_PATH, bitmapPath);
+        return intent;
+    }
+
+    public static Intent createIntent(Context context, String userId, String successMessage, String bitmapPath, String action) {
+        Intent intent = createIntent(context, userId, successMessage, bitmapPath);
+        intent.putExtra(EXTRA_ACTION, action);
         return intent;
     }
     
@@ -71,13 +78,6 @@ public class FaceIdSuccessActivity extends AppCompatActivity {
     
     private void setupClickListeners() {
         binding.ivBack.setOnClickListener(v -> finishWithResult());
-        
-        binding.btnContinue.setOnClickListener(v -> finishWithResult());
-        
-        binding.btnTestFaceId.setOnClickListener(v -> {
-            // TODO: Launch Face ID test activity
-            Toast.makeText(this, "Face ID test will be implemented", Toast.LENGTH_SHORT).show();
-        });
     }
     
     private void startBackgroundSync() {
@@ -88,14 +88,32 @@ public class FaceIdSuccessActivity extends AppCompatActivity {
             Log.w(TAG, "Missing data for background sync");
             return;
         }
+        // Guard: ensure file exists before enqueueing work
+        try {
+            java.io.File f = new java.io.File(bitmapPath);
+            if (!f.exists()) {
+                Log.w(TAG, "Bitmap file not found, skip background sync: " + bitmapPath);
+                if (binding != null) {
+                    binding.progressSync.setVisibility(View.GONE);
+                    binding.tvSyncStatus.setText("Ready");
+                    binding.pbSync.setVisibility(View.GONE);
+                }
+                return;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Error checking bitmap file, skip background sync", e);
+            return;
+        }
         
         // Show sync progress
         binding.progressSync.setVisibility(View.VISIBLE);
         
         // Create work request
+        String action = getIntent().getStringExtra(EXTRA_ACTION);
         Data inputData = new Data.Builder()
                 .putString(FaceEmbeddingSyncWorker.KEY_USER_ID, userId)
                 .putString(FaceEmbeddingSyncWorker.KEY_BITMAP_PATH, bitmapPath)
+                .putString(FaceEmbeddingSyncWorker.KEY_ACTION, action)
                 .build();
         
         OneTimeWorkRequest syncWork = new OneTimeWorkRequest.Builder(FaceEmbeddingSyncWorker.class)
