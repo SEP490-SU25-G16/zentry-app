@@ -3,18 +3,15 @@ package vn.edu.fpt.zentryapp.faceid.ui.components;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.media.Image;
 import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.YuvImage;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.Size;
+import android.view.Surface;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
-import android.view.Surface;
-import android.view.WindowManager;
-import android.hardware.display.DisplayManager;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -38,11 +35,8 @@ import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import vn.edu.fpt.zentryapp.faceid.utils.YuvToRgbConverter;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Custom camera view for face capture with continuous frame analysis
@@ -55,14 +49,8 @@ public class CameraView extends FrameLayout {
     private ProcessCameraProvider cameraProvider;
     private ImageCapture imageCapture;
     private ImageAnalysis imageAnalysis;
-    private Preview previewUseCase;
     private final Executor executor = Executors.newSingleThreadExecutor();
-    private final ExecutorService mlWorker = Executors.newSingleThreadExecutor();
-    private final YuvToRgbConverter yuvConverter = new YuvToRgbConverter();
-    private Bitmap reusableRgbBitmap;
-    private final AtomicReference<Bitmap> latestFrame = new AtomicReference<>(null);
-    private final AtomicBoolean workerActive = new AtomicBoolean(false);
-    private volatile int analysisStride = 1; // soft FPS cap: analyze every N frames
+    private AtomicBoolean processingFrame = new AtomicBoolean(false);
     
     // Biến để log info chỉ một lần
     private boolean hasLoggedImageInfo = false;
@@ -132,25 +120,11 @@ public class CameraView extends FrameLayout {
     /**
      * Bind camera use cases
      */
-    @OptIn(markerClass = ExperimentalGetImage.class)
     private void bindCameraUseCases(LifecycleOwner lifecycleOwner, @Nullable FrameAnalysisCallback frameCallback) {
         Log.d(TAG, "Binding camera use cases, frameCallback: " + (frameCallback != null));
         
-        // Cleanup previous bindings BEFORE creating new use cases to avoid clearing new analyzer
-        try {
-            if (imageAnalysis != null) {
-                imageAnalysis.clearAnalyzer();
-            }
-            if (previewUseCase != null) {
-                previewUseCase.setSurfaceProvider(null);
-            }
-            if (cameraProvider != null) {
-                cameraProvider.unbindAll();
-            }
-        } catch (Exception ignore) {}
-        
-        // Get screen rotation safely (previewView.getDisplay() may be null if not yet attached)
-        int rotation = getSafeRotation();
+        // Get screen metrics
+        int rotation = previewView.getDisplay().getRotation();
         
         // CameraSelector - Front camera for face capture
         CameraSelector cameraSelector = new CameraSelector.Builder()
@@ -158,7 +132,7 @@ public class CameraView extends FrameLayout {
                 .build();
         
         // Preview use case
-        previewUseCase = new Preview.Builder()
+        Preview preview = new Preview.Builder()
                 .setTargetRotation(rotation)
                 .build();
         
@@ -177,12 +151,9 @@ public class CameraView extends FrameLayout {
             imageAnalysis = new ImageAnalysis.Builder()
                     .setTargetRotation(rotation)
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
-                    .setTargetResolution(new Size(640, 480)) // match model-friendly size
+                    .setTargetResolution(new Size(640, 480)) // Độ phân giải phù hợp cho face detection
                     .build();
             
-            // Store callback for worker delivery
-            final FrameAnalysisCallback analysisCallback = frameCallback;
             imageAnalysis.setAnalyzer(executor, image -> {
                 frameCount++;
                 
@@ -192,13 +163,17 @@ public class CameraView extends FrameLayout {
                             ", size: " + image.getWidth() + "x" + image.getHeight());
                 }
                 
-                // Adaptive frame skipping: if worker is busy, skip; also apply stride
-                if (workerActive.get() || (analysisStride > 1 && (frameCount % analysisStride) != 0)) {
+                // Skip if we're still processing a previous frame
+                if (processingFrame.get()) {
+                    if (frameCount % 30 == 0) {
+                        Log.d(TAG, "Skipping frame #" + frameCount + " - still processing previous frame");
+                    }
                     image.close();
                     return;
                 }
                 
                 try {
+                    processingFrame.set(true);
                     
                     // Log thông tin về định dạng ảnh (chỉ log lần đầu tiên)
                     if (!hasLoggedImageInfo) {
@@ -209,14 +184,14 @@ public class CameraView extends FrameLayout {
                     try {
                         Log.d(TAG, "Converting frame #" + frameCount + " to bitmap");
                         
-                        // Fast YUV->RGB using reusable buffer
-                        Image mediaImage = image.getImage();
-                        if (mediaImage == null) { image.close(); return; }
-                        if (reusableRgbBitmap == null || reusableRgbBitmap.getWidth() != image.getWidth() || reusableRgbBitmap.getHeight() != image.getHeight()) {
-                            reusableRgbBitmap = Bitmap.createBitmap(image.getWidth(), image.getHeight(), Bitmap.Config.ARGB_8888);
+                        // Convert to bitmap
+                        Bitmap bitmap = imageToBitmap(image);
+                        
+                        if (bitmap == null) {
+                            Log.e(TAG, "Failed to convert frame #" + frameCount + " to bitmap - bitmap is null");
+                            processingFrame.set(false);
+                            return;
                         }
-                        yuvConverter.yuvToRgb(mediaImage, reusableRgbBitmap);
-                        Bitmap bitmap = reusableRgbBitmap;
                         
                         Log.d(TAG, "Successfully converted frame #" + frameCount + " to bitmap: " + 
                                 bitmap.getWidth() + "x" + bitmap.getHeight());
@@ -240,33 +215,30 @@ public class CameraView extends FrameLayout {
                         Log.d(TAG, "Final bitmap for frame #" + frameCount + ": " + 
                                 bitmap.getWidth() + "x" + bitmap.getHeight());
                         
-                        // Coalesce frames for worker to keep freshest
-                        Bitmap previous = latestFrame.getAndSet(bitmap);
-                        if (previous != null && previous != bitmap && !previous.isRecycled()) {
-                            try { previous.recycle(); } catch (Exception ignore) {}
-                        }
-                        if (workerActive.compareAndSet(false, true)) {
-                            mlWorker.execute(() -> drainWorkerQueue(analysisCallback));
-                        }
+                        // Return bitmap via callback
+                        final Bitmap finalBitmap = bitmap;
+                        post(() -> {
+                            Log.d(TAG, "Calling frameCallback for frame #" + frameCount);
+                            frameCallback.onFrameAnalyzed(finalBitmap);
+                            processingFrame.set(false);
+                        });
                     } catch (Exception e) {
                         Log.e(TAG, "Error processing frame #" + frameCount, e);
-
+                        processingFrame.set(false);
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "Error analyzing frame #" + frameCount, e);
-
+                    processingFrame.set(false);
                 } finally {
                     image.close();
                 }
             });
-
-            // Warm default stride based on device load could be updated elsewhere
-            setAnalysisStride(1);
         } else {
             Log.d(TAG, "No frame callback provided - ImageAnalysis not set up");
         }
         
-        // Previous unbound above
+        // Unbind previous use cases
+        cameraProvider.unbindAll();
         
         try {
             // Bind use cases to camera
@@ -275,7 +247,7 @@ public class CameraView extends FrameLayout {
                 camera = cameraProvider.bindToLifecycle(
                         lifecycleOwner,
                         cameraSelector,
-                        previewUseCase,
+                        preview,
                         imageCapture,
                         imageAnalysis);
             } else {
@@ -283,103 +255,18 @@ public class CameraView extends FrameLayout {
                 camera = cameraProvider.bindToLifecycle(
                         lifecycleOwner,
                         cameraSelector,
-                        previewUseCase,
+                        preview,
                         imageCapture);
             }
             
             // Connect preview to previewView
-            if (previewUseCase != null) {
-                previewUseCase.setSurfaceProvider(previewView.getSurfaceProvider());
-            }
+            preview.setSurfaceProvider(previewView.getSurfaceProvider());
             Log.d(TAG, "Camera binding successful");
         } catch (Exception e) {
             Log.e(TAG, "Use case binding failed", e);
         }
     }
-
-    /**
-     * Safely get the current display rotation with fallbacks for cases where the view is not yet attached.
-     */
-    private int getSafeRotation() {
-        try {
-            if (previewView != null && previewView.getDisplay() != null) {
-                return previewView.getDisplay().getRotation();
-            }
-            android.view.Display display = null;
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                DisplayManager dm = (DisplayManager) getContext().getSystemService(Context.DISPLAY_SERVICE);
-                if (dm != null) {
-                    display = dm.getDisplay(android.view.Display.DEFAULT_DISPLAY);
-                }
-            } else {
-                WindowManager wm = (WindowManager) getContext().getSystemService(Context.WINDOW_SERVICE);
-                if (wm != null) {
-                    display = wm.getDefaultDisplay();
-                }
-            }
-            if (display != null) {
-                return display.getRotation();
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "getSafeRotation fallback error", e);
-        }
-        return Surface.ROTATION_0;
-    }
     
-    private void drainWorkerQueue(@Nullable FrameAnalysisCallback analysisCallback) {
-        try {
-            while (true) {
-                Bitmap toProcess = latestFrame.getAndSet(null);
-                if (toProcess == null) break;
-                final Bitmap deliver = toProcess;
-                post(() -> {
-                    try {
-                        // Deliver on UI thread; heavy ML should be in worker callbacks downstream
-                        if (analysisCallback != null) analysisCallback.onFrameAnalyzed(deliver);
-                    } catch (Exception e) {
-                        Log.e(TAG, "Error delivering frame to callback", e);
-                    }
-                });
-            }
-        } finally {
-            workerActive.set(false);
-            if (latestFrame.get() != null && workerActive.compareAndSet(false, true)) {
-                mlWorker.execute(() -> drainWorkerQueue(null));
-            }
-        }
-    }
-
-    /**
-     * Adjust analysis stride (process every Nth frame). Use >1 to reduce load.
-     */
-    public void setAnalysisStride(int stride) {
-        if (stride < 1) stride = 1;
-        this.analysisStride = stride;
-    }
-
-    /**
-     * Stop camera and release analysis/preview surfaces
-     */
-    public void stopCamera() {
-        try {
-            if (imageAnalysis != null) {
-                imageAnalysis.clearAnalyzer();
-            }
-            if (previewUseCase != null) {
-                previewUseCase.setSurfaceProvider(null);
-            }
-            if (cameraProvider != null) {
-                cameraProvider.unbindAll();
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "stopCamera cleanup error", e);
-        } finally {
-            camera = null;
-            imageAnalysis = null;
-            imageCapture = null;
-        }
-    }
-
     /**
      * Capture a photo
      */
@@ -391,18 +278,11 @@ public class CameraView extends FrameLayout {
         
         // Create image capture listener
         ImageCapture.OnImageCapturedCallback imageCapturedCallback = new ImageCapture.OnImageCapturedCallback() {
-            @OptIn(markerClass = ExperimentalGetImage.class)
             @Override
             public void onCaptureSuccess(@NonNull ImageProxy imageProxy) {
                 try {
-                    // Convert ImageProxy to Bitmap via reusable YUV converter
-                    Image media = imageProxy.getImage();
-                    if (media == null) { imageProxy.close(); post(() -> callback.onError("Image null")); return; }
-                    if (reusableRgbBitmap == null || reusableRgbBitmap.getWidth() != imageProxy.getWidth() || reusableRgbBitmap.getHeight() != imageProxy.getHeight()) {
-                        reusableRgbBitmap = Bitmap.createBitmap(imageProxy.getWidth(), imageProxy.getHeight(), Bitmap.Config.ARGB_8888);
-                    }
-                    yuvConverter.yuvToRgb(media, reusableRgbBitmap);
-                    Bitmap bitmap = reusableRgbBitmap;
+                    // Convert ImageProxy to Bitmap
+                    Bitmap bitmap = imageToBitmap(imageProxy);
                     
                     // Apply rotation if needed
                     int rotationDegrees = imageProxy.getImageInfo().getRotationDegrees();
@@ -849,5 +729,13 @@ public class CameraView extends FrameLayout {
             return null;
         }
     }
-
+    
+    /**
+     * Stop camera and release resources
+     */
+    public void stopCamera() {
+        if (cameraProvider != null) {
+            cameraProvider.unbindAll();
+        }
+    }
 } 

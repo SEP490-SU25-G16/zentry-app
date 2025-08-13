@@ -16,7 +16,6 @@ import android.view.animation.AccelerateDecelerateInterpolator;
 
 import androidx.annotation.Nullable;
 
-import lombok.Getter;
 import vn.edu.fpt.zentryapp.faceid.data.service.FaceProcessingState;
 import android.util.Log;
 
@@ -45,13 +44,8 @@ public class OvalFaceOverlayView extends View {
     private final Paint textPaint;
     private final Paint successPaint;
     private final Paint guidePaint;
-
-    /**
-     * -- GETTER --
-     *  Get the oval rect in absolute coordinates
-     */
+    
     // Geometry
-    @Getter
     private RectF ovalRect;
     private Path ovalPath;
     
@@ -62,13 +56,8 @@ public class OvalFaceOverlayView extends View {
     private ValueAnimator progressAnimator;
     private ValueAnimator successAnimator;
     private float successAnimValue = 0f;
-
-    /**
-     * -- GETTER --
-     *  Get the last face rect
-     */
+    
     // Face position tracking
-    @Getter
     private android.graphics.Rect lastFaceRect;
     private boolean isGoodPosition = false;
     private String positionGuidance = "";
@@ -465,7 +454,21 @@ public class OvalFaceOverlayView extends View {
         ovalPaint.setPathEffect(null);
         invalidate();
     }
-
+    
+    /**
+     * Get the oval rect in absolute coordinates
+     */
+    public RectF getOvalRect() {
+        return ovalRect;
+    }
+    
+    /**
+     * Get the last face rect
+     */
+    public android.graphics.Rect getLastFaceRect() {
+        return lastFaceRect;
+    }
+    
     /**
      * Check if a face is properly positioned within the oval boundary
      * This can be called externally to validate face position

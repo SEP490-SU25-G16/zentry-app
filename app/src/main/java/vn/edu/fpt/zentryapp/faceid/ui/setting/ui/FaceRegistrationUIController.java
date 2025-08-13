@@ -1,4 +1,4 @@
-package vn.edu.fpt.zentryapp.faceid.ui;
+package vn.edu.fpt.zentryapp.faceid.ui.setting.ui;
 
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
@@ -6,7 +6,6 @@ import android.view.View;
 
 import androidx.core.content.ContextCompat;
 
-import lombok.Getter;
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentSettingRegisterFaceIdBinding;
 import vn.edu.fpt.zentryapp.faceid.data.service.FaceProcessingState;
@@ -18,14 +17,10 @@ import vn.edu.fpt.zentryapp.faceid.ui.setting.state.FaceRegistrationState;
  * Tách riêng UI logic khỏi business logic
  */
 public class FaceRegistrationUIController {
+    private static final String TAG = "FaceRegUIController";
+
     private final FragmentStudentSettingRegisterFaceIdBinding binding;
     private final OvalFaceOverlayView faceOverlayView;
-    /**
-     * -- GETTER --
-     *  Get current screen state
-     */
-    @Getter
-    private UIScreenState currentScreenState = UIScreenState.SETUP;
 
     // UI States
     public enum UIScreenState {
@@ -33,6 +28,8 @@ public class FaceRegistrationUIController {
         CAMERA,   // Màn hình camera
         LOADING   // Màn hình loading khi processing
     }
+
+    private UIScreenState currentScreenState = UIScreenState.SETUP;
 
     public FaceRegistrationUIController(FragmentStudentSettingRegisterFaceIdBinding binding,
                                          OvalFaceOverlayView faceOverlayView) {
@@ -293,6 +290,21 @@ public class FaceRegistrationUIController {
         // Có thể extend layout để có retry button
     }
 
+    /**
+     * Enable/disable camera controls
+     */
+    public void setCameraControlsEnabled(boolean enabled) {
+        // Disable back button during processing
+        binding.ivCameraBack.setEnabled(enabled);
+        binding.ivCameraBack.setAlpha(enabled ? 1.0f : 0.5f);
+    }
+
+    /**
+     * Get current screen state
+     */
+    public UIScreenState getCurrentScreenState() {
+        return currentScreenState;
+    }
 
     /**
      * Cleanup UI controller
@@ -301,40 +313,6 @@ public class FaceRegistrationUIController {
         // Clear any pending UI updates
         if (faceOverlayView != null) {
             faceOverlayView.stopProgressAnimation();
-        }
-    }
-
-    public int getColorForState(FaceRegistrationState state) {
-        final var ctx = binding.getRoot().getContext();
-        switch (state) {
-            case FACE_REAL:
-            case FACE_STABLE:
-                return ContextCompat.getColor(ctx, R.color.success_green);
-
-            case FACE_DETECTED:
-            case FACE_STABILIZING:
-            case FACE_WARNING:
-            case FACE_OUT_OF_BOUNDS:
-                return ContextCompat.getColor(ctx, R.color.warning_yellow);
-
-            case FACE_SPOOFED:
-            case FAILED_SPOOF:
-            case MULTIPLE_FACES:
-                return ContextCompat.getColor(ctx, R.color.error_red);
-
-            case NO_FACE:
-            case READY:
-                return ContextCompat.getColor(ctx, R.color.white);
-
-            case LIVENESS_CHALLENGE:
-                return ContextCompat.getColor(ctx, R.color.liveness_challenge_blue);
-
-            case ANALYZING:
-            case PROCESSING:
-                return ContextCompat.getColor(ctx, R.color.processing_blue);
-
-            default:
-                return ContextCompat.getColor(ctx, R.color.white);
         }
     }
 }
