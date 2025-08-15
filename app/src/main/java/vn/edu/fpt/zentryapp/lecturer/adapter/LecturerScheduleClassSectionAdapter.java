@@ -181,18 +181,16 @@ public class LecturerScheduleClassSectionAdapter extends RecyclerView.Adapter<Le
 
             switch (status) {
                 case STATUS_PENDING:
-                    if (hasEnded) {
+                    if (hasEnded) {                       // quá giờ  → MISSED
                         return ACTION_MISSED;
                     }
-                    if (hasActiveSession) {
-                        return ACTION_UPCOMING;
-                    }
-                    // Nếu đang trong thời gian diễn ra -> có thể start
-                    if (isCurrentlyHappening) {
+                    if (isCurrentlyHappening) {           // đang tới giờ → START
                         return ACTION_START;
-                    } else {
+                    }
+                    if (hasActiveSession) {               // có lớp Active khác → UPCOMING
                         return ACTION_UPCOMING;
                     }
+                    return ACTION_UPCOMING;               // mặc định
 
                 case STATUS_ACTIVE:
                     // ✅ HARDCODE: Nếu Active nhưng đã quá giờ kết thúc → VIEW
