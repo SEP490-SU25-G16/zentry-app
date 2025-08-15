@@ -268,25 +268,28 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
 
             // ✅ Check từ SharedPreferences
             boolean hasJoined = isSessionJoinedFromPrefs(session.getSessionId());
-
+            boolean hasEnded = endTime != null && currentTime.after(endTime);
             switch (status) {
                 case STATUS_PENDING:
+                    if (hasEnded) {
+                        return ACTION_MISSED;
+                    }
                     // Pending luôn luôn là UPCOMING, dù có đang trong thời gian
                     return ACTION_UPCOMING;
 
                 case STATUS_ACTIVE:
-                    if (isCurrentlyHappening) {
-                        if (hasJoined) {
-                            // Active + trong thời gian + đã join = ONGOING
-                            return ACTION_ONGOING;
-                        } else {
-                            // Active + trong thời gian + chưa join = JOIN
-                            return ACTION_JOIN;
-                        }
-                    } else {
-                        // Active + không trong thời gian = VIEW
-                        return ACTION_VIEW;
+                    // 2.1 Đã hết giờ
+                    if (hasEnded) {
+                        return hasJoined ? ACTION_VIEW       // đã Join → chỉ xem lại
+                                : ACTION_MISSED;    // chưa Join → Missed
                     }
+                    // 2.2 Đang trong giờ
+                    if (isCurrentlyHappening) {
+                        return hasJoined ? ACTION_ONGOING    // đang học
+                                : ACTION_JOIN;      // có thể Join
+                    }
+                    // 2.3 Chưa tới giờ (hiếm) → VIEW
+                    return ACTION_VIEW;
 
                 case STATUS_COMPLETED:
                     return ACTION_VIEW;

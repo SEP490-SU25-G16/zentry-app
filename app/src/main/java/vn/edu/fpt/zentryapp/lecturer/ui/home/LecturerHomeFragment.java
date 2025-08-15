@@ -44,6 +44,7 @@ public class LecturerHomeFragment extends Fragment {
 
         // Initialize ViewModel with dependencies
         AuthManager authManager = AuthManager.getInstance(requireContext());
+        setupGreeting(authManager.getCurrentUserName());
         viewModel.init(requireContext(), authManager);
 
         viewModel.loadTodayClasses();
@@ -188,6 +189,16 @@ public class LecturerHomeFragment extends Fragment {
         LinearLayout.LayoutParams layoutParams = (LinearLayout.LayoutParams) targetView.getLayoutParams();
         layoutParams.bottomMargin = (int) (marginDp * getResources().getDisplayMetrics().density);
         targetView.setLayoutParams(layoutParams);
+    }
+
+    private void setupGreeting(String fullName) {
+        if (fullName == null || fullName.trim().isEmpty()) return;
+
+        String first = fullName.trim().split("\\s+")[0];      // token đầu tiên
+        first = first.substring(0,1).toUpperCase()            // Viết hoa chữ cái đầu
+                + first.substring(1).toLowerCase();
+
+        binding.tvGreeting.setText("Hi " + first);
     }
 
     @Override

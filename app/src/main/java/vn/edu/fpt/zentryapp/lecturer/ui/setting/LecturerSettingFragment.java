@@ -55,7 +55,8 @@ public class LecturerSettingFragment extends Fragment {
 
     // Thêm các phương thức kiểm tra trạng thái như Student
     private boolean checkIfDeviceRegistered() {
-        return authManager.isDeviceRegistered();
+        return getContext().getSharedPreferences("prefs", 0)
+                .getBoolean("device_registered", false);
     }
 
     private void setupClickListeners() {

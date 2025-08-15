@@ -181,6 +181,9 @@ public class LecturerScheduleClassSectionAdapter extends RecyclerView.Adapter<Le
 
             switch (status) {
                 case STATUS_PENDING:
+                    if (hasEnded) {
+                        return ACTION_MISSED;
+                    }
                     if (hasActiveSession) {
                         return ACTION_UPCOMING;
                     }
