@@ -18,6 +18,7 @@ import lombok.Setter;
 public class UserProfile implements Serializable {
     private String userId;
     private String accountId;
+    private String code;
     private String email;
     private String fullName;
     private String phoneNumber;

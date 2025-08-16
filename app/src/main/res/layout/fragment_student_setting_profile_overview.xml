@@ -95,6 +95,43 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardStudentSettingProfileOverviewCode"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:strokeColor="#FFFFFF">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp">
+
+                    <ImageView
+                        android:id="@+id/ivStudentSettingProfileOverviewCodeIcon"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_code"
+                        app:tint="#666666"/>
+                    <TextView
+                        android:id="@+id/tvStudentSettingProfileOverviewCode"
+                        android:fontFamily="@font/mulishbold"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:text="Loading..."
+                        android:textSize="16sp"
+                        android:textColor="#505050"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+
             <!-- Phone -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardStudentSettingProfileOverviewPhone"

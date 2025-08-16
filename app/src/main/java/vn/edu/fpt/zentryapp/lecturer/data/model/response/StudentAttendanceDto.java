@@ -12,6 +12,9 @@ public class StudentAttendanceDto {
     @SerializedName("StudentId")
     private String studentId;
 
+    @SerializedName("StudentCode")  // ✅ Thêm trường này
+    private String studentCode;
+
     @SerializedName("FullName")
     private String fullName;
 
@@ -19,13 +22,12 @@ public class StudentAttendanceDto {
     private boolean isAttended;
 
     @SerializedName("AttendedTime")
-    private String attendedTime; // yyyy-MM-dd HH:mm:ss format
+    private String attendedTime;
 
     // Helper methods
     public String getDisplayName() {
         return fullName;
     }
-
     public String getAttendanceStatus() {
         return isAttended ? "Present" : "Absent";
     }

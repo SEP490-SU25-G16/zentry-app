@@ -259,8 +259,8 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
             Date currentTime = new Date();
 
             // Parse session times
-            Date startTime = parseSessionTime(session.getStartTime());
-            Date endTime = parseSessionTime(session.getEndTime());
+            Date startTime = parseSessionTimeForLogic(session.getStartTime());
+            Date endTime = parseSessionTimeForLogic(session.getEndTime());
 
             // Check if session is currently happening (within time range)
             boolean isCurrentlyHappening = startTime != null && endTime != null &&
@@ -299,6 +299,67 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
 
                 default:
                     return ACTION_UPCOMING;
+            }
+        }
+
+        // Method để parse thời gian chính xác (bao gồm giây)
+        private Date parseSessionTimeForLogic(String timeStr) {
+            try {
+                SimpleDateFormat timeFormat;
+
+                // Tự động detect format dựa vào độ dài string
+                if (timeStr != null && timeStr.length() > 5) {
+                    timeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+                } else {
+                    timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+                }
+
+                Date timeOnly = timeFormat.parse(timeStr);
+
+                // Tạo Date với ngày hiện tại + thời gian parsed
+                java.util.Calendar today = java.util.Calendar.getInstance();
+                java.util.Calendar sessionTime = java.util.Calendar.getInstance();
+                sessionTime.setTime(timeOnly);
+
+                today.set(java.util.Calendar.HOUR_OF_DAY, sessionTime.get(java.util.Calendar.HOUR_OF_DAY));
+                today.set(java.util.Calendar.MINUTE, sessionTime.get(java.util.Calendar.MINUTE));
+
+                // ✅ Giữ nguyên giây từ API nếu có
+                if (timeStr != null && timeStr.length() > 5) {
+                    today.set(java.util.Calendar.SECOND, sessionTime.get(java.util.Calendar.SECOND));
+                } else {
+                    today.set(java.util.Calendar.SECOND, 0);
+                }
+
+                return today.getTime();
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error parsing session time for logic: " + timeStr, e);
+                return null;
+            }
+        }
+
+        // Method để format thời gian cho hiển thị (chỉ giờ:phút)
+        private String formatTimeForDisplay(String timeStr) {
+            try {
+                SimpleDateFormat inputFormat;
+
+                // Parse input format
+                if (timeStr != null && timeStr.length() > 5) {
+                    inputFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+                } else {
+                    inputFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+                }
+
+                Date time = inputFormat.parse(timeStr);
+
+                // Format lại chỉ giờ:phút cho display
+                SimpleDateFormat displayFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+                return displayFormat.format(time);
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error formatting time for display: " + timeStr, e);
+                return timeStr; // fallback to original
             }
         }
 

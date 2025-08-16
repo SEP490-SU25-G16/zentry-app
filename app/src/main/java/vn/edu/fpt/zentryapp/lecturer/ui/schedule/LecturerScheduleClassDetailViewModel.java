@@ -47,6 +47,7 @@ import vn.edu.fpt.zentryapp.student.data.model.response.ScheduleDetailResponse;
 public class LecturerScheduleClassDetailViewModel extends ViewModel {
     private static final String TAG = "ClassDetailViewModel";
     private BroadcastReceiver attendanceCalculatedReceiver;
+    private final MutableLiveData<Boolean> _isLoading = new MutableLiveData<>(false);
     private final MutableLiveData<SessionDetailInfoRound> _sessionInfo = new MutableLiveData<>();
     private final MutableLiveData<List<Round>> _listHistoryRounds = new MutableLiveData<>();
     private final MutableLiveData<List<Attendance>> _listAttendance = new MutableLiveData<>();
@@ -61,7 +62,9 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
     private final MutableLiveData<Boolean> _isCreatingFaceIdRequest = new MutableLiveData<>(false);
     private final MutableLiveData<String> _faceIdRequestSuccess = new MutableLiveData<>();
     private final MutableLiveData<String> _faceIdRequestError = new MutableLiveData<>();
-
+    public LiveData<Boolean> isLoading() {
+        return _isLoading;
+    }
     public LiveData<Boolean> isEndingSession() { return _isEndingSession; }
     public LiveData<EndSessionResponse> endSessionResult() { return _endSessionResult; }
     public LiveData<Boolean> isCreatingFaceIdRequest() { return _isCreatingFaceIdRequest; }
@@ -371,6 +374,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
             return;
         }
         _errorMessage.setValue(null);
+        _isLoading.setValue(true);
 
         String sessionId = getSessionId();
         Log.d(TAG, "📤 Loading rounds for sessionId: " + sessionId);
@@ -381,6 +385,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                     public void onResponse(Call<RoundsDataResponse> call, Response<RoundsDataResponse> response) {
                         if (response.isSuccessful() && response.body() != null) {
                             RoundsDataResponse apiResponse = response.body();
+                            _isLoading.setValue(false);
 
                             if (apiResponse.isSuccess()) {
                                 // Map data
@@ -413,6 +418,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
 
                     @Override
                     public void onFailure(Call<RoundsDataResponse> call, Throwable t) {
+                        _isLoading.setValue(false);
                         String error = "Network Error: " + t.getMessage();
                         _errorMessage.setValue(error);
                         Log.e(TAG, "❌ Network Error: " + error, t);
@@ -523,7 +529,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
             Log.d(TAG, "🔄 Creating API call...");
             Call<AttendanceResponse> call = apiService.getListAttendances(sessionId);
             Log.d(TAG, "✅ API call created: " + call.request().url());
-
+            _isLoading.setValue(true);
             call.enqueue(new Callback<AttendanceResponse>() {
                 @Override
                 public void onResponse(Call<AttendanceResponse> call, Response<AttendanceResponse> response) {
@@ -531,6 +537,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                     Log.d(TAG, "  • Response code: " + response.code());
                     Log.d(TAG, "  • Response successful: " + response.isSuccessful());
                     Log.d(TAG, "  • Response body null: " + (response.body() == null));
+                    _isLoading.setValue(false);
 
                     if (response.isSuccessful() && response.body() != null) {
                         AttendanceResponse apiResponse = response.body();
@@ -587,6 +594,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
 
                 @Override
                 public void onFailure(Call<AttendanceResponse> call, Throwable t) {
+                    _isLoading.setValue(false);
                     String error = "Network Error: " + t.getMessage();
                     _errorMessage.setValue("Final Attendance: " + error);
                     Log.e(TAG, "❌ Final Attendance Network Error: " + error, t);
@@ -614,7 +622,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
             _errorMessage.setValue("Round ID not available");
             return;
         }
-
+        _isLoading.setValue(true);
         _isLoadingRoundDetail.setValue(true);
         _errorMessage.setValue(null);
 
@@ -625,7 +633,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                     @Override
                     public void onResponse(Call<RoundResultResponse> call, Response<RoundResultResponse> response) {
                         _isLoadingRoundDetail.setValue(false);
-
+                        _isLoading.setValue(false);
                         if (response.isSuccessful() && response.body() != null) {
                             RoundResultResponse apiResponse = response.body();
 
@@ -658,6 +666,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                     @Override
                     public void onFailure(Call<RoundResultResponse> call, Throwable t) {
                         _isLoadingRoundDetail.setValue(false);
+                        _isLoading.setValue(false);
                         String error = "Network Error: " + t.getMessage();
                         _errorMessage.setValue("Round Attendance: " + error);
                         Log.e(TAG, "❌ Round Attendance Network Error", t);
@@ -667,12 +676,10 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
 
     private List<Attendance> mapRoundResultToAttendanceList(RoundResultDto roundResult) {
         List<Attendance> attendanceList = new ArrayList<>();
-
         if (roundResult == null || roundResult.getStudentsAttendance() == null) {
             return attendanceList;
         }
 
-        // ✅ Get current user ID to exclude lecturer
         String currentUserId = null;
         if (authManager != null) {
             currentUserId = authManager.getCurrentUserId();
@@ -681,7 +688,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
 
         for (StudentAttendanceDto studentDto : roundResult.getStudentsAttendance()) {
             try {
-                // ✅ Skip lecturer's record
+                // Skip lecturer's record
                 if (currentUserId != null && currentUserId.equals(studentDto.getStudentId())) {
                     Log.d(TAG, "⏭️ Skipping lecturer record: " + studentDto.getDisplayName() +
                             " (ID: " + studentDto.getStudentId() + ")");
@@ -690,15 +697,17 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
 
                 Attendance attendance = new Attendance();
 
-                // ✅ Map basic student info
-                attendance.setStudentId(studentDto.getStudentId());
+                // ✅ CHANGED: Sử dụng StudentCode từ API thay vì StudentId
+                attendance.setStudentCode(studentDto.getStudentCode()); // Thay đổi này
                 attendance.setStudentName(studentDto.getDisplayName());
                 attendance.setFinalStatus(studentDto.isAttended());
                 attendance.setRoundNumber(roundResult.getRoundNumber());
+
                 attendanceList.add(attendance);
 
                 Log.d(TAG, "✅ Added student: " + studentDto.getDisplayName() +
-                        " (ID: " + studentDto.getStudentId() + ")");
+                        " (Code: " + studentDto.getStudentCode() +
+                        ", ID: " + studentDto.getStudentId() + ")");
 
             } catch (Exception e) {
                 Log.e(TAG, "Error mapping round attendance for student: " + studentDto.getFullName(), e);
@@ -709,6 +718,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                 " (excluding lecturer)");
         return attendanceList;
     }
+
 
     private List<Round> mapApiDataToAttendanceRounds(List<RoundDetail> apiData) {
         List<Round> rounds = new ArrayList<>();
@@ -775,7 +785,7 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
             try {
                 Attendance student = new Attendance();
 
-                student.setStudentId(apiStudent.getStudentId());
+                student.setStudentCode(apiStudent.getStudentCode());
                 student.setStudentName(apiStudent.getStudentFullName());
 
                 boolean isPresent = isStudentPresent(apiStudent.getStatus());                student.setFinalStatus(isPresent);

@@ -11,8 +11,6 @@ public class StudentReport implements Serializable {
     private String lecturerName;
     private String lecturerId;
     private double attendanceRate;
-    private int totalSessions;
-    private int attendedSessions;
 
     // Constructors
     public StudentReport() {}
@@ -27,11 +25,6 @@ public class StudentReport implements Serializable {
         this.lecturerName = lecturerName;
         this.lecturerId = lecturerId;
         this.attendanceRate = attendanceRate;
-
-        // Calculate estimated sessions based on attendance rate
-        // You might need to call another API to get exact session counts
-        this.totalSessions = estimateTotalSessions();
-        this.attendedSessions = (int) Math.round(this.totalSessions * (attendanceRate / 100.0));
     }
 
     // Getters and Setters
@@ -59,12 +52,6 @@ public class StudentReport implements Serializable {
     public double getAttendanceRate() { return attendanceRate; }
     public void setAttendanceRate(double attendanceRate) { this.attendanceRate = attendanceRate; }
 
-    public int getTotalSessions() { return totalSessions; }
-    public void setTotalSessions(int totalSessions) { this.totalSessions = totalSessions; }
-
-    public int getAttendedSessions() { return attendedSessions; }
-    public void setAttendedSessions(int attendedSessions) { this.attendedSessions = attendedSessions; }
-
     // Helper methods
     public String getClassInfo() {
         return courseCode + " - " + sectionCode;
@@ -72,10 +59,6 @@ public class StudentReport implements Serializable {
 
     public String getAttendanceDisplay() {
         return String.format("%.1f%%", attendanceRate);
-    }
-
-    public String getSessionProgress() {
-        return attendedSessions + "/" + totalSessions + " Sessions";
     }
 
     public String getLecturerDisplayName() {
@@ -95,8 +78,6 @@ public class StudentReport implements Serializable {
         this.courseCode = courseCode;
         this.sectionCode = sectionCode;
         this.lecturerName = lecturerName;
-        this.totalSessions = totalSessions;
-        this.attendedSessions = attendedSessions;
         this.attendanceRate = totalSessions > 0 ? (double) attendedSessions / totalSessions * 100 : 0;
         this.className = courseName + " - " + sectionCode;
     }

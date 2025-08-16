@@ -4,6 +4,7 @@ import retrofit2.Call;
 import retrofit2.http.Body;
 import retrofit2.http.GET;
 import retrofit2.http.POST;
+import retrofit2.http.PUT;
 import retrofit2.http.Path;
 import retrofit2.http.Query;
 import vn.edu.fpt.zentryapp.lecturer.data.model.response.ClassSectionResponse;
@@ -45,4 +46,9 @@ public interface LecturerApiService {
     );
     @GET("/api/user/{user_id}")
     Call<ApiResponseDto<UserDto>> getUserProfile(@Path("user_id") String userId);
+    @PUT("attendance/sessions/{sessionId}/students/{studentId}/status")
+    Call<ApiResponseDto<Void>> updateStudentAttendanceStatus(
+            @Path("sessionId") String sessionId,
+            @Path("studentId") String studentId
+    );
 }

@@ -76,7 +76,7 @@
                         android:fontFamily="@font/jostsemibold"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="No studentSessions scheduled"
+                        android:text="No sessions scheduled"
                         android:textSize="16sp"
                         android:textColor="#666666" />
 

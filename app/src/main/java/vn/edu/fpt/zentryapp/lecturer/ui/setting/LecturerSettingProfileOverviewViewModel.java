@@ -79,6 +79,7 @@ public class LecturerSettingProfileOverviewViewModel extends ViewModel {
         UserProfile profile = new UserProfile();
         profile.setUserId(userDto.getUserId());
         profile.setAccountId(userDto.getAccountId());
+        profile.setCode(userDto.getCode());
         profile.setEmail(userDto.getEmail());
         profile.setFullName(userDto.getFullName());
         profile.setPhoneNumber(userDto.getPhoneNumber());

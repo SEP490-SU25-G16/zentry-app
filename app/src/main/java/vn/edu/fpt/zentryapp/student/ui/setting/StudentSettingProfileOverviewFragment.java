@@ -96,7 +96,7 @@ public class StudentSettingProfileOverviewFragment extends Fragment {
         binding.tvStudentSettingProfileOverviewPhone.setText(userProfile.getFormattedPhoneNumber());
         binding.tvStudentSettingProfileOverviewRole.setText(userProfile.getRoleDisplayName());
         binding.tvStudentSettingProfileOverviewStatus.setText(userProfile.getStatusDisplayName());
-
+        binding.tvStudentSettingProfileOverviewCode.setText(userProfile.getCode());
         // Hiển thị ngày tạo
         binding.tvStudentSettingProfileOverviewCreatedAt.setText("Joined: " + userProfile.getFormattedCreatedDate());
 

@@ -96,6 +96,7 @@ public class LecturerSettingProfileOverviewFragment extends Fragment {
         binding.tvProfileOverviewPhone.setText(userProfile.getFormattedPhoneNumber());
         binding.tvProfileOverviewRole.setText(userProfile.getRoleDisplayName());
         binding.tvProfileOverviewStatus.setText(userProfile.getStatusDisplayName());
+        binding.tvProfileOverviewCode.setText(userProfile.getCode());
 
         // Hiển thị ngày tạo
         binding.tvProfileOverviewCreatedAt.setText("Joined: " + userProfile.getFormattedCreatedDate());
