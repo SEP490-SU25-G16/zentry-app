@@ -34,7 +34,7 @@
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="32dp"
             android:layout_marginTop="32dp"
-            android:text="Set up Face ID"
+            android:text="Update Your Face ID"
             android:textSize="32sp"
             android:textStyle="bold"
             android:textColor="@color/text_primary"
@@ -46,7 +46,7 @@
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="32dp"
             android:layout_marginTop="8dp"
-            android:text="Scan your face to verify your identity"
+            android:text="Scan your face to update your identity"
             android:textSize="16sp"
             android:textColor="@color/text_secondary"
             android:fontFamily="@font/jost"/>
