@@ -18,6 +18,8 @@ import vn.edu.fpt.zentryapp.notification.data.NotificationItem;
 import vn.edu.fpt.zentryapp.notification.sharedviewmodel.NotificationViewModel;
 
 import java.util.ArrayList;
+import java.util.List;
+import android.util.Log;
 
 public class AllNotificationsFragment extends Fragment {
 
@@ -38,62 +40,43 @@ public class AllNotificationsFragment extends Fragment {
         RecyclerView recyclerView = view.findViewById(R.id.recyclerViewNotifications);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 
-        // Scope theo fragment để tránh share giữa Lecturer/Student
-        viewModel = new ViewModelProvider(this).get(NotificationViewModel.class);
+        // Use shared ViewModel from parent NotificationFragment
+        viewModel = new ViewModelProvider(getParentFragment()).get(NotificationViewModel.class);
 
         adapter = new NotificationAdapter(new ArrayList<>(), new NotificationAdapter.OnItemClickListener() {
             @Override
             public void onItemClick(NotificationItem item) {
-                viewModel.markAsRead(item.getId());
+                viewModel.markAsRead(item.getId(), requireContext());
                 handleNotificationClick(item);
             }
 
             @Override
             public void onSeeMoreClick() {
-                viewModel.loadMoreNotifications();
+                // Optional: implement local pagination if needed
             }
         });
         recyclerView.setAdapter(adapter);
 
-        // Add scroll listener for infinite scroll (chỉ khi đã click "See More")
+        // Add scroll listener for infinite scroll (optional if implementing local pagination)
         recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
                 super.onScrolled(recyclerView, dx, dy);
-                
-                LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
-                if (layoutManager != null && viewModel != null) {
-                    int visibleItemCount = layoutManager.getChildCount();
-                    int totalItemCount = layoutManager.getItemCount();
-                    int firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition();
-                    
-                    // Load more khi gần cuối danh sách và đã click "See More" trước đó
-                    if ((visibleItemCount + firstVisibleItemPosition) >= totalItemCount - 2 && 
-                        firstVisibleItemPosition >= 0 && 
-                        viewModel.canLoadMoreByScroll()) {
-                        viewModel.loadMoreNotifications();
-                    }
-                }
+                // No-op for now
             }
         });
 
-        viewModel.getNotifications().observe(getViewLifecycleOwner(), notifications -> {
-            if (notifications != null) {
-                adapter.setItems(notifications);
+        // Observe ALL notifications directly (one source of truth)
+        viewModel.allNotifications().observe(getViewLifecycleOwner(), allNotifications -> {
+            if (allNotifications != null) {
+                Log.d("AllNotificationsFragment", "🔄 AllNotifications changed, auto-refreshing UI with " + allNotifications.size() + " notifications");
+                adapter.setItems(allNotifications);
+                adapter.notifyDataSetChanged();
+                updateEmptyState(allNotifications.isEmpty());
             }
         });
-        
-        // Observe see more button visibility
-        viewModel.shouldShowSeeMoreButton().observe(getViewLifecycleOwner(), shouldShow -> {
-            adapter.setSeeMoreVisible(shouldShow);
-        });
 
-        // Load dữ liệu từ API với userId và context
-        String userId = vn.edu.fpt.zentryapp.auth.client.AuthManager.getInstance(requireContext()).getCurrentUserId();
-        viewModel.loadNotifications(userId, requireContext());
-        // Reset pagination và apply filter khi fragment được tạo
-        viewModel.resetPagination();
-        viewModel.applyFilter(NotificationViewModel.FilterType.ALL);
+        // Removed: per-fragment load/reset/applyFilter (handled by parent)
     }
 
     private void handleNotificationClick(NotificationItem item) {
@@ -123,9 +106,46 @@ public class AllNotificationsFragment extends Fragment {
     public void onResume() {
         super.onResume();
         // Refresh filter khi fragment được hiển thị lại
-        if (viewModel != null) {
-            viewModel.resetPagination();
-            viewModel.applyFilter(NotificationViewModel.FilterType.ALL);
+        // Removed: per-fragment load/reset/applyFilter (handled by parent)
+    }
+
+    // 🔧 NEW: Method to refresh notifications
+    public void refreshNotifications() {
+        try {
+            Log.d("AllNotificationsFragment", "🔄 Refreshing all notifications");
+            
+            // Get current notifications from ViewModel
+            List<NotificationItem> currentNotifications = viewModel.allNotifications().getValue();
+            if (currentNotifications != null) {
+                Log.d("AllNotificationsFragment", "📊 Refreshing with " + currentNotifications.size() + " notifications");
+                
+                // Update adapter
+                if (adapter != null) {
+                    adapter.setItems(currentNotifications);
+                    adapter.notifyDataSetChanged();
+                    Log.d("AllNotificationsFragment", "✅ Adapter updated successfully");
+                }
+                
+                // Update empty state
+                updateEmptyState(currentNotifications.isEmpty());
+            } else {
+                Log.w("AllNotificationsFragment", "⚠️ No notifications available to refresh");
+            }
+            
+        } catch (Exception e) {
+            Log.e("AllNotificationsFragment", "❌ Error refreshing notifications", e);
+        }
+    }
+
+    // 🔧 NEW: Method to update empty state
+    private void updateEmptyState(boolean isEmpty) {
+        try {
+            View emptyStateView = getView().findViewById(R.id.notificationEmptyState);
+            if (emptyStateView != null) {
+                emptyStateView.setVisibility(isEmpty ? View.VISIBLE : View.GONE);
+            }
+        } catch (Exception e) {
+            Log.e("AllNotificationsFragment", "❌ Error updating empty state", e);
         }
     }
 

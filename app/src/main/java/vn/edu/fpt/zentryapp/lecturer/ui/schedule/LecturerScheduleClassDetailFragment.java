@@ -42,6 +42,8 @@ import vn.edu.fpt.zentryapp.lecturer.ui.schedule.tabs.LecturerAttendanceFragment
 
 import vn.edu.fpt.zentryapp.notification.sharedviewmodel.NotificationViewModel;
 
+import android.util.Log;
+
 public class LecturerScheduleClassDetailFragment extends Fragment implements LecturerHistoryFragment.OnRoundClickListener {
 
     private FragmentLecturerScheduleClassDetailBinding binding;
@@ -87,8 +89,12 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
         viewModel = new ViewModelProvider(this).get(LecturerScheduleClassDetailViewModel.class);
         notificationViewModel = new ViewModelProvider(requireActivity()).get(NotificationViewModel.class);
         AuthManager authManager = AuthManager.getInstance(requireContext());
+        
+        // 🔍 Debug authentication state
+        Log.d("LecturerScheduleClassDetail", "🔍 Debugging authentication state...");
+        authManager.debugAuthState();
+        
         viewModel.init(requireContext(), authManager, session);
-
 
         // Load notifications từ API để có dữ liệu cho badge
         String userId = authManager.getCurrentUserId();
@@ -171,10 +177,13 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
         binding.ivScheduleClassDetailBack.setOnClickListener(v -> navController.navigateUp());
 
         binding.btnScheduleClassDetailRequestFaceId.setOnClickListener(v -> {
+            Log.d("LecturerScheduleClassDetail", "🔘 Request Face Now button clicked");
             if (isSessionEndedNow()) {
+                Log.d("LecturerScheduleClassDetail", "⚠️ Session ended, button disabled");
                 // Button will already be disabled/gray; no action
                 return;
             }
+            Log.d("LecturerScheduleClassDetail", "✅ Proceeding to show Face ID dialog");
             showFaceIdRequestDialog();
         });
 
@@ -224,7 +233,6 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
         // Observer for button visibility
         viewModel.canAddFaceId().observe(getViewLifecycleOwner(), canAdd ->
                 binding.btnScheduleClassDetailRequestFaceId.setEnabled(canAdd));
-
 
         // Observer for history rounds
         viewModel.listHistoryRounds().observe(getViewLifecycleOwner(), rounds -> {
@@ -315,7 +323,6 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
         dialog.show();
     }
 
-
     @Override
     public void onRoundClick(Round round) {
         // Khi user click vào round trong History tab
@@ -326,7 +333,8 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
             // ✅ 3. Sau đó mới load data
             viewModel.loadListRoundAttendances(round.getRoundId());
             binding.viewPagerScheduleClassDetail.setCurrentItem(1, true);
-        });    }
+        });
+    }
 
     @Override
     public void onDestroyView() {
@@ -335,17 +343,20 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
     }
     
     private void showFaceIdRequestDialog() {
+        Log.d("LecturerScheduleClassDetail", "🎭 Showing Face ID request dialog");
         FaceIdRequestDialog dialog = new FaceIdRequestDialog();
         dialog.setFaceIdRequestListener(this::scheduleFaceIdVerification);
         dialog.show(getChildFragmentManager(), "FaceIdRequestDialog");
     }
     
     private void scheduleFaceIdVerification(int totalSeconds) {
+        Log.d("LecturerScheduleClassDetail", "🎯 scheduleFaceIdVerification called with: " + totalSeconds + "s");
         int minutes = (totalSeconds + 59) / 60; // round up to minutes
         if (minutes <= 0) minutes = 1;
         String title = "Yêu cầu xác thực Face ID";
         String body = "Vui lòng xác thực khuôn mặt để tiếp tục.";
 
+        Log.d("LecturerScheduleClassDetail", "📤 Calling viewModel.createFaceIdRequest with: " + minutes + " minutes");
         Toast.makeText(requireContext(), "Đang gửi yêu cầu Face ID...", Toast.LENGTH_SHORT).show();
         viewModel.createFaceIdRequest(minutes, title, body);
         // Attach observers if not yet (idempotent safety)
@@ -364,18 +375,23 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
     private void attachFaceIdObservers() {
         if (faceIdObserversAttached) return;
         faceIdObserversAttached = true;
+        Log.d("LecturerScheduleClassDetail", "👁️ Attaching Face ID observers");
+        
         viewModel.faceIdRequestSuccess().observe(getViewLifecycleOwner(), msg -> {
             if (msg != null) {
+                Log.d("LecturerScheduleClassDetail", "✅ Face ID request success: " + msg);
                 Toast.makeText(requireContext(), msg, Toast.LENGTH_LONG).show();
             }
         });
         viewModel.faceIdRequestError().observe(getViewLifecycleOwner(), err -> {
             if (err != null) {
+                Log.e("LecturerScheduleClassDetail", "❌ Face ID request error: " + err);
                 Toast.makeText(requireContext(), "Face ID request error: " + err, Toast.LENGTH_LONG).show();
             }
         });
         viewModel.isCreatingFaceIdRequest().observe(getViewLifecycleOwner(), loading -> {
             if (loading != null) {
+                Log.d("LecturerScheduleClassDetail", "🔄 Face ID request loading state: " + loading);
                 isCreatingRequest = loading;
                 updateRequestButtonEnabled();
             }

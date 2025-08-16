@@ -1,6 +1,7 @@
 package vn.edu.fpt.zentryapp.student.ui.report;
 
 import android.annotation.SuppressLint;
+import android.content.BroadcastReceiver;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.Toast;
@@ -61,12 +62,35 @@ public class StudentReportFragment extends Fragment implements StudentReportAdap
             notificationViewModel.loadNotifications(userId, requireContext());
         }
 
+        // 🔧 NEW: Register broadcast receiver for real-time notification updates
+        androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(requireContext())
+                .registerReceiver(notificationUpdateReceiver, new android.content.IntentFilter("vn.edu.fpt.zentryapp.NOTIFICATIONS_UPDATED"));
+
         setupRecyclerView();
         setupClickListeners();
         observeViewModel();
         setupSearchBar();
         setupRefreshListener();
     }
+
+    // 🔧 NEW: Broadcast receiver for real-time notification updates
+    private final BroadcastReceiver notificationUpdateReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(android.content.Context context, android.content.Intent intent) {
+            Log.d(TAG, "📢 StudentReport: Received notification update broadcast");
+            
+            // Force refresh notification count for badge
+            String userId = intent.getStringExtra("userId");
+            if (userId != null) {
+                Log.d(TAG, "🔄 Refreshing notification count for badge update");
+                // 🔧 FIX: Use forceRefresh instead of forceRefreshNotifications
+                notificationViewModel.forceRefresh(userId, requireContext());
+                
+                // 🔧 FIX: Ensure unseenCount observer is set up for immediate badge update
+                Log.d(TAG, "ℹ️ Badge will be updated automatically by existing observer");
+            }
+        }
+    };
 
     private void setupClickListeners() {
         // Notification button click handler
@@ -190,6 +214,15 @@ public class StudentReportFragment extends Fragment implements StudentReportAdap
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        
+        // 🔧 NEW: Unregister broadcast receiver
+        try {
+            androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(requireContext())
+                    .unregisterReceiver(notificationUpdateReceiver);
+        } catch (Exception e) {
+            Log.e(TAG, "Error unregistering notification receiver", e);
+        }
+        
         binding = null;
     }
 

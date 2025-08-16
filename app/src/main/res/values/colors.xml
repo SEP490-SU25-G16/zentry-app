@@ -46,6 +46,11 @@
     <color name="info">#2196F3</color>
     <color name="notification_unread_background">#E6F2FF</color>
     <color name="lightGray">#E5E5E5</color>
+    
+    <!-- 🔧 NEW: Notification colors for read/unread styling -->
+    <color name="notification_read_text">#8E8E93</color>
+    <color name="notification_unread_text">#2C2C2E</color>
+    <color name="notification_read_background">#F8F9FA</color>
 
     <!-- UI Design Colors -->
     <color name="background_light">#F9F9F9</color>

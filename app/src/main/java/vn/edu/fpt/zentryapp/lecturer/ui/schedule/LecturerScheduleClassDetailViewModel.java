@@ -958,24 +958,57 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
 
     // ================= Face ID Request Creation =================
     public void createFaceIdRequest(int expiresInMinutes, String title, String body) {
+        Log.d(TAG, "🚀🚀🚀 createFaceIdRequest CALLED! 🚀🚀🚀");
+        Log.d(TAG, "=== createFaceIdRequest started ===");
+        Log.d(TAG, "Parameters: expiresIn=" + expiresInMinutes + "m, title='" + title + "', body='" + body + "'");
+        Log.d(TAG, "Session: " + (session != null ? "Available" : "NULL"));
+        Log.d(TAG, "AuthManager: " + (authManager != null ? "Available" : "NULL"));
+        
+        if (authManager != null) {
+            Log.d(TAG, "isLoggedIn: " + authManager.isLoggedIn());
+            Log.d(TAG, "CurrentUserId: " + authManager.getCurrentUserId());
+            Log.d(TAG, "AccessToken: " + (authManager.getAccessToken() != null ? "Available" : "NULL"));
+            Log.d(TAG, "UserRole: " + authManager.getCurrentUserRole());
+            Log.d(TAG, "UserEmail: " + authManager.getCurrentUserEmail());
+        }
+        
+        if (session != null) {
+            Log.d(TAG, "Session details:");
+            Log.d(TAG, "  - SessionId: " + session.getSessionId());
+            Log.d(TAG, "  - LecturerId: " + session.getLecturerId());
+            Log.d(TAG, "  - ClassSectionId: " + session.getClassSectionId());
+            Log.d(TAG, "  - Status: " + session.getSessionStatus());
+        }
+        
         if (session == null) {
+            Log.e(TAG, "❌ Session not available");
             _faceIdRequestError.setValue("Session not available");
             return;
         }
         // Block creating Face ID request if the session is already ended
         if (isSessionEnded()) {
+            Log.e(TAG, "❌ Session already ended");
             _faceIdRequestError.setValue("Session already ended. Cannot create Face ID request.");
             return;
         }
         if (authManager == null || !authManager.isLoggedIn()) {
+            Log.e(TAG, "❌ Lecturer not authenticated");
+            Log.e(TAG, "  - AuthManager: " + (authManager != null ? "available" : "null"));
+            Log.e(TAG, "  - isLoggedIn: " + (authManager != null ? authManager.isLoggedIn() : "N/A"));
+            if (authManager != null) {
+                Log.e(TAG, "  - AccessToken: " + (authManager.getAccessToken() != null ? "exists" : "missing"));
+                Log.e(TAG, "  - UserInfo: " + (authManager.getUserInfo() != null ? "exists" : "missing"));
+            }
             _faceIdRequestError.setValue("Lecturer not authenticated");
             return;
         }
         if (faceIdApiController == null) {
+            Log.e(TAG, "❌ FaceId API service unavailable");
             _faceIdRequestError.setValue("FaceId API service unavailable");
             return;
         }
 
+        Log.d(TAG, "✅ All pre-checks passed, proceeding with Face ID request creation");
         _isCreatingFaceIdRequest.setValue(true);
         _faceIdRequestError.setValue(null);
         _faceIdRequestSuccess.setValue(null);
@@ -987,11 +1020,11 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
             String currentUserId = authManager != null ? authManager.getCurrentUserId() : null;
             if (currentUserId != null && !currentUserId.trim().isEmpty()) {
                 lecturerId = currentUserId;
-                Log.w(TAG, "LecturerId missing in session. Falling back to current userId=" + lecturerId);
+                Log.w(TAG, "⚠️ LecturerId missing in session. Falling back to current userId=" + lecturerId);
             } else {
                 _isCreatingFaceIdRequest.setValue(false);
+                Log.e(TAG, "❌ Cannot create Face ID request: lecturerId is null/empty");
                 _faceIdRequestError.setValue("Lecturer ID not available");
-                Log.e(TAG, "Cannot create Face ID request: lecturerId is null/empty");
                 return;
             }
         }
@@ -999,16 +1032,16 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
         String sessionId = session.getSessionId();
         if (sessionId == null || sessionId.trim().isEmpty()) {
             _isCreatingFaceIdRequest.setValue(false);
+            Log.e(TAG, "❌ Cannot create Face ID request: sessionId is null/empty");
             _faceIdRequestError.setValue("Session ID not available");
-            Log.e(TAG, "Cannot create Face ID request: sessionId is null/empty");
             return;
         }
 
         String classSectionId = session.getClassSectionId();
         if (classSectionId == null || classSectionId.trim().isEmpty()) {
             _isCreatingFaceIdRequest.setValue(false);
+            Log.e(TAG, "❌ Cannot create Face ID request: classSectionId is null/empty");
             _faceIdRequestError.setValue("Class section ID not available");
-            Log.e(TAG, "Cannot create Face ID request: classSectionId is null/empty");
             return;
         }
 
@@ -1021,18 +1054,39 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                 body
         );
 
-        Log.d(TAG, "Creating Face ID request: session=" + session.getSessionId() + " expiresIn=" + expiresInMinutes + "m");
+        Log.d(TAG, "🚀 Creating Face ID request with:");
+        Log.d(TAG, "  - LecturerId: " + lecturerId);
+        Log.d(TAG, "  - SessionId: " + sessionId);
+        Log.d(TAG, "  - ClassSectionId: " + classSectionId);
+        Log.d(TAG, "  - ExpiresIn: " + expiresInMinutes + " minutes");
+        
+        Log.d(TAG, "🌐🌐🌐 ABOUT TO CALL API! 🌐🌐🌐");
+        Log.d(TAG, "API Endpoint: faceIdApiController.createFaceIdRequest()");
+        Log.d(TAG, "Request object: " + request.toString());
+        
         faceIdApiController.createFaceIdRequest(request)
                 .enqueue(new Callback<FaceIdRequestCreateResponse>() {
                     @Override
                     public void onResponse(Call<FaceIdRequestCreateResponse> call, Response<FaceIdRequestCreateResponse> response) {
+                        Log.d(TAG, "📡📡📡 API RESPONSE RECEIVED! 📡📡📡");
+                        Log.d(TAG, "📡 Face ID request API response received");
+                        Log.d(TAG, "  - Response code: " + response.code());
+                        Log.d(TAG, "  - Response successful: " + response.isSuccessful());
+                        Log.d(TAG, "  - Response body: " + (response.body() != null ? "available" : "null"));
+                        
                         _isCreatingFaceIdRequest.setValue(false);
                         if (response.isSuccessful() && response.body() != null) {
                             FaceIdRequestCreateResponse apiResponse = response.body();
+                            Log.d(TAG, "📋 API Response details:");
+                            Log.d(TAG, "  - Success: " + apiResponse.isSuccess());
+                            Log.d(TAG, "  - Error: " + apiResponse.getError());
+                            Log.d(TAG, "  - Message: " + apiResponse.getMessage());
+                            Log.d(TAG, "  - RequestId: " + apiResponse.getRequestId());
+                            
                             if (apiResponse.isEffectiveSuccess()) {
                                 String msg = apiResponse.getMessage() != null ? apiResponse.getMessage() : "Face ID request created";
                                 _faceIdRequestSuccess.setValue(msg);
-                                Log.d(TAG, "Face ID request created successfully");
+                                Log.d(TAG, "✅ Face ID request created successfully");
                                 // Cache requestId locally for later revoke on end session
                                 try {
                                     String reqId = apiResponse.getRequestId();
@@ -1041,41 +1095,45 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                                     }
                                     if (reqId != null && !reqId.isEmpty()) {
                                         activeFaceIdRequestIds.add(reqId);
-                                        Log.d(TAG, "Cached active FaceId requestId: " + reqId);
+                                        Log.d(TAG, "💾 Cached active FaceId requestId: " + reqId);
                                     }
                                 } catch (Exception ignored) {}
 
                                 // Publish verify deadline for downstream (optional consumption)
                                 try {
                                     long deadlineMs = System.currentTimeMillis() + (expiresInMinutes * 60L * 1000L);
-                                    Log.d(TAG, "Verify window deadline (ms): " + deadlineMs);
+                                    Log.d(TAG, "⏰ Verify window deadline (ms): " + deadlineMs);
                                     // If you have a shared event bus / navigation, pass deadline here.
                                 } catch (Exception ignored) {}
                             } else {
-                                // Try to extract success from root-level fields even if Success=false
-                                if (apiResponse.getRequestId() != null && !apiResponse.getRequestId().isEmpty()) {
-                                    String msg = apiResponse.getMessage() != null ? apiResponse.getMessage() : "Face ID request created";
-                                    _faceIdRequestSuccess.setValue(msg);
-                                    Log.w(TAG, "Face ID request treated as success via root fields: requestId=" + apiResponse.getRequestId());
-                                    return;
-                                }
-                                String err = apiResponse.getError() != null ? apiResponse.getError() : "Failed to create Face ID request";
-                                _faceIdRequestError.setValue(err);
-                                Log.e(TAG, "Face ID request API error: " + err);
+                                String errorMsg = apiResponse.getError() != null ? apiResponse.getError() : "Unknown API error";
+                                Log.e(TAG, "❌ Face ID request API failed: " + errorMsg);
+                                _faceIdRequestError.setValue("API Error: " + errorMsg);
                             }
                         } else {
-                            String err = "HTTP Error: " + response.code();
-                            _faceIdRequestError.setValue(err);
-                            Log.e(TAG, "Face ID request " + err);
+                            String errorMsg = "HTTP Error: " + response.code();
+                            try {
+                                if (response.errorBody() != null) {
+                                    String errorBody = response.errorBody().string();
+                                    Log.e(TAG, "❌ Error body: " + errorBody);
+                                    errorMsg += " - " + errorBody;
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "❌ Could not read error body", e);
+                            }
+                            Log.e(TAG, "❌ Face ID request HTTP failed: " + errorMsg);
+                            _faceIdRequestError.setValue(errorMsg);
                         }
                     }
 
                     @Override
                     public void onFailure(Call<FaceIdRequestCreateResponse> call, Throwable t) {
+                        Log.d(TAG, "❌❌❌ API CALL FAILED! ❌❌❌");
+                        Log.d(TAG, "Network/Retrofit error occurred");
                         _isCreatingFaceIdRequest.setValue(false);
-                        String err = "Network Error: " + t.getMessage();
-                        _faceIdRequestError.setValue(err);
-                        Log.e(TAG, "Face ID request network error", t);
+                        String errorMsg = "Network Error: " + t.getMessage();
+                        Log.e(TAG, "❌ Face ID request network failed: " + errorMsg, t);
+                        _faceIdRequestError.setValue(errorMsg);
                     }
                 });
     }

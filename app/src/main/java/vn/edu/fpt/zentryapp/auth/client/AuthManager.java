@@ -75,20 +75,40 @@ public class AuthManager {
     public boolean isLoggedIn() {
         String token = getAccessToken();
         UserInfo userInfo = getUserInfo();
-        return token != null && userInfo != null;
+        boolean loggedIn = token != null && userInfo != null;
+        
+        Log.d(TAG, "🔐 isLoggedIn() check:");
+        Log.d(TAG, "  - AccessToken: " + (token != null ? "Available" : "Missing"));
+        Log.d(TAG, "  - UserInfo: " + (userInfo != null ? "Available" : "Missing"));
+        Log.d(TAG, "  - Result: " + (loggedIn ? "✅ Logged In" : "❌ Not Logged In"));
+        
+        return loggedIn;
     }
 
     // Check device đã được register chưa
     public boolean isDeviceRegistered() {
         String deviceId = getDeviceId();
         String deviceToken = getDeviceToken();
-        return deviceId != null && deviceToken != null;
+        boolean registered = deviceId != null && deviceToken != null;
+        
+        Log.d(TAG, "📱 isDeviceRegistered() check:");
+        Log.d(TAG, "  - DeviceId: " + (deviceId != null ? "Available" : "Missing"));
+        Log.d(TAG, "  - DeviceToken: " + (deviceToken != null ? "Available" : "Missing"));
+        Log.d(TAG, "  - Result: " + (registered ? "✅ Registered" : "❌ Not Registered"));
+        
+        return registered;
     }
 
     // User info helpers
     public String getCurrentUserId() {
         UserInfo userInfo = getUserInfo();
-        return userInfo != null ? userInfo.getId() : null;
+        String userId = userInfo != null ? userInfo.getId() : null;
+        
+        Log.d(TAG, "👤 getCurrentUserId() called:");
+        Log.d(TAG, "  - UserInfo: " + (userInfo != null ? "Available" : "Missing"));
+        Log.d(TAG, "  - UserId: " + (userId != null ? userId : "NULL"));
+        
+        return userId;
     }
 
     public String getCurrentUserEmail() {
@@ -134,5 +154,38 @@ public class AuthManager {
     // ✅ NEW: Check if user is lecturer
     public boolean isLecturer() {
         return hasRole("Lecturer");
+    }
+    
+    // 🔍 NEW: Debug method to troubleshoot authentication issues
+    public void debugAuthState() {
+        Log.d(TAG, "🔍 === AUTH DEBUG INFO ===");
+        Log.d(TAG, "SharedPreferences: " + (sharedPreferences != null ? "Available" : "NULL"));
+        
+        String accessToken = getAccessToken();
+        UserInfo userInfo = getUserInfo();
+        String deviceId = getDeviceId();
+        String deviceToken = getDeviceToken();
+        
+        Log.d(TAG, "📋 Stored Data:");
+        Log.d(TAG, "  - AccessToken: " + (accessToken != null ? "✅ " + accessToken.substring(0, Math.min(20, accessToken.length())) + "..." : "❌ NULL"));
+        Log.d(TAG, "  - UserInfo: " + (userInfo != null ? "✅ Available" : "❌ NULL"));
+        Log.d(TAG, "  - DeviceId: " + (deviceId != null ? "✅ " + deviceId : "❌ NULL"));
+        Log.d(TAG, "  - DeviceToken: " + (deviceToken != null ? "✅ Available" : "❌ NULL"));
+        
+        if (userInfo != null) {
+            Log.d(TAG, "👤 User Details:");
+            Log.d(TAG, "  - ID: " + userInfo.getId());
+            Log.d(TAG, "  - Email: " + userInfo.getEmail());
+            Log.d(TAG, "  - Role: " + userInfo.getRole());
+            Log.d(TAG, "  - FullName: " + userInfo.getFullName());
+        }
+        
+        Log.d(TAG, "🔐 Authentication Status:");
+        Log.d(TAG, "  - isLoggedIn(): " + isLoggedIn());
+        Log.d(TAG, "  - isDeviceRegistered(): " + isDeviceRegistered());
+        Log.d(TAG, "  - isLecturer(): " + isLecturer());
+        Log.d(TAG, "  - isStudent(): " + isStudent());
+        
+        Log.d(TAG, "🔍 === END AUTH DEBUG ===");
     }
 }

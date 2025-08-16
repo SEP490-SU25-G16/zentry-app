@@ -139,17 +139,44 @@ public class NotificationAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
                 notificationHolder.itemView.setBackground(null);
                 
                 if (item.isRead()) {
+                    // 🔧 ENHANCED: Read notification styling
                     notificationHolder.unreadIndicator.setVisibility(View.GONE);
-                    // Sử dụng setBackgroundColor thay vì setBackgroundResource cho transparent
                     notificationHolder.itemView.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+                    
+                    // Dimmed text for read notifications
+                    notificationHolder.tvTitle.setTextColor(
+                        ContextCompat.getColor(notificationHolder.itemView.getContext(), R.color.notification_read_text)
+                    );
+                    notificationHolder.tvMessage.setTextColor(
+                        ContextCompat.getColor(notificationHolder.itemView.getContext(), R.color.notification_read_text)
+                    );
+                    notificationHolder.tvDate.setTextColor(
+                        ContextCompat.getColor(notificationHolder.itemView.getContext(), R.color.notification_read_text)
+                    );
+                    
+                    // Optional: Add subtle border or background for read notifications
+                    notificationHolder.itemView.setBackground(
+                        ContextCompat.getDrawable(notificationHolder.itemView.getContext(), R.drawable.notification_read_background)
+                    );
+                    
                 } else {
+                    // 🔧 ENHANCED: Unread notification styling
                     notificationHolder.unreadIndicator.setVisibility(View.VISIBLE);
-                    // Sử dụng ContextCompat để get color từ resource
+                    
+                    // Bold text for unread notifications
+                    notificationHolder.tvTitle.setTextColor(
+                        ContextCompat.getColor(notificationHolder.itemView.getContext(), R.color.notification_unread_text)
+                    );
+                    notificationHolder.tvMessage.setTextColor(
+                        ContextCompat.getColor(notificationHolder.itemView.getContext(), R.color.notification_unread_text)
+                    );
+                    notificationHolder.tvDate.setTextColor(
+                        ContextCompat.getColor(notificationHolder.itemView.getContext(), R.color.notification_unread_text)
+                    );
+                    
+                    // Bright background for unread notifications
                     notificationHolder.itemView.setBackgroundColor(
-                        androidx.core.content.ContextCompat.getColor(
-                            notificationHolder.itemView.getContext(), 
-                            R.color.notification_unread_background
-                        )
+                        ContextCompat.getColor(notificationHolder.itemView.getContext(), R.color.notification_unread_background)
                     );
                 }
             }
