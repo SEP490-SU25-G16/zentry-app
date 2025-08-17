@@ -18,6 +18,10 @@
     <string name="delete_notification">Delete notification</string>
     <string name="see_more_notifications">See previous notifications</string>
     <string name="notification_icon">Notification Icon</string>
+    <string name="face_id_verification">Face ID Verification</string>
+    <string name="scan_your_face_to_register_your_identity">Scan your face to register your identity</string>
+    <string name="get_started">Get started</string>
+    <string name="hold_still">Hold still</string>
 
 
 </resources>

@@ -113,6 +113,8 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
         analysisOverlay = null;
 
         Log.d(TAG, "✅ Fragment initialized with clean architecture");
+        
+        // ✅ REMOVED: Không cần ẩn navbar vì đang chạy trong Activity riêng biệt
     }
 
     /**
@@ -1019,18 +1021,21 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
             }
             String userId = AuthManager.getInstance(requireContext()).getCurrentUserId();
             String successMessage = "Face ID has been registered successfully!";
-
-            // Double-check fragment is still attached before starting activity
-            if (!isAdded()) {
-                Log.w(TAG, "Fragment detached during success handling");
-                return;
-            }
-
-            // 🚀 Launch Success Activity
-            Intent successIntent = FaceIdSuccessActivity.createIntent(
-                    requireContext(), userId, successMessage, bitmapPath,
-                    vn.edu.fpt.zentryapp.faceid.adapter.workers.FaceEmbeddingSyncWorker.ACTION_REGISTER);
-            startActivityForResult(successIntent, SUCCESS_ACTIVITY_REQUEST_CODE);
+                    
+                    // Double-check fragment is still attached before starting activity
+                    if (!isAdded()) {
+                        Log.w(TAG, "Fragment no longer attached, cannot start success activity");
+                        return;
+                    }
+                    
+                    // ✅ NEW: Sử dụng Intent mới với userName
+                    Intent successIntent = FaceIdSuccessActivity.createRegisterSuccessIntent(
+                        requireContext(),
+                        userId,
+                        AuthManager.getInstance(requireContext()).getCurrentUserName(),
+                        bitmapPath
+                    );
+                    startActivity(successIntent);
 
             Log.d(TAG, "🎉 Navigating to Success Activity");
 
@@ -1201,15 +1206,22 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
      * Back to setup screen
      */
     private void backToSetup() {
-        // Check if fragment is still attached
-        if (!isAdded()) {
-            Log.w(TAG, "Fragment not attached, cannot go back to setup");
-            return;
+        try {
+            Log.d(TAG, "🔄 Returning to setup screen");
+            
+            // ✅ REMOVED: Không cần hiện navbar vì đang chạy trong Activity riêng biệt
+            
+            // Stop camera and reset state
+            stopCamera();
+            stateManager.transitionTo(FaceRegistrationState.INITIALIZING, "Returned to setup");
+            
+            // Update UI to show setup screen
+            uiController.showScreen(FaceRegistrationUIController.UIScreenState.SETUP);
+            
+            Log.d(TAG, "✅ Successfully returned to setup screen");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error returning to setup", e);
         }
-
-        stopCamera();
-        resetComponents();
-        uiController.showScreen(FaceRegistrationUIController.UIScreenState.SETUP);
     }
 
     /**
@@ -1555,6 +1567,8 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+
+        // ✅ REMOVED: Không cần hiện navbar vì đang chạy trong Activity riêng biệt
 
         stopCamera();
 

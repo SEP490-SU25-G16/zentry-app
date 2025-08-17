@@ -38,7 +38,6 @@ public class FaceEmbeddingSyncWorker extends Worker {
     @NonNull
     @Override
     public Result doWork() {
-        Log.d(TAG, "Starting face embedding sync work");
         
         String userId = getInputData().getString(KEY_USER_ID);
         String bitmapPath = getInputData().getString(KEY_BITMAP_PATH);

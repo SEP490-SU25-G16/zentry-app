@@ -48,7 +48,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="24dp"
         android:fontFamily="@font/mulish"
-        android:text="Setting up face ID verification..."
+        android:text=""
         android:textAlignment="center"
         android:textColor="#64748B"
         android:textSize="16sp"

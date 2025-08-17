@@ -11,6 +11,8 @@ import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
 import android.view.ViewGroup;
+import android.view.OrientationEventListener;
+import android.view.Surface;
 import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
@@ -45,12 +47,14 @@ public class CameraView extends FrameLayout {
     private static final String TAG = "CameraView";
     
     private PreviewView previewView;
+    private Preview preview;
     private Camera camera;
     private ProcessCameraProvider cameraProvider;
     private ImageCapture imageCapture;
     private ImageAnalysis imageAnalysis;
     private final Executor executor = Executors.newSingleThreadExecutor();
     private AtomicBoolean processingFrame = new AtomicBoolean(false);
+    private OrientationEventListener orientationEventListener;
     
     // Biến để log info chỉ một lần
     private boolean hasLoggedImageInfo = false;
@@ -132,7 +136,7 @@ public class CameraView extends FrameLayout {
                 .build();
         
         // Preview use case
-        Preview preview = new Preview.Builder()
+        preview = new Preview.Builder()
                 .setTargetRotation(rotation)
                 .build();
         
@@ -196,21 +200,11 @@ public class CameraView extends FrameLayout {
                         Log.d(TAG, "Successfully converted frame #" + frameCount + " to bitmap: " + 
                                 bitmap.getWidth() + "x" + bitmap.getHeight());
                         
-                        // Apply rotation if needed
-                        int rotationDegrees = image.getImageInfo().getRotationDegrees();
-                        if (rotationDegrees != 0) {
-                            Log.d(TAG, "Applying rotation: " + rotationDegrees + " degrees");
-                            Matrix matrix = new Matrix();
-                            matrix.postRotate(rotationDegrees);
-                            bitmap = Bitmap.createBitmap(
-                                    bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
-                        }
-                        
-                        // Mirror image for front camera
-                        Matrix matrix = new Matrix();
-                        matrix.preScale(-1.0f, 1.0f);
+                        // Mirror image for front camera (rotation already handled in converter)
+                        Matrix mirrorMatrix = new Matrix();
+                        mirrorMatrix.preScale(-1.0f, 1.0f);
                         bitmap = Bitmap.createBitmap(
-                                bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+                                bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), mirrorMatrix, true);
                         
                         Log.d(TAG, "Final bitmap for frame #" + frameCount + ": " + 
                                 bitmap.getWidth() + "x" + bitmap.getHeight());
@@ -261,6 +255,31 @@ public class CameraView extends FrameLayout {
             
             // Connect preview to previewView
             preview.setSurfaceProvider(previewView.getSurfaceProvider());
+            
+            // Enable dynamic orientation updates
+            if (orientationEventListener == null) {
+                orientationEventListener = new OrientationEventListener(getContext()) {
+                    @Override
+                    public void onOrientationChanged(int orientation) {
+                        if (orientation == ORIENTATION_UNKNOWN) return;
+                        int newRotation;
+                        if (orientation >= 45 && orientation < 135) {
+                            newRotation = Surface.ROTATION_270;
+                        } else if (orientation >= 135 && orientation < 225) {
+                            newRotation = Surface.ROTATION_180;
+                        } else if (orientation >= 225 && orientation < 315) {
+                            newRotation = Surface.ROTATION_90;
+                        } else {
+                            newRotation = Surface.ROTATION_0;
+                        }
+                        try {
+                            if (imageAnalysis != null) imageAnalysis.setTargetRotation(newRotation);
+                            if (preview != null) preview.setTargetRotation(newRotation);
+                        } catch (Exception ignored) {}
+                    }
+                };
+            }
+            if (orientationEventListener != null) orientationEventListener.enable();
             Log.d(TAG, "Camera binding successful");
         } catch (Exception e) {
             Log.e(TAG, "Use case binding failed", e);
@@ -284,20 +303,11 @@ public class CameraView extends FrameLayout {
                     // Convert ImageProxy to Bitmap
                     Bitmap bitmap = imageToBitmap(imageProxy);
                     
-                    // Apply rotation if needed
-                    int rotationDegrees = imageProxy.getImageInfo().getRotationDegrees();
-                    if (rotationDegrees != 0) {
-                        Matrix matrix = new Matrix();
-                        matrix.postRotate(rotationDegrees);
-                        bitmap = Bitmap.createBitmap(
-                                bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
-                    }
-                    
-                    // Mirror image for front camera
-                    Matrix matrix = new Matrix();
-                    matrix.preScale(-1.0f, 1.0f);
+                    // Mirror image for front camera (rotation already handled in converter)
+                    Matrix mirrorMatrix = new Matrix();
+                    mirrorMatrix.preScale(-1.0f, 1.0f);
                     bitmap = Bitmap.createBitmap(
-                            bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+                            bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), mirrorMatrix, true);
                     
                     // Return bitmap
                     final Bitmap finalBitmap = bitmap;
@@ -329,90 +339,48 @@ public class CameraView extends FrameLayout {
     @OptIn(markerClass = ExperimentalGetImage.class)
     private Bitmap imageToBitmap(ImageProxy image) {
         try {
-            // Lấy định dạng ảnh
-            int format = image.getFormat();
-            Log.d(TAG, "imageToBitmap: Image format = " + format + " (RGBA_8888=" + ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888 + ")");
-            
-            // Thử chuyển đổi từ Image đối tượng TRƯỚC (ưu tiên cao nhất)
+            // Canonical path: always try robust YUV_420_888 → NV21 → JPEG decode
             android.media.Image mediaImage = image.getImage();
-            if (mediaImage != null) {
-                int mediaFormat = mediaImage.getFormat();
-                Log.d(TAG, "imageToBitmap: MediaImage format = " + mediaFormat + 
-                        " (YUV_420_888=" + android.graphics.ImageFormat.YUV_420_888 + 
-                        ", NV16=" + android.graphics.ImageFormat.NV16 + 
-                        ", NV21=" + android.graphics.ImageFormat.NV21 + ")");
-                
-                // Thử các định dạng YUV
-                if (mediaFormat == android.graphics.ImageFormat.YUV_420_888 || 
-                    mediaFormat == android.graphics.ImageFormat.NV21 ||
-                    mediaFormat == android.graphics.ImageFormat.NV16) {
-                    Log.d(TAG, "imageToBitmap: Trying YUV conversion for format " + mediaFormat);
-                    Bitmap bitmap = imageToBitmapUsingYUV(mediaImage);
-                    if (bitmap != null) {
-                        Log.d(TAG, "imageToBitmap: YUV conversion successful");
-                        return bitmap;
-                    } else {
-                        Log.w(TAG, "imageToBitmap: YUV conversion failed");
-                    }
-                }
-                
-                // Nếu không phải YUV, thử chuyển đổi raw data
-                Log.d(TAG, "imageToBitmap: Trying generic YUV conversion for unknown format " + mediaFormat);
-                Bitmap bitmap = imageToBitmapUsingGenericYUV(mediaImage);
-                if (bitmap != null) {
-                    Log.d(TAG, "imageToBitmap: Generic YUV conversion successful");
-                    return bitmap;
-                } else {
-                    Log.w(TAG, "imageToBitmap: Generic YUV conversion failed");
-                }
-            } else {
-                Log.w(TAG, "imageToBitmap: MediaImage is null");
+            if (mediaImage != null && mediaImage.getFormat() == android.graphics.ImageFormat.YUV_420_888) {
+                Bitmap bmp = vn.edu.fpt.zentryapp.faceid.util.YuvToRgbConverter.convert(image, image.getImageInfo().getRotationDegrees());
+                if (bmp != null) return bmp;
             }
-            
-            // Thử phương pháp RGBA
-            if (format == ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888) {
-                Log.d(TAG, "imageToBitmap: Trying RGBA conversion");
-                Bitmap bitmap = rgbaImageProxyToBitmap(image);
-                if (bitmap != null) {
-                    Log.d(TAG, "imageToBitmap: RGBA conversion successful");
-                    return bitmap;
-                } else {
-                    Log.w(TAG, "imageToBitmap: RGBA conversion failed");
-                }
+
+            // Fallback: RGBA fast path (if truly RGBA)
+            if (image.getFormat() == ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888) {
+                Bitmap bmp = rgbaImageProxyToBitmap(image);
+                if (bmp != null) return applyRotation(bmp, image.getImageInfo().getRotationDegrees());
             }
-            
-            // Thử phương pháp JPEG
+
+            // Last resort: JPEG decode from first plane (rare)
             if (image.getPlanes().length > 0) {
-                Log.d(TAG, "imageToBitmap: Trying JPEG/byte array conversion");
                 ByteBuffer buffer = image.getPlanes()[0].getBuffer();
                 byte[] bytes = new byte[buffer.remaining()];
                 buffer.get(bytes);
-                
-                Log.d(TAG, "imageToBitmap: Byte array size = " + bytes.length);
-                
-                Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                if (bitmap != null) {
-                    Log.d(TAG, "imageToBitmap: JPEG conversion successful");
-                    return bitmap;
-                } else {
-                    Log.w(TAG, "imageToBitmap: JPEG conversion failed");
-                }
-            } else {
-                Log.w(TAG, "imageToBitmap: No planes available");
+                Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                if (bmp != null) return applyRotation(bmp, image.getImageInfo().getRotationDegrees());
             }
-            
-            // Nếu tất cả các phương pháp đều thất bại, tạo bitmap trống
-            Log.w(TAG, "imageToBitmap: All conversion methods failed, creating empty bitmap");
-            int width = image.getWidth() > 0 ? image.getWidth() : 640;
-            int height = image.getHeight() > 0 ? image.getHeight() : 480;
-            Bitmap fallbackBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-            Log.d(TAG, "imageToBitmap: Created fallback bitmap: " + width + "x" + height);
-            return fallbackBitmap;
+
+            // Fallback empty bitmap
+            int width = Math.max(1, image.getWidth());
+            int height = Math.max(1, image.getHeight());
+            return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         } catch (Exception e) {
             Log.e(TAG, "imageToBitmap: Exception occurred", e);
-            Bitmap errorBitmap = Bitmap.createBitmap(640, 480, Bitmap.Config.ARGB_8888);
-            Log.d(TAG, "imageToBitmap: Created error bitmap: 640x480");
-            return errorBitmap;
+            return Bitmap.createBitmap(640, 480, Bitmap.Config.ARGB_8888);
+        }
+    }
+
+    private Bitmap applyRotation(Bitmap src, int rotationDegrees) {
+        if (rotationDegrees == 0) return src;
+        try {
+            Matrix m = new Matrix();
+            m.postRotate(rotationDegrees);
+            Bitmap out = Bitmap.createBitmap(src, 0, 0, src.getWidth(), src.getHeight(), m, true);
+            if (out != src) src.recycle();
+            return out;
+        } catch (Exception ignored) {
+            return src;
         }
     }
     

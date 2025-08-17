@@ -18,9 +18,13 @@ public class AuthInterceptor implements Interceptor {
     public Response intercept(@NonNull Chain chain) throws IOException {
         Request originalRequest = chain.request();
         String requestUrl = originalRequest.url().toString();
+        String method = originalRequest.method();
+
+        Log.d(TAG, "🌐 Intercepting request: " + method + " " + requestUrl);
 
         // Skip auth cho các endpoint không cần authentication
         if (shouldSkipAuth(requestUrl)) {
+            Log.d(TAG, "⏭️ Skipping auth for: " + requestUrl);
             return chain.proceed(originalRequest);
         }
 
@@ -45,7 +49,18 @@ public class AuthInterceptor implements Interceptor {
         */
 
         // Hiện tại chỉ proceed request gốc không có auth
-        return chain.proceed(originalRequest);
+        Log.w(TAG, "⚠️ Auth logic disabled - proceeding without authentication for: " + requestUrl);
+        Log.w(TAG, "  - AuthManager available: " + (authManager != null ? "Yes" : "No"));
+        if (authManager != null) {
+            Log.w(TAG, "  - User logged in: " + authManager.isLoggedIn());
+            Log.w(TAG, "  - Access token: " + (authManager.getAccessToken() != null ? "Available" : "Missing"));
+        }
+        
+        Response response = chain.proceed(originalRequest);
+        
+        Log.d(TAG, "📡 Response received: " + response.code() + " for " + requestUrl);
+        
+        return response;
     }
 
     private boolean shouldSkipAuth(String url) {

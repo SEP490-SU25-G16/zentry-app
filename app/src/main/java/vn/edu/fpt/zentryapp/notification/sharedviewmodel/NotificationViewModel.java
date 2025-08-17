@@ -20,6 +20,7 @@ import vn.edu.fpt.zentryapp.notification.data.model.NotificationDto;
 
 import lombok.Getter;
 import vn.edu.fpt.zentryapp.notification.data.NotificationItem;
+import org.json.JSONException;
 
 public class NotificationViewModel extends ViewModel {
 
@@ -46,6 +47,11 @@ public class NotificationViewModel extends ViewModel {
 
     public LiveData<List<NotificationItem>> getNotifications() {
         return filteredNotifications;
+    }
+    
+    // 🔧 NEW: Getter for allNotifications to allow direct observation
+    public LiveData<List<NotificationItem>> allNotifications() {
+        return allNotifications;
     }
     
     public LiveData<Boolean> shouldShowSeeMoreButton() {
@@ -83,6 +89,9 @@ public class NotificationViewModel extends ViewModel {
                 List<NotificationItem> items = new ArrayList<>();
                 if (response.isSuccessful() && response.body() != null) {
                     for (NotificationDto dto : response.body()) {
+                        // ✅ NEW: Extract expiration from notification data
+                        String expiresAt = extractExpirationFromData(dto.getData());
+                        
                         items.add(new NotificationItem(
                                 dto.getId(),
                                 dto.getTitle(),
@@ -90,7 +99,8 @@ public class NotificationViewModel extends ViewModel {
                                 dto.getCreatedAt(),
                                 dto.isRead(),
                                 false,
-                                dto.getData()
+                                dto.getData(),
+                                expiresAt // ✅ NEW: 8th parameter
                         ));
                     }
                 } else {
@@ -137,6 +147,9 @@ public class NotificationViewModel extends ViewModel {
                 List<NotificationItem> items = new ArrayList<>();
                 if (response.isSuccessful() && response.body() != null) {
                     for (NotificationDto dto : response.body()) {
+                        // ✅ NEW: Extract expiration from notification data
+                        String expiresAt = extractExpirationFromData(dto.getData());
+                        
                         items.add(new NotificationItem(
                                 dto.getId(),
                                 dto.getTitle(),
@@ -144,7 +157,8 @@ public class NotificationViewModel extends ViewModel {
                                 dto.getCreatedAt(),
                                 dto.isRead(),
                                 false,
-                                dto.getData()
+                                dto.getData(),
+                                expiresAt // ✅ NEW: 8th parameter
                         ));
                     }
                 } else {
@@ -193,6 +207,9 @@ public class NotificationViewModel extends ViewModel {
                 List<NotificationItem> items = new ArrayList<>();
                 if (response.isSuccessful() && response.body() != null) {
                     for (NotificationDto dto : response.body()) {
+                        // ✅ NEW: Extract expiration from notification data
+                        String expiresAt = extractExpirationFromData(dto.getData());
+                        
                         items.add(new NotificationItem(
                                 dto.getId(),
                                 dto.getTitle(),
@@ -200,7 +217,8 @@ public class NotificationViewModel extends ViewModel {
                                 dto.getCreatedAt(),
                                 dto.isRead(),
                                 false,
-                                dto.getData()
+                                dto.getData(),
+                                expiresAt // ✅ NEW: 8th parameter
                         ));
                     }
                 } else {
@@ -284,6 +302,41 @@ public class NotificationViewModel extends ViewModel {
         updateUnseenCount();
     }
     
+    // ✅ NEW: Helper method to extract expiration from notification data
+    private String extractExpirationFromData(String data) {
+        if (data == null || data.isEmpty()) {
+            android.util.Log.d("NotificationVM", "🔍 No data to extract expiration from");
+            return null;
+        }
+        
+        try {
+            org.json.JSONObject json = new org.json.JSONObject(data);
+            String type = json.optString("type", "");
+            android.util.Log.d("NotificationVM", "🔍 Notification type: " + type);
+            
+            // Only extract expiration for Face ID verification requests
+            if ("FACE_VERIFICATION_REQUEST".equalsIgnoreCase(type)) {
+                String expiresAt = json.optString("expiresAt", "");
+                android.util.Log.d("NotificationVM", "🔍 Raw expiresAt from JSON: " + expiresAt);
+                
+                if (expiresAt != null && !expiresAt.isEmpty()) {
+                    android.util.Log.d("NotificationVM", "✅ Extracted expiration for Face ID request: " + expiresAt);
+                    return expiresAt;
+                } else {
+                    android.util.Log.w("NotificationVM", "⚠️ Face ID request but no expiration found");
+                }
+            } else {
+                android.util.Log.d("NotificationVM", "🔍 Not a Face ID request, no expiration needed");
+            }
+            
+            return null; // No expiration for other notification types
+            
+        } catch (JSONException e) {
+            android.util.Log.w("NotificationVM", "⚠️ Failed to parse notification data for expiration: " + data, e);
+            return null;
+        }
+    }
+    
     public boolean canLoadMoreByScroll() {
         return seeMoreClicked;
     }
@@ -307,6 +360,17 @@ public class NotificationViewModel extends ViewModel {
             allNotifications.setValue(new ArrayList<>(all));
             applyFilter(currentFilter);
             updateUnseenCount();
+        }
+    }
+
+    // 🔧 NEW: Mark all notifications as seen and read via API
+    public void markAllAsSeen(Context context) {
+        // Update local state immediately
+        markAllAsSeen();
+        
+        // Also mark all as read via API if we have userId
+        if (lastLoadedUserId != null && !lastLoadedUserId.isEmpty()) {
+            markAllAsRead(context);
         }
     }
 
@@ -336,7 +400,85 @@ public class NotificationViewModel extends ViewModel {
             if (changed) {
                 allNotifications.setValue(current); // trigger lại observers
                 applyFilter(currentFilter);         // 🔁 apply lại filter hiện tại
+                updateUnseenCount();               // 🔁 update unseen count
             }
+        }
+    }
+
+    // 🔧 NEW: Mark single notification as read via API
+    public void markAsRead(String id, Context context) {
+        if (id == null || id.isEmpty()) return;
+        
+        // Update local state immediately for better UX
+        markAsRead(id);
+        
+        // Call API to persist the change
+        NotificationApiService api = ApiClient.getClient(context).create(NotificationApiService.class);
+        api.markNotificationAsRead(id).enqueue(new Callback<Void>() {
+            @Override
+            public void onResponse(@NonNull Call<Void> call, @NonNull Response<Void> response) {
+                if (response.isSuccessful()) {
+                    Log.d("NotificationVM", "✅ Marked notification " + id + " as read via API");
+                } else {
+                    Log.e("NotificationVM", "❌ Failed to mark notification as read: " + response.code());
+                    // Optionally revert local state on API failure
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<Void> call, @NonNull Throwable t) {
+                Log.e("NotificationVM", "❌ Network error marking notification as read", t);
+                // Optionally revert local state on network failure
+            }
+        });
+    }
+
+    // 🔧 NEW: Mark all notifications as read via API
+    public void markAllAsRead(Context context) {
+        String userId = lastLoadedUserId;
+        if (userId == null || userId.isEmpty()) return;
+        
+        // Update local state immediately for better UX
+        markAllAsReadLocal();
+        
+        // Call API to persist the change
+        NotificationApiService api = ApiClient.getClient(context).create(NotificationApiService.class);
+        api.markAllNotificationsAsRead(userId).enqueue(new Callback<Void>() {
+            @Override
+            public void onResponse(@NonNull Call<Void> call, @NonNull Response<Void> response) {
+                if (response.isSuccessful()) {
+                    Log.d("NotificationVM", "✅ Marked all notifications as read via API");
+                } else {
+                    Log.e("NotificationVM", "❌ Failed to mark all notifications as read: " + response.code());
+                    // Optionally revert local state on API failure
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<Void> call, @NonNull Throwable t) {
+                Log.e("NotificationVM", "❌ Network error marking all notifications as read", t);
+                // Optionally revert local state on network failure
+            }
+        });
+    }
+
+    // 🔧 NEW: Mark all notifications as read locally (without API call)
+    private void markAllAsReadLocal() {
+        List<NotificationItem> current = allNotifications.getValue();
+        if (current == null) return;
+        
+        boolean changed = false;
+        for (NotificationItem n : current) {
+            if (!n.isRead()) {
+                n.setRead(true);
+                changed = true;
+            }
+        }
+        
+        if (changed) {
+            allNotifications.setValue(new ArrayList<>(current));
+            applyFilter(currentFilter);
+            updateUnseenCount();
         }
     }
 
@@ -355,7 +497,7 @@ public class NotificationViewModel extends ViewModel {
         unseenCount.setValue(count);
     }
 
-    // 🧠 Helper: kiểm tra 2 list có giống nhau không (tránh re-render)
+    // �� Helper: kiểm tra 2 list có giống nhau không (tránh re-render)
     private boolean isSameList(List<NotificationItem> oldList, List<NotificationItem> newList) {
         if (oldList == null || newList == null) return false;
         if (oldList.size() != newList.size()) return false;
@@ -368,4 +510,133 @@ public class NotificationViewModel extends ViewModel {
         return true;
     }
 
+    // 🔧 NEW: Force refresh method that actually works
+    public void forceRefresh(String userId, Context context) {
+        Log.d("NotificationVM", "🔄 FORCE REFRESH: Bypassing cache and calling API directly");
+        
+        // Reset all flags to force reload
+        isDataLoaded = false;
+        lastLoadedUserId = null;
+        
+        // Clear current data immediately
+        allNotifications.setValue(new ArrayList<>());
+        filteredNotifications.setValue(new ArrayList<>());
+        unseenCount.setValue(0);
+        
+        // Reset pagination
+        resetPagination();
+        
+        // 🔧 FIX: Call API directly without going through loadNotifications
+        if (userId != null && !userId.isEmpty()) {
+            NotificationApiService api = ApiClient.getClient(context).create(NotificationApiService.class);
+            api.getNotifications(userId).enqueue(new Callback<List<NotificationDto>>() {
+                @Override
+                public void onResponse(@NonNull Call<List<NotificationDto>> call, @NonNull Response<List<NotificationDto>> response) {
+                    List<NotificationItem> items = new ArrayList<>();
+                    if (response.isSuccessful() && response.body() != null) {
+                        for (NotificationDto dto : response.body()) {
+                            // ✅ NEW: Extract expiration from notification data
+                            String expiresAt = extractExpirationFromData(dto.getData());
+                            
+                            items.add(new NotificationItem(
+                                    dto.getId(),
+                                    dto.getTitle(),
+                                    dto.getBody(),
+                                    dto.getCreatedAt(),
+                                    dto.isRead(),
+                                    false,
+                                    dto.getData(),
+                                    expiresAt // ✅ NEW: 8th parameter
+                            ));
+                        }
+                        Log.d("NotificationVM", "✅ FORCE REFRESH: loaded " + items.size() + " notifications");
+                    } else {
+                        Log.e("NotificationVM", "❌ FORCE REFRESH HTTP Error: " + response.code());
+                    }
+
+                    // 🔧 FIX: Update data in correct order to trigger observers
+                    Log.d("NotificationVM", "🔄 Updating data in correct order...");
+                    
+                    // 1. Update allNotifications first
+                    allNotifications.setValue(items);
+                    Log.d("NotificationVM", "✅ allNotifications updated with " + items.size() + " items");
+                    
+                    // 2. Apply filter to update filteredNotifications
+                    applyFilter(currentFilter);
+                    Log.d("NotificationVM", "✅ filter applied, filteredNotifications updated");
+                    
+                    // 3. Update flags
+                    isDataLoaded = true;
+                    lastLoadedUserId = userId;
+                    
+                    // 4. Update unseen count
+                    updateUnseenCount();
+                    Log.d("NotificationVM", "✅ unseenCount updated: " + unseenCount.getValue());
+                    
+                    Log.d("NotificationVM", "✅ FORCE REFRESH completed successfully");
+                }
+
+                @Override
+                public void onFailure(@NonNull Call<List<NotificationDto>> call, @NonNull Throwable t) {
+                    Log.e("NotificationVM", "❌ FORCE REFRESH failed", t);
+                }
+            });
+        }
+    }
+
+    // 🔧 IMPROVED: Fix existing forceRefreshNotifications
+    public void forceRefreshNotifications(String userId, Context context) {
+        Log.d("NotificationVM", "🔄 Force refreshing notifications for real-time updates");
+        
+        // Reset pagination for fresh data
+        resetPagination();
+        
+        // 🔧 FIX: Reset isDataLoaded to force reload
+        isDataLoaded = false;
+        
+        // Force reload from API
+        if (userId != null && !userId.isEmpty()) {
+            NotificationApiService api = ApiClient.getClient(context).create(NotificationApiService.class);
+            api.getNotifications(userId).enqueue(new Callback<List<NotificationDto>>() {
+                @Override
+                public void onResponse(@NonNull Call<List<NotificationDto>> call, @NonNull Response<List<NotificationDto>> response) {
+                    List<NotificationItem> items = new ArrayList<>();
+                    if (response.isSuccessful() && response.body() != null) {
+                        for (NotificationDto dto : response.body()) {
+                            // ✅ NEW: Extract expiration from notification data
+                            String expiresAt = extractExpirationFromData(dto.getData());
+                            
+                            items.add(new NotificationItem(
+                                    dto.getId(),
+                                    dto.getTitle(),
+                                    dto.getBody(),
+                                    dto.getCreatedAt(),
+                                    dto.isRead(),
+                                    false,
+                                    dto.getData(),
+                                    expiresAt // ✅ NEW: 8th parameter
+                            ));
+                        }
+                        Log.d("NotificationVM", "✅ Real-time refresh: loaded " + items.size() + " notifications");
+                    } else {
+                        Log.e("NotificationVM", "❌ Real-time refresh HTTP Error: " + response.code());
+                    }
+
+                    // Update data immediately
+                    allNotifications.setValue(items);
+                    applyFilter(currentFilter);
+                    isDataLoaded = true;
+                    lastLoadedUserId = userId;
+                    updateUnseenCount();
+                    
+                    Log.d("NotificationVM", "✅ Data updated, unseenCount: " + unseenCount.getValue());
+                }
+
+                @Override
+                public void onFailure(@NonNull Call<List<NotificationDto>> call, @NonNull Throwable t) {
+                    Log.e("NotificationVM", "❌ Real-time refresh failed", t);
+                }
+            });
+        }
+    }
 }

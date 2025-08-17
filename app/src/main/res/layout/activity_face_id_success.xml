@@ -4,113 +4,85 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background_primary"
-    tools:context=".student.ui.setting.success.FaceIdSuccessActivity">
+    android:background="@color/white"
+    tools:context=".faceid.ui.setting.success.FaceIdSuccessActivity">
 
     <!-- Back Button -->
     <ImageView
         android:id="@+id/ivBack"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="16dp"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="20dp"
+        android:background="@drawable/bg_circle_button"
+        android:padding="12dp"
         android:src="@drawable/ic_arrow_back"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:padding="8dp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:tint="@color/text_primary" />
+        app:tint="@color/faceid_success_text" />
 
-    <!-- Success Animation/Icon Container -->
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/clSuccessContainer"
+    <!-- Main Content Container -->
+    <LinearLayout
+        android:id="@+id/llMainContent"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginStart="32dp"
-        android:layout_marginEnd="32dp"
-        app:layout_constraintBottom_toTopOf="@+id/guideline_60"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/ivBack">
 
-        <!-- Success Icon -->
-        <ImageView
-            android:id="@+id/ivSuccessIcon"
-            android:layout_width="160dp"
-            android:layout_height="160dp"
-            android:src="@drawable/ic_check_circle"
-            android:scaleType="centerInside"
-            app:layout_constraintBottom_toTopOf="@+id/tvSuccessTitle"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_chainStyle="packed"
-            app:tint="@color/success_green" />
+        <!-- Success Icon Container -->
+        <FrameLayout
+            android:id="@+id/ivSuccessIconContainer"
+            android:layout_width="140dp"
+            android:layout_height="140dp"
+            android:layout_marginBottom="40dp"
+            android:background="@drawable/bg_faceid_success_icon">
+
+            <ImageView
+                android:id="@+id/ivSuccessIcon"
+                android:layout_width="90dp"
+                android:layout_height="90dp"
+                android:layout_gravity="center"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_check_circle"
+                app:tint="@color/white" />
+
+        </FrameLayout>
 
         <!-- Success Title -->
         <TextView
             android:id="@+id/tvSuccessTitle"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="Face ID Registered Successfully!"
+            android:layout_marginBottom="16dp"
+            android:text="Đăng ký FaceID thành công!"
             android:textAlignment="center"
-            android:textColor="@color/text_primary"
-            android:textSize="24sp"
+            android:textColor="@color/faceid_success_text"
+            android:textSize="28sp"
             android:textStyle="bold"
-            app:layout_constraintBottom_toTopOf="@+id/tvSuccessSubtitle"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/ivSuccessIcon" />
+            android:fontFamily="sans-serif-medium"
+            android:lineSpacingExtra="4dp" />
 
         <!-- Success Subtitle -->
         <TextView
             android:id="@+id/tvSuccessSubtitle"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="You can now use Face ID to quickly check in for attendance."
+            android:layout_marginBottom="60dp"
+            android:text="Giờ đây bạn có thể sử dụng Face ID để nhanh chóng điểm danh và truy cập ứng dụng một cách an toàn."
             android:textAlignment="center"
-            android:textColor="@color/text_secondary"
+            android:textColor="@color/faceid_success_subtitle"
             android:textSize="16sp"
-            android:lineSpacingExtra="4dp"
-            app:layout_constraintBottom_toTopOf="@+id/progressSync"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/tvSuccessTitle" />
+            android:lineSpacingExtra="6dp"
+            android:fontFamily="sans-serif"
+            android:maxLines="3" />
 
-        <!-- Sync Progress (Hidden by default) -->
-        <LinearLayout
-            android:id="@+id/progressSync"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:visibility="gone"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/tvSuccessSubtitle">
 
-            <ProgressBar
-                android:id="@+id/pbSync"
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:layout_marginEnd="8dp"
-                android:indeterminateTint="@color/primary" />
-
-            <TextView
-                android:id="@+id/tvSyncStatus"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Syncing with server..."
-                android:textColor="@color/text_secondary"
-                android:textSize="14sp" />
-
-        </LinearLayout>
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
+    </LinearLayout>
 
     <!-- Bottom Button Container -->
     <LinearLayout
@@ -119,32 +91,42 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="24dp"
         android:layout_marginEnd="24dp"
-        android:layout_marginBottom="32dp"
+        android:layout_marginBottom="40dp"
         android:orientation="vertical"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="@+id/guideline_60">
+        app:layout_constraintStart_toStartOf="parent">
 
-        <!-- Update Face ID Button -->
+        <!-- Continue Button -->
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnContinue"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:background="@drawable/bg_faceid_success_button"
+            android:text="Tiếp tục"
+            android:textColor="@color/white"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-medium"
+            android:elevation="8dp"
+            android:stateListAnimator="@null" />
+
+        <!-- Update Face ID Button (Hidden by default, shown when needed) -->
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/btnUpdateFaceId"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:background="@drawable/bg_button_primary"
-            android:text="Update Face ID"
+            android:layout_height="60dp"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_faceid_success_button"
+            android:text="Cập nhật Face ID"
             android:textColor="@color/white"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-medium"
+            android:elevation="8dp"
+            android:stateListAnimator="@null"
+            android:visibility="gone" />
 
     </LinearLayout>
-
-    <!-- Guideline at 60% -->
-    <androidx.constraintlayout.widget.Guideline
-        android:id="@+id/guideline_60"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        app:layout_constraintGuide_percent="0.6" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

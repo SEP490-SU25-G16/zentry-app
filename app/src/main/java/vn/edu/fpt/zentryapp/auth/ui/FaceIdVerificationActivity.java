@@ -20,8 +20,6 @@ public class FaceIdVerificationActivity extends AppCompatActivity implements Fac
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_face_id_request);
-
         // Initialize UI components
         btnStartVerification = findViewById(R.id.btnStartVerification);
         

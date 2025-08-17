@@ -58,6 +58,17 @@ public class GazeEstimator {
     private float[] gazeHistory = new float[10]; // Last 10 gaze positions (magnitude)
     private int historyIndex = 0;
 
+    // Camera/coordinate config
+    private boolean frontCameraMirrored = true;
+
+    // Post-process smoothing
+    private float emaGazeX = 0f;
+    private float emaGazeY = 0f;
+    private float emaAlpha = 0.4f; // smoothing factor
+
+    // Head pose blending weight
+    private float headPoseWeight = 0.2f; // reduced from 0.3 to avoid over-correction
+
     /**
      * Callback interface for gaze events
      */
@@ -143,6 +154,14 @@ public class GazeEstimator {
      */
     public void setCallback(GazeCallback callback) {
         this.callback = callback;
+    }
+
+    public void setFrontCameraMirrored(boolean mirrored) {
+        this.frontCameraMirrored = mirrored;
+    }
+
+    public void setHeadPoseWeight(float weight) {
+        this.headPoseWeight = Math.max(0f, Math.min(1f, weight));
     }
 
     /**
@@ -299,8 +318,16 @@ public class GazeEstimator {
                 return simulateGazeEstimation(headPose);
             }
 
-            // Process left eye (we use left eye for this model)
-            preprocessImage(leftEyeImage);
+            // Choose eye dynamically in single-input mode by head pose/quality
+            Bitmap primaryEye = leftEyeImage;
+            if (headPose != null && headPose.length >= 3) {
+                float yaw = headPose[2];
+                // If turning right (positive yaw), prioritize right eye; if left, prioritize left eye
+                if (yaw > 0) primaryEye = rightEyeImage;
+            }
+
+            // Process chosen eye
+            preprocessImage(primaryEye);
 
             // Check if interpreter is null
             if (interpreter == null) {
@@ -343,10 +370,19 @@ public class GazeEstimator {
             gazeX = outputBuffer[0][0];
             gazeY = outputBuffer[0][1];
 
+            // Apply front camera mirroring if needed
+            if (frontCameraMirrored) {
+                gazeX = -gazeX;
+            }
+
             // Adjust gaze based on head pose
             if (headPose != null && headPose.length >= 3) {
                 adjustGazeWithHeadPose(headPose);
             }
+
+            // Smooth gaze with EMA to stabilize thresholds
+            emaGazeX = emaAlpha * gazeX + (1 - emaAlpha) * emaGazeX;
+            emaGazeY = emaAlpha * gazeY + (1 - emaAlpha) * emaGazeY;
 
             // Update gaze history
             updateGazeHistory();
@@ -358,9 +394,9 @@ public class GazeEstimator {
             Log.d(TAG, "Gaze direction: (" + gazeX + ", " + gazeY + "), " +
                     (isLookingAtScreen ? "Looking at screen" : "Looking away"));
 
-            // Notify callback if available
+            // Notify callback if available (use smoothed values)
             if (callback != null) {
-                callback.onGazeUpdate(gazeX, gazeY, isLookingAtScreen);
+                callback.onGazeUpdate(emaGazeX, emaGazeY, isLookingAtScreen);
                 callback.onLookingAway(isLookingAway);
             }
 
@@ -627,7 +663,12 @@ public class GazeEstimator {
 
         // Adjust gaze by adding scaled head pose influence
         // Head yaw affects horizontal gaze, head pitch affects vertical gaze
-        float headWeight = 0.3f; // Weight of head pose vs. eye gaze
+        float headWeight = headPoseWeight; // configurable weight
+
+        // If eyes are likely closed/occluded (based on large |normYaw|), reduce head influence further
+        if (Math.abs(normYaw) > 0.8f) {
+            headWeight *= 0.5f;
+        }
 
         gazeX = gazeX * (1 - headWeight) + normYaw * headWeight;
         gazeY = gazeY * (1 - headWeight) + normPitch * headWeight;

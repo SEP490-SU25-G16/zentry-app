@@ -139,6 +139,13 @@ public class BottomNavigationHelper {
     public void selectInitialTab(int tabId) {
         switchTab(tabId);
     }
+    
+    // ✅ NEW: Public method to programmatically select a tab
+    public void selectTab(int tabId) {
+        if (currentTabId != tabId) {
+            switchTab(tabId);
+        }
+    }
 
     private NavHostFragment getCurrentNavHostFragment() {
         if (currentTabId == 0) return null;
