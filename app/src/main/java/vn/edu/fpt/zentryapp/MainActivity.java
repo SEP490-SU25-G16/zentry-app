@@ -323,7 +323,6 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     // ✅ NEW: Show error for expired request
                     Log.w("MainActivity", "⏰ Face ID verification request expired: " + requestId);
-                    showExpiredRequestError();
                 }
             } else {
                 Log.w("MainActivity", "⚠️ Missing requestId or sessionId in deeplink");
@@ -384,15 +383,5 @@ public class MainActivity extends AppCompatActivity {
             return true; // Treat as expired if parsing fails
         }
     }
-    
-    // ✅ NEW: Show error message for expired request
-    private void showExpiredRequestError() {
-        try {
-            Toast.makeText(this, 
-                "⏰ Face ID verification request has expired. Please ask your lecturer for a new request.", 
-                Toast.LENGTH_LONG).show();
-        } catch (Exception e) {
-            Log.e("MainActivity", "❌ Failed to show expired request error", e);
-        }
-    }
+
 }

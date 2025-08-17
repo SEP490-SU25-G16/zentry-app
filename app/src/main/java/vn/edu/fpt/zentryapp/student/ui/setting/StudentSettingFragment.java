@@ -1,6 +1,9 @@
 package vn.edu.fpt.zentryapp.student.ui.setting;
 
 import android.os.Bundle;
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -14,6 +17,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.content.Intent;
+import android.widget.Toast;
 
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
@@ -21,10 +25,18 @@ import vn.edu.fpt.zentryapp.auth.client.ApiClient;
 import vn.edu.fpt.zentryapp.auth.models.ApiResponse;
 import vn.edu.fpt.zentryapp.student.data.api.UserApiService;
 import vn.edu.fpt.zentryapp.student.data.model.response.UserProfileDto;
+import vn.edu.fpt.zentryapp.faceid.data.service.FaceIdRequestManager;
+import vn.edu.fpt.zentryapp.faceid.data.model.response.FaceIdRequestStatusResponse;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentSettingBinding;
+
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+import java.util.TimeZone;
 
 public class StudentSettingFragment extends Fragment {
 
@@ -34,6 +46,10 @@ public class StudentSettingFragment extends Fragment {
     private boolean hasFaceId;
     private StudentSettingViewModel viewModel;
     private boolean isFaceIdClickProcessing = false;
+    
+    // ✅ NEW: Face ID Request Manager để quản lý verification request lifecycle
+    private FaceIdRequestManager requestManager;
+    private boolean hasPendingVerificationRequest = false;
 
     @Nullable
     @Override
@@ -63,6 +79,12 @@ public class StudentSettingFragment extends Fragment {
         // Fetch latest HasFaceId from API and update cache
         refreshUserProfileHasFaceId();
 
+        // ✅ NEW: Initialize Face ID Request Manager
+        initializeFaceIdRequestManager();
+        
+        // ✅ NEW: Check verification request status
+        checkVerificationRequestStatus();
+
         // Xử lý click Device: điều hướng dựa trên trạng thái đăng ký thiết bị
         binding.llStudentSettingRowDevice.setOnClickListener(v -> {
             if (hasDevice) {
@@ -74,6 +96,19 @@ public class StudentSettingFragment extends Fragment {
 
         // Xử lý click Face ID: luôn xác nhận trạng thái mới nhất qua API trước khi điều hướng
         binding.llStudentSettingRowFaceId.setOnClickListener(v -> {
+            // ✅ NEW: Check request status trước khi cho phép click
+            if (requestManager != null && hasPendingVerificationRequest) {
+                // Có pending request, check xem có thể verify không
+                // Nếu request đã được xử lý (verified, expired, cancelled, failed), block click
+                if (!isVerificationRequestActive()) {
+                    // Request không thể verify → Show message và return
+                    String message = getRequestStatusMessageForPendingRequest();
+                    Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show();
+                    Log.d("StudentSettingFragment", "Blocked Face ID click: " + message);
+                    return;
+                }
+            }
+            
             // ✅ NEW: Chống duplicate click
             if (isFaceIdClickProcessing) {
                 Log.d("StudentSettingFragment", "Face ID click đang xử lý, bỏ qua");
@@ -263,6 +298,269 @@ public class StudentSettingFragment extends Fragment {
                 Log.w("StudentSettingFragment", "Failed to refresh user profile: " + t.getMessage());
             }
         });
+    }
+
+    // ✅ NEW: Initialize Face ID Request Manager
+    private void initializeFaceIdRequestManager() {
+        requestManager = new FaceIdRequestManager(requireContext());
+        Log.d("StudentSettingFragment", "FaceIdRequestManager initialized");
+    }
+
+    // ✅ NEW: Check verification request status
+    private void checkVerificationRequestStatus() {
+        try {
+            // Check if there's a pending verification request from SharedPreferences
+            SharedPreferences prefs = requireActivity().getSharedPreferences("face_verification", Context.MODE_PRIVATE);
+            String requestId = prefs.getString("pending_request_id", null);
+            String sessionId = prefs.getString("pending_session_id", null);
+            String expiresAt = prefs.getString("pending_expires_at", null);
+            
+            if (requestId != null && sessionId != null && !TextUtils.isEmpty(requestId) && !TextUtils.isEmpty(sessionId)) {
+                Log.d("StudentSettingFragment", "Found pending verification request: " + requestId);
+                
+                // Check if request is expired
+                if (isRequestExpired(expiresAt)) {
+                    Log.d("StudentSettingFragment", "Request expired, clearing from preferences");
+                    prefs.edit().clear().apply();
+                    hasPendingVerificationRequest = false;
+                } else {
+                    // Initialize request manager with this request
+                    long expirationTime = parseExpirationTime(expiresAt);
+                    requestManager.initializeRequest(requestId, sessionId, expirationTime);
+                    setupRequestManagerCallbacks();
+                    hasPendingVerificationRequest = true;
+                    Log.d("StudentSettingFragment", "Initialized request manager for pending request");
+                }
+            } else {
+                hasPendingVerificationRequest = false;
+                Log.d("StudentSettingFragment", "No pending verification request found");
+            }
+        } catch (Exception e) {
+            Log.e("StudentSettingFragment", "Error checking verification request status", e);
+            hasPendingVerificationRequest = false;
+        }
+    }
+    
+    // ✅ NEW: Check if Face ID request is expired
+    private boolean isRequestExpired(String expiresAt) {
+        if (TextUtils.isEmpty(expiresAt)) {
+            Log.w("StudentSettingFragment", "No expiration timestamp provided, treating as expired for security");
+            return true; // Treat as expired if no timestamp provided
+        }
+        
+        try {
+            // Parse ISO 8601 timestamp (e.g., "2024-01-01T12:00:00Z")
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
+            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+            Date expirationDate = sdf.parse(expiresAt);
+            
+            if (expirationDate == null) {
+                Log.w("StudentSettingFragment", "Failed to parse expiration date: " + expiresAt);
+                return true; // Treat as expired if parsing fails
+            }
+            
+            long currentTime = System.currentTimeMillis();
+            long expirationTime = expirationDate.getTime();
+            
+            // Add 5-minute buffer for network delays and processing time
+            long bufferTime = 5 * 60 * 1000; // 5 minutes in milliseconds
+            
+            boolean isExpired = currentTime > (expirationTime + bufferTime);
+            
+            Log.d("StudentSettingFragment", "Expiration check: " + expiresAt + ", isExpired: " + isExpired);
+            return isExpired;
+            
+        } catch (ParseException e) {
+            Log.e("StudentSettingFragment", "Failed to parse expiration timestamp: " + expiresAt, e);
+            return true; // Treat as expired if parsing fails
+        }
+    }
+    
+    // ✅ NEW: Parse expiration time from string to milliseconds
+    private long parseExpirationTime(String expiresAt) {
+        if (TextUtils.isEmpty(expiresAt)) {
+            return System.currentTimeMillis() + (5 * 60 * 1000); // Default 5 minutes
+        }
+        
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
+            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+            Date expirationDate = sdf.parse(expiresAt);
+            
+            if (expirationDate != null) {
+                return expirationDate.getTime();
+            }
+        } catch (ParseException e) {
+            Log.e("StudentSettingFragment", "Failed to parse expiration time: " + expiresAt, e);
+        }
+        
+        // Fallback to default 5 minutes
+        return System.currentTimeMillis() + (5 * 60 * 1000);
+    }
+    
+    // ✅ NEW: Setup callbacks for FaceIdRequestManager
+    private void setupRequestManagerCallbacks() {
+        if (requestManager == null) return;
+        
+        requestManager.setStatusCallback(new FaceIdRequestManager.RequestStatusCallback() {
+            @Override
+            public void onRequestStatusUpdated(FaceIdRequestManager.RequestState state, 
+                                            FaceIdRequestStatusResponse response) {
+                if (!isAdded()) return;
+                
+                Log.d("StudentSettingFragment", "Request status updated: " + state);
+                updateFaceIdUIState(state);
+            }
+            
+            @Override
+            public void onRequestExpired() {
+                if (!isAdded()) return;
+                updateFaceIdUIState(FaceIdRequestManager.RequestState.EXPIRED);
+            }
+            
+            @Override
+            public void onRequestCancelled() {
+                if (!isAdded()) return;
+                updateFaceIdUIState(FaceIdRequestManager.RequestState.CANCELLED);
+            }
+            
+            @Override
+            public void onRequestFailed(String error) {
+                if (!isAdded()) return;
+                updateFaceIdUIState(FaceIdRequestManager.RequestState.FAILED);
+            }
+        });
+        
+        requestManager.setExpiredCallback(() -> {
+            if (!isAdded()) return;
+            updateFaceIdUIState(FaceIdRequestManager.RequestState.EXPIRED);
+        });
+    }
+    
+    // ✅ NEW: Update UI based on request state
+    private void updateFaceIdUIState(FaceIdRequestManager.RequestState state) {
+        if (binding == null || !isAdded()) return;
+        
+        Log.d("StudentSettingFragment", "Updating Face ID UI state: " + state);
+        
+        switch (state) {
+            case VERIFIED:
+                // ✅ Request đã verify thành công → Disable UI
+                binding.llStudentSettingRowFaceId.setEnabled(false);
+                binding.llStudentSettingRowFaceId.setAlpha(0.5f);
+                hasPendingVerificationRequest = false;
+                // Clear pending request from SharedPreferences
+                clearPendingVerificationRequest();
+                break;
+                
+            case EXPIRED:
+                // ⏰ Request đã quá hạn → Disable UI
+                binding.llStudentSettingRowFaceId.setEnabled(false);
+                binding.llStudentSettingRowFaceId.setAlpha(0.5f);
+                hasPendingVerificationRequest = false;
+                // Clear expired request from SharedPreferences
+                clearPendingVerificationRequest();
+                break;
+                
+            case CANCELLED:
+                // ❌ Request đã bị hủy → Disable UI
+                binding.llStudentSettingRowFaceId.setEnabled(false);
+                binding.llStudentSettingRowFaceId.setAlpha(0.5f);
+                hasPendingVerificationRequest = false;
+                // Clear cancelled request from SharedPreferences
+                clearPendingVerificationRequest();
+                break;
+                
+            case FAILED:
+                // ❌ Request verification thất bại → Disable UI
+                binding.llStudentSettingRowFaceId.setEnabled(false);
+                binding.llStudentSettingRowFaceId.setAlpha(0.5f);
+                hasPendingVerificationRequest = false;
+                // Clear failed request from SharedPreferences
+                clearPendingVerificationRequest();
+                break;
+                
+            case PENDING:
+            default:
+                // ✅ Request đang pending → Enable UI bình thường
+                binding.llStudentSettingRowFaceId.setEnabled(true);
+                binding.llStudentSettingRowFaceId.setAlpha(1.0f);
+                hasPendingVerificationRequest = true;
+                break;
+        }
+    }
+    
+    // ✅ NEW: Clear pending verification request from SharedPreferences
+    private void clearPendingVerificationRequest() {
+        try {
+            SharedPreferences prefs = requireActivity().getSharedPreferences("face_verification", Context.MODE_PRIVATE);
+            prefs.edit().clear().apply();
+            Log.d("StudentSettingFragment", "Cleared pending verification request from SharedPreferences");
+        } catch (Exception e) {
+            Log.e("StudentSettingFragment", "Error clearing pending verification request", e);
+        }
+    }
+    
+    // ✅ NEW: Get status message for user feedback
+    private String getRequestStatusMessage(FaceIdRequestManager.RequestState state) {
+        switch (state) {
+            case VERIFIED:
+                return "Face ID verification already completed successfully!";
+            case EXPIRED:
+                return "Face ID verification window has expired!";
+            case CANCELLED:
+                return "Face ID verification request was cancelled!";
+            case FAILED:
+                return "Face ID verification failed!";
+            default:
+                return "Face ID verification not available!";
+        }
+    }
+
+    // ✅ NEW: Get status message for pending verification request
+    private String getRequestStatusMessageForPendingRequest() {
+        // Sử dụng SharedPreferences để check request status
+        try {
+            SharedPreferences prefs = requireActivity().getSharedPreferences("face_verification", Context.MODE_PRIVATE);
+            String requestId = prefs.getString("pending_request_id", null);
+            String expiresAt = prefs.getString("pending_expires_at", null);
+            
+            if (requestId == null) {
+                return "Face ID verification not available.";
+            }
+            
+            // Check if request is expired
+            if (isRequestExpired(expiresAt)) {
+                return "Face ID verification window has expired!";
+            }
+            
+            // Nếu có request và chưa expired, có thể verify
+            return "Face ID verification available.";
+            
+        } catch (Exception e) {
+            Log.e("StudentSettingFragment", "Error getting request status message", e);
+            return "Face ID verification not available.";
+        }
+    }
+    
+    // ✅ NEW: Check if the current verification request is active (not expired, not cancelled, not failed)
+    private boolean isVerificationRequestActive() {
+        try {
+            SharedPreferences prefs = requireActivity().getSharedPreferences("face_verification", Context.MODE_PRIVATE);
+            String requestId = prefs.getString("pending_request_id", null);
+            String expiresAt = prefs.getString("pending_expires_at", null);
+            
+            if (requestId == null) {
+                return false;
+            }
+            
+            // Check if request is expired
+            return !isRequestExpired(expiresAt);
+            
+        } catch (Exception e) {
+            Log.e("StudentSettingFragment", "Error checking if verification request is active", e);
+            return false;
+        }
     }
 
     private void showFaceIdLoading(boolean show) {

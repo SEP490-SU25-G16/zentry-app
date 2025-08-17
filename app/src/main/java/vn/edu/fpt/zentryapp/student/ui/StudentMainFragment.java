@@ -171,7 +171,6 @@ public class StudentMainFragment extends Fragment {
                                 // ✅ NEW: Clear expired request and show error
                                 android.util.Log.w("StudentMainFragment", "⏰ Pending verification request expired: " + requestId);
                                 prefs.edit().clear().apply();
-                                showExpiredRequestError();
                             }
                         }
                     } catch (Exception e) {
@@ -219,14 +218,5 @@ public class StudentMainFragment extends Fragment {
                     }
                 }
                 
-                // ✅ NEW: Show error message for expired request
-                private void showExpiredRequestError() {
-                    try {
-                        android.widget.Toast.makeText(requireContext(), 
-                            "⏰ Face ID verification request has expired. Please ask your lecturer for a new request.", 
-                            android.widget.Toast.LENGTH_LONG).show();
-                    } catch (Exception e) {
-                        android.util.Log.e("StudentMainFragment", "❌ Failed to show expired request error", e);
-                    }
-                }
+
 }
