@@ -140,28 +140,22 @@ public class NotificationFragment extends Fragment {
             
             // Force refresh notifications in real-time
             if (userId != null) {
-                Log.d("NotificationFragment", "🔄 Triggering real-time notification refresh");
+                Log.d("NotificationFragment", "🔄 Force refreshing notifications for user: " + userId);
                 
-                // Use post to ensure UI thread execution
-                requireView().post(() -> {
-                    try {
-                        // 🔧 IMPROVED: Use forceRefresh instead of forceRefreshNotifications
-                        viewModel.forceRefresh(userId, requireContext());
-                        Log.d("NotificationFragment", "✅ Real-time refresh triggered successfully");
-                        
-                        // 🔧 FIX: No need to manually refresh tabs - they will observe data changes automatically
-                        Log.d("NotificationFragment", "ℹ️ Tabs will auto-refresh by observing data changes");
-                        
-                    } catch (Exception e) {
-                        Log.e("NotificationFragment", "❌ Error during real-time refresh", e);
-                    }
-                });
-                
-                // Show toast for Face ID requests
-                if ("FACE_VERIFICATION_REQUEST".equalsIgnoreCase(notificationType)) {
-                    String message = "🎭 " + (notificationTitle != null ? notificationTitle : "Face ID verification requested");
-                    Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
+                // ✅ NEW: Check if this is a session end notification and handle BLE service stopping
+                // This serves as a fallback when FCM fails due to network restrictions
+                if (notificationBody != null && notificationBody.contains("Tiết học đã kết thúc sớm")) {
+                    Log.d("NotificationFragment", "🛑 Received session end notification, checking if BLE service needs to be stopped");
+                    stopBLEAttendanceServiceIfNeeded();
                 }
+                
+                // Force refresh notifications
+                viewModel.forceRefresh(userId, requireContext());
+                Log.d("NotificationFragment", "✅ Real-time refresh triggered successfully");
+                
+                // 🔧 FIX: No need to manually refresh tabs - they will observe data changes automatically
+                Log.d("NotificationFragment", "ℹ️ Tabs will auto-refresh by observing data changes");
+                
             } else {
                 Log.w("NotificationFragment", "⚠️ No userId in broadcast, cannot refresh");
             }
@@ -305,6 +299,23 @@ public class NotificationFragment extends Fragment {
 
     private void stopInAppPolling() {
         viewPagerNotification.removeCallbacks(pollingRunnable);
+    }
+    
+    // ✅ NEW: Method to stop BLE attendance service when session ends (fallback for FCM failures)
+    private void stopBLEAttendanceServiceIfNeeded() {
+        try {
+            // Check if BLE service is already stopped via FCM
+            if (!vn.edu.fpt.zentryapp.notification.push.FcmMessagingService.isBLEServiceStopped()) {
+                Intent serviceIntent = new Intent(requireContext(), vn.edu.fpt.zentryapp.service.BLEAttendanceService.class);
+                serviceIntent.setAction("STOP_ATTENDANCE");
+                requireContext().startService(serviceIntent);
+                Log.d("NotificationFragment", "✅ Fragment: Sent STOP_ATTENDANCE intent to BLE service (FCM fallback)");
+            } else {
+                Log.d("NotificationFragment", "ℹ️ Fragment: BLE service already stopped by FCM, no action needed");
+            }
+        } catch (Exception e) {
+            Log.e("NotificationFragment", "❌ Fragment: Error stopping BLE service", e);
+        }
     }
 }
 

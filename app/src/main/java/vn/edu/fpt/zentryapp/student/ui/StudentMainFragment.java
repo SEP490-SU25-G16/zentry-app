@@ -10,6 +10,8 @@ import androidx.fragment.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentMainBinding;
@@ -73,6 +75,40 @@ public class StudentMainFragment extends Fragment {
         requireActivity()
                 .getOnBackPressedDispatcher()
                 .addCallback(getViewLifecycleOwner(), backCallback);
+    }
+
+    // ✅ NEW: Method to hide bottom navigation bar (for Face ID fragments)
+    public void hideBottomNavigation() {
+        if (binding != null && binding.bottomNavigationStudent != null) {
+            binding.bottomNavigationStudent.setVisibility(View.GONE);
+            
+            // Remove bottom padding from fragment container to use full screen
+            if (binding.studentNavHostFragment != null) {
+                binding.studentNavHostFragment.setPadding(
+                    binding.studentNavHostFragment.getPaddingLeft(),
+                    binding.studentNavHostFragment.getPaddingTop(),
+                    binding.studentNavHostFragment.getPaddingRight(),
+                    0 // Remove bottom padding
+                );
+            }
+        }
+    }
+
+    // ✅ NEW: Method to show bottom navigation bar (when returning from Face ID fragments)
+    public void showBottomNavigation() {
+        if (binding != null && binding.bottomNavigationStudent != null) {
+            binding.bottomNavigationStudent.setVisibility(View.VISIBLE);
+            
+            // Restore bottom padding for fragment container
+            if (binding.studentNavHostFragment != null) {
+                binding.studentNavHostFragment.setPadding(
+                    binding.studentNavHostFragment.getPaddingLeft(),
+                    binding.studentNavHostFragment.getPaddingTop(),
+                    binding.studentNavHostFragment.getPaddingRight(),
+                    56 // Restore 56dp bottom padding
+                );
+            }
+        }
     }
 
     @Override

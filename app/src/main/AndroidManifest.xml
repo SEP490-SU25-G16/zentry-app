@@ -76,7 +76,32 @@
         <!-- Face ID Success Activity declaration -->
         <activity
             android:name=".faceid.ui.setting.success.FaceIdSuccessActivity"
-            android:exported="false" />
+            android:exported="false"
+            android:launchMode="singleTop" />
+            
+        <!-- Face ID Info Activity declaration -->
+        <activity
+            android:name=".faceid.ui.setting.FaceIdInfoActivity"
+            android:exported="false"
+            android:launchMode="singleTop" />
+            
+        <!-- Face ID Register Activity declaration -->
+        <activity
+            android:name=".faceid.ui.setting.StudentSettingRegisterFaceIdActivity"
+            android:exported="false"
+            android:launchMode="singleTop" />
+            
+        <!-- Face ID Update Activity declaration -->
+        <activity
+            android:name=".faceid.ui.setting.StudentSettingUpdateFaceIdActivity"
+            android:exported="false"
+            android:launchMode="singleTop" />
+            
+        <!-- Face ID Verify Activity declaration -->
+        <activity
+            android:name=".faceid.ui.setting.StudentSettingVerifyFaceIdActivity"
+            android:exported="false"
+            android:launchMode="singleTop" />
     </application>
 
 </manifest>

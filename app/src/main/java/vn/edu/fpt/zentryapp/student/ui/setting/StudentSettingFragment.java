@@ -13,6 +13,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.content.Intent;
 
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
@@ -32,6 +33,7 @@ public class StudentSettingFragment extends Fragment {
     private boolean hasDevice;
     private boolean hasFaceId;
     private StudentSettingViewModel viewModel;
+    private boolean isFaceIdClickProcessing = false;
 
     @Nullable
     @Override
@@ -72,8 +74,22 @@ public class StudentSettingFragment extends Fragment {
 
         // Xử lý click Face ID: luôn xác nhận trạng thái mới nhất qua API trước khi điều hướng
         binding.llStudentSettingRowFaceId.setOnClickListener(v -> {
+            // ✅ NEW: Chống duplicate click
+            if (isFaceIdClickProcessing) {
+                Log.d("StudentSettingFragment", "Face ID click đang xử lý, bỏ qua");
+                return;
+            }
+            
+            // ✅ NEW: Disable click trong khi xử lý
+            isFaceIdClickProcessing = true;
+            binding.llStudentSettingRowFaceId.setEnabled(false);
+            
+            // ✅ NEW: Hiển thị loading indicator
+            showFaceIdLoading(true);
+            
             String userId = AuthManager.getInstance(requireContext()).getCurrentUserId();
             Log.d("StudentSettingFragment", "Face ID clicked, checking HasFaceId via API for userId=" + userId);
+            
             UserApiService api = ApiClient.getClient(requireContext()).create(UserApiService.class);
             api.getUser(userId).enqueue(new Callback<ApiResponse<UserProfileDto>>() {
                 @Override
@@ -93,23 +109,59 @@ public class StudentSettingFragment extends Fragment {
                         } catch (Exception ignored) {}
                     }
 
-                    if (latestHasFaceId) {
-                        // Nếu đã có Face ID, chuyển tới màn hình success có nút update
-                        navController.navigate(R.id.action_studentSetting_to_faceIdSuccess);
-                    } else {
-                        navController.navigate(R.id.action_studentSetting_to_registerFaceId);
+                    // ✅ NEW: Kiểm tra xem Activity đã tồn tại chưa
+                    if (isActivityDestroyed()) {
+                        Log.d("StudentSettingFragment", "Activity đã destroy, không start Activity mới");
+                        return;
                     }
+
+                    if (latestHasFaceId) {
+                        // Nếu đã có Face ID, chuyển tới màn hình thông tin Face ID (không phải success)
+                        // ✅ NEW: Sử dụng FaceIdInfoActivity để hiển thị thông tin và cho phép update
+                        Intent infoIntent = vn.edu.fpt.zentryapp.faceid.ui.setting.FaceIdInfoActivity.createIntent(
+                            requireContext(), 
+                            userId, 
+                            authManager.getCurrentUserName()
+                        );
+                        startActivity(infoIntent);
+                    } else {
+                        // ✅ NEW: Sử dụng startActivity để ẩn navbar hoàn toàn
+                        Intent registerIntent = new Intent(requireContext(), vn.edu.fpt.zentryapp.faceid.ui.setting.StudentSettingRegisterFaceIdActivity.class);
+                        startActivity(registerIntent);
+                    }
+                    
+                    // ✅ NEW: Reset trạng thái sau khi hoàn thành
+                    resetFaceIdClickState();
                 }
 
                 @Override
                 public void onFailure(@NonNull Call<ApiResponse<UserProfileDto>> call, @NonNull Throwable t) {
                     Log.e("StudentSettingFragment", "GET /api/User failed: " + t.getMessage(), t);
+                    
+                    // ✅ NEW: Kiểm tra xem Activity đã tồn tại chưa
+                    if (isActivityDestroyed()) {
+                        Log.d("StudentSettingFragment", "Activity đã destroy, không start Activity mới");
+                        return;
+                    }
+                    
                     // Nếu API lỗi, fallback theo cache
                     if (hasFaceId) {
-                        navController.navigate(R.id.action_studentSetting_to_faceIdSuccess);
+                        // ✅ NEW: Sử dụng FaceIdInfoActivity để hiển thị thông tin và cho phép update
+                        String userId = AuthManager.getInstance(requireContext()).getCurrentUserId();
+                        Intent infoIntent = vn.edu.fpt.zentryapp.faceid.ui.setting.FaceIdInfoActivity.createIntent(
+                            requireContext(), 
+                            userId, 
+                            authManager.getCurrentUserName()
+                        );
+                        startActivity(infoIntent);
                     } else {
-                        navController.navigate(R.id.action_studentSetting_to_registerFaceId);
+                        // ✅ NEW: Sử dụng startActivity để ẩn navbar hoàn toàn
+                        Intent registerIntent = new Intent(requireContext(), vn.edu.fpt.zentryapp.faceid.ui.setting.StudentSettingRegisterFaceIdActivity.class);
+                        startActivity(registerIntent);
                     }
+                    
+                    // ✅ NEW: Reset trạng thái sau khi hoàn thành
+                    resetFaceIdClickState();
                 }
             });
         });
@@ -172,33 +224,55 @@ public class StudentSettingFragment extends Fragment {
                 .getBoolean("faceid_registered", false);
     }
 
+    private void resetFaceIdClickState() {
+        isFaceIdClickProcessing = false;
+        binding.llStudentSettingRowFaceId.setEnabled(true);
+        showFaceIdLoading(false);
+    }
+    
+    // ✅ NEW: Kiểm tra xem Activity đã destroy chưa
+    private boolean isActivityDestroyed() {
+        return getActivity() == null || 
+               getActivity().isFinishing() || 
+               getActivity().isDestroyed() ||
+               !isAdded() ||
+               isDetached();
+    }
+    
+    // ✅ NEW: Tối ưu hóa việc refresh user profile
     private void refreshUserProfileHasFaceId() {
-        try {
-            String userId = AuthManager.getInstance(requireContext()).getCurrentUserId();
-            if (userId == null || userId.isEmpty()) return;
-
-            UserApiService api = ApiClient.getClient(requireContext()).create(UserApiService.class);
-            api.getUser(userId).enqueue(new Callback<ApiResponse<UserProfileDto>>() {
-                @Override
-                public void onResponse(@NonNull Call<ApiResponse<UserProfileDto>> call, @NonNull Response<ApiResponse<UserProfileDto>> response) {
-                    if (!isAdded()) return;
-                    if (response.isSuccessful() && response.body() != null && response.body().getData() != null) {
-                        boolean latestHasFaceId = response.body().getData().isHasFaceId();
-                        hasFaceId = latestHasFaceId;
-                        // cache
-                        requireContext().getSharedPreferences("prefs", 0)
-                                .edit()
-                                .putBoolean("faceid_registered", latestHasFaceId)
-                                .apply();
-                    }
+        // Chỉ refresh nếu cần thiết
+        if (hasFaceId) {
+            return;
+        }
+        
+        String userId = AuthManager.getInstance(requireContext()).getCurrentUserId();
+        UserApiService api = ApiClient.getClient(requireContext()).create(UserApiService.class);
+        api.getUser(userId).enqueue(new Callback<ApiResponse<UserProfileDto>>() {
+            @Override
+            public void onResponse(@NonNull Call<ApiResponse<UserProfileDto>> call, @NonNull Response<ApiResponse<UserProfileDto>> response) {
+                if (response.isSuccessful() && response.body() != null && response.body().getData() != null) {
+                    hasFaceId = response.body().getData().isHasFaceId();
+                    requireContext().getSharedPreferences("prefs", 0)
+                            .edit().putBoolean("faceid_registered", hasFaceId).apply();
                 }
+            }
 
-                @Override
-                public void onFailure(@NonNull Call<ApiResponse<UserProfileDto>> call, @NonNull Throwable t) {
-                    // ignore; fallback to cached value
-                }
-            });
-        } catch (Exception ignored) {}
+            @Override
+            public void onFailure(@NonNull Call<ApiResponse<UserProfileDto>> call, @NonNull Throwable t) {
+                Log.w("StudentSettingFragment", "Failed to refresh user profile: " + t.getMessage());
+            }
+        });
+    }
+
+    private void showFaceIdLoading(boolean show) {
+        if (show) {
+            binding.llStudentSettingRowFaceId.setVisibility(View.GONE);
+            binding.llStudentSettingRowFaceIdLoading.setVisibility(View.VISIBLE);
+        } else {
+            binding.llStudentSettingRowFaceId.setVisibility(View.VISIBLE);
+            binding.llStudentSettingRowFaceIdLoading.setVisibility(View.GONE);
+        }
     }
 
     @Override

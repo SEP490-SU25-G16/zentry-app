@@ -70,4 +70,9 @@
     <color name="button_primary">#1976D2</color>
     <color name="button_secondary">#E3F2FD</color>
     <color name="liveness_challenge_blue">#0000FF</color>
+
+    <!-- 🔧 NEW: FaceID Success Screen Colors -->
+    <color name="faceid_success_primary">#A9B6E1</color>
+    <color name="faceid_success_text">#4A5568</color>
+    <color name="faceid_success_subtitle">#718096</color>
 </resources>

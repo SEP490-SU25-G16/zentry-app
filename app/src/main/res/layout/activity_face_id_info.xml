@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/white"
-    tools:context=".faceid.ui.setting.success.FaceIdSuccessActivity">
+    tools:context=".faceid.ui.setting.FaceIdInfoActivity">
 
     <!-- Back Button -->
     <ImageView
@@ -34,53 +34,45 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/ivBack">
 
-        <!-- Success Icon Container -->
-        <FrameLayout
-            android:id="@+id/ivSuccessIconContainer"
-            android:layout_width="140dp"
-            android:layout_height="140dp"
-            android:layout_marginBottom="40dp"
-            android:background="@drawable/bg_faceid_success_icon">
+        <!-- Face ID Icon -->
 
-            <ImageView
-                android:id="@+id/ivSuccessIcon"
-                android:layout_width="90dp"
-                android:layout_height="90dp"
-                android:layout_gravity="center"
-                android:scaleType="centerInside"
-                android:src="@drawable/ic_check_circle"
-                app:tint="@color/white" />
 
-        </FrameLayout>
+        <!-- Face ID Status -->
+        <ImageView
+            android:id="@+id/ivFaceIdIcon"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:layout_marginBottom="32dp"
+            android:background="@drawable/bg_faceid_success_icon"
+            android:padding="24dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_check"
+            app:tint="@color/green_success" />
 
-        <!-- Success Title -->
         <TextView
-            android:id="@+id/tvSuccessTitle"
+            android:id="@+id/tvFaceIdStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:text="Đăng ký FaceID thành công!"
+            android:layout_marginBottom="14dp"
+            android:text="Face ID đã được đăng ký thành công!"
             android:textAlignment="center"
-            android:textColor="@color/faceid_success_text"
-            android:textSize="28sp"
+            android:textColor="@color/faceid_success_primary"
+            android:textSize="20sp"
             android:textStyle="bold"
-            android:fontFamily="sans-serif-medium"
-            android:lineSpacingExtra="4dp" />
+            android:fontFamily="sans-serif-medium" />
 
-        <!-- Success Subtitle -->
+        <!-- Face ID Description -->
         <TextView
-            android:id="@+id/tvSuccessSubtitle"
+            android:id="@+id/tvFaceIdDescription"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="60dp"
-            android:text="Giờ đây bạn có thể sử dụng Face ID để nhanh chóng điểm danh và truy cập ứng dụng một cách an toàn."
             android:textAlignment="center"
             android:textColor="@color/faceid_success_subtitle"
             android:textSize="16sp"
             android:lineSpacingExtra="6dp"
             android:fontFamily="sans-serif"
             android:maxLines="3" />
-
 
     </LinearLayout>
 
@@ -97,26 +89,11 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
-        <!-- Continue Button -->
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/btnContinue"
-            android:layout_width="match_parent"
-            android:layout_height="60dp"
-            android:background="@drawable/bg_faceid_success_button"
-            android:text="Tiếp tục"
-            android:textColor="@color/white"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:fontFamily="sans-serif-medium"
-            android:elevation="8dp"
-            android:stateListAnimator="@null" />
-
-        <!-- Update Face ID Button (Hidden by default, shown when needed) -->
+        <!-- Update Face ID Button -->
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/btnUpdateFaceId"
             android:layout_width="match_parent"
             android:layout_height="60dp"
-            android:layout_marginTop="16dp"
             android:background="@drawable/bg_faceid_success_button"
             android:text="Cập nhật Face ID"
             android:textColor="@color/white"
@@ -124,8 +101,8 @@
             android:textStyle="bold"
             android:fontFamily="sans-serif-medium"
             android:elevation="8dp"
-            android:stateListAnimator="@null"
-            android:visibility="gone" />
+            android:stateListAnimator="@null" />
+
 
     </LinearLayout>
 

@@ -221,6 +221,30 @@
                         app:tint="#666666"/>
                 </LinearLayout>
 
+                <!-- ✅ NEW: Face ID Loading Indicator -->
+                <LinearLayout
+                    android:id="@+id/llStudentSettingRowFaceIdLoading"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingVertical="12dp"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:id="@+id/ivStudentSettingFaceIdIconLoading"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_faceid"
+                        app:tint="#202244"/>
+
+                    <ProgressBar
+                        android:id="@+id/pbStudentSettingFaceIdLoading"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:indeterminateTint="#6367F1"/>
+                </LinearLayout>
+
                 <View
                     android:id="@+id/viewStudentSettingDivider5"
                     android:layout_width="match_parent"

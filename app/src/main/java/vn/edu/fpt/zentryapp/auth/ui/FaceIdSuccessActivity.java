@@ -2,11 +2,13 @@ package vn.edu.fpt.zentryapp.auth.ui;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.constraintlayout.widget.ConstraintLayout;
+import androidx.cardview.widget.CardView;
 
 import vn.edu.fpt.zentryapp.R;
 
@@ -20,7 +22,8 @@ public class FaceIdSuccessActivity extends AppCompatActivity {
     private ImageView ivSuccessIcon;
     private Button btnContinue;
     private Button btnTestFaceId;
-    private ConstraintLayout clSuccessContainer;
+    private CardView cardSuccess;
+    private LinearLayout llBottomButtons;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,59 +46,73 @@ public class FaceIdSuccessActivity extends AppCompatActivity {
     private void initializeUI() {
         ivBack = findViewById(R.id.ivBack);
         ivSuccessIcon = findViewById(R.id.ivSuccessIcon);
-        btnContinue = findViewById(R.id.btnContinue);
-        clSuccessContainer = findViewById(R.id.clSuccessContainer);
+        btnContinue = findViewById(R.id.btnUpdateFaceId); // Sử dụng button có sẵn trong layout
+        cardSuccess = findViewById(R.id.cardSuccess);
+        llBottomButtons = findViewById(R.id.llBottomButtons);
+        
+        // Ẩn button update vì đây là màn hình success sau khi thiết lập verification
+        if (btnContinue != null) {
+            btnContinue.setText("Continue");
+        }
     }
     
     /**
      * Set up click listeners
      */
     private void setupClickListeners() {
-        ivBack.setOnClickListener(v -> onBackPressed());
+        if (ivBack != null) {
+            ivBack.setOnClickListener(v -> onBackPressed());
+        }
         
-        btnContinue.setOnClickListener(v -> {
-            // Navigate back to the main flow
-            finish();
-        });
+        if (btnContinue != null) {
+            btnContinue.setOnClickListener(v -> {
+                // Navigate back to the main flow
+                finish();
+            });
+        }
         
-        btnTestFaceId.setOnClickListener(v -> {
-            // Start a verification test (for demonstration purposes)
-            startTestVerification();
-        });
+        // Ẩn test button vì không cần thiết trong màn hình này
+        btnTestFaceId = null;
     }
     
     /**
      * Apply enhanced visual effects
      */
     private void applyEnhancedVisuals() {
-        // Use green gradient background for success button
-        btnContinue.setBackgroundResource(R.drawable.button_green_gradient);
-        
-        // Use ripple effect for buttons
-        btnContinue.setBackgroundResource(R.drawable.ripple_green_gradient);
+        if (btnContinue != null) {
+            // Use green gradient background for success button
+            btnContinue.setBackgroundResource(R.drawable.bg_button_success);
+        }
         
         // Apply animation to success icon
-        ivSuccessIcon.setScaleX(0f);
-        ivSuccessIcon.setScaleY(0f);
-        ivSuccessIcon.setAlpha(0f);
-        ivSuccessIcon.animate()
-                .scaleX(1f)
-                .scaleY(1f)
-                .alpha(1f)
-                .setDuration(500)
-                .start();
+        if (ivSuccessIcon != null) {
+            ivSuccessIcon.setScaleX(0f);
+            ivSuccessIcon.setScaleY(0f);
+            ivSuccessIcon.setAlpha(0f);
+            ivSuccessIcon.animate()
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .alpha(1f)
+                    .setDuration(500)
+                    .start();
+        }
                 
-        // Apply animation to the success container
-        clSuccessContainer.setAlpha(0f);
-        clSuccessContainer.animate()
-                .alpha(1f)
-                .setDuration(800)
-                .setStartDelay(300)
-                .start();
+        // Apply animation to the success card
+        if (cardSuccess != null) {
+            cardSuccess.setAlpha(0f);
+            cardSuccess.setTranslationY(100f);
+            cardSuccess.animate()
+                    .alpha(1f)
+                    .translationY(0f)
+                    .setDuration(800)
+                    .setStartDelay(300)
+                    .start();
+        }
     }
     
     /**
      * Start a verification test (for demonstration purposes)
+     * Note: This method is no longer used in the current implementation
      */
     private void startTestVerification() {
         // In a real application, this would start a Face ID verification test

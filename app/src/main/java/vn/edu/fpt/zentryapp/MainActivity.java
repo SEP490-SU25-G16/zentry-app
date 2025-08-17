@@ -50,6 +50,18 @@ public class MainActivity extends AppCompatActivity {
             if (host != null) {
                 androidx.navigation.NavController navController = host.getNavController();
                 navController.handleDeepLink(getIntent());
+                
+                // ✅ NEW: Xử lý navigation về student settings từ Face ID success
+                String navigateTo = getIntent().getStringExtra("navigate_to");
+                if ("student_settings".equals(navigateTo)) {
+                    android.util.Log.d("MainActivity", "✅ Navigating to student settings from Face ID success");
+                    // Navigate đến student settings
+                    try {
+                        navController.navigate(vn.edu.fpt.zentryapp.R.id.nav_graph_student);
+                    } catch (Exception e) {
+                        android.util.Log.w("MainActivity", "⚠️ Failed to navigate to student settings", e);
+                    }
+                }
             }
         } catch (Exception ignored) {}
         android.util.Log.d("MainActivity", "Using default navigation starting with login screen");
@@ -65,6 +77,18 @@ public class MainActivity extends AppCompatActivity {
             if (host != null) {
                 androidx.navigation.NavController navController = host.getNavController();
                 navController.handleDeepLink(intent);
+                
+                // ✅ NEW: Xử lý navigation về student settings từ Face ID success
+                String navigateTo = intent.getStringExtra("navigate_to");
+                if ("student_settings".equals(navigateTo)) {
+                    android.util.Log.d("MainActivity", "✅ Navigating to student settings from Face ID success (onNewIntent)");
+                    // Navigate đến student settings
+                    try {
+                        navController.navigate(vn.edu.fpt.zentryapp.R.id.nav_graph_student);
+                    } catch (Exception e) {
+                        android.util.Log.w("MainActivity", "⚠️ Failed to navigate to student settings", e);
+                    }
+                }
             }
         } catch (Exception ignored) {}
     }

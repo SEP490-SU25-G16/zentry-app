@@ -96,8 +96,9 @@ public class UnreadNotificationsFragment extends Fragment {
                         android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(deeplink));
                         startActivity(intent);
                     } else {
-                        androidx.navigation.NavController navController = androidx.navigation.fragment.NavHostFragment.findNavController(this);
-                        navController.navigate(vn.edu.fpt.zentryapp.R.id.studentSettingVerifyFaceIdFragment);
+                        // ✅ NEW: Sử dụng startActivity để ẩn navbar hoàn toàn
+                        android.content.Intent verifyIntent = new android.content.Intent(requireContext(), vn.edu.fpt.zentryapp.faceid.ui.setting.StudentSettingVerifyFaceIdActivity.class);
+                        startActivity(verifyIntent);
                     }
                     return;
                 }

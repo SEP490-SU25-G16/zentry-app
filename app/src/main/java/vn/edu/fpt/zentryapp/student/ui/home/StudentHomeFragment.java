@@ -30,6 +30,7 @@ import android.util.Log;
 import androidx.annotation.Nullable;
 import androidx.navigation.fragment.NavHostFragment;
 import android.content.BroadcastReceiver;
+import android.content.Intent;
 
 public class StudentHomeFragment extends Fragment {
 
@@ -75,7 +76,10 @@ public class StudentHomeFragment extends Fragment {
 
         setupClickListeners();
         observeViewModel();
+
     }
+
+
 
     // 🔧 NEW: Broadcast receiver for real-time notification updates
     private final BroadcastReceiver notificationUpdateReceiver = new BroadcastReceiver() {
@@ -89,6 +93,14 @@ public class StudentHomeFragment extends Fragment {
                 Log.d(TAG, "🔄 Refreshing notification count for badge update");
                 // 🔧 FIX: Use forceRefresh instead of forceRefreshNotifications
                 notificationViewModel.forceRefresh(userId, requireContext());
+                
+                // ✅ NEW: Check if this is a session end notification and handle BLE service stopping
+                // This serves as a fallback when FCM fails due to network restrictions
+                String notificationBody = intent.getStringExtra("notificationBody");
+                if (notificationBody != null && notificationBody.contains("Tiết học đã kết thúc sớm")) {
+                    Log.d(TAG, "🛑 Received session end notification, checking if BLE service needs to be stopped");
+                    stopBLEAttendanceServiceIfNeeded();
+                }
                 
                 // 🔧 NOTE: StudentHomeFragment doesn't have notification badge UI
                 // So we only refresh the data, not update any badge
@@ -253,5 +265,22 @@ public class StudentHomeFragment extends Fragment {
         }
         
         binding = null;
+    }
+    
+    // ✅ NEW: Method to stop BLE attendance service when session ends (fallback for FCM failures)
+    private void stopBLEAttendanceServiceIfNeeded() {
+        try {
+            // Check if BLE service is already stopped via FCM
+            if (!vn.edu.fpt.zentryapp.notification.push.FcmMessagingService.isBLEServiceStopped()) {
+                Intent serviceIntent = new Intent(requireContext(), vn.edu.fpt.zentryapp.service.BLEAttendanceService.class);
+                serviceIntent.setAction("STOP_ATTENDANCE");
+                requireContext().startService(serviceIntent);
+                Log.d(TAG, "✅ Fragment: Sent STOP_ATTENDANCE intent to BLE service (FCM fallback)");
+            } else {
+                Log.d(TAG, "ℹ️ Fragment: BLE service already stopped by FCM, no action needed");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Fragment: Error stopping BLE service", e);
+        }
     }
 }

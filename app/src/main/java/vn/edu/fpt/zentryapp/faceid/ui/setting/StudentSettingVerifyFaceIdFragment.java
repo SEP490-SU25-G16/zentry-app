@@ -1148,10 +1148,13 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
             }
 
             // 🚀 Launch Success Activity
-            Intent successIntent = FaceIdSuccessActivity.createIntent(
-                    requireContext(), userId, successMessage, bitmapPath,
-                    vn.edu.fpt.zentryapp.faceid.adapter.workers.FaceEmbeddingSyncWorker.ACTION_VERIFY);
-            startActivityForResult(successIntent, SUCCESS_ACTIVITY_REQUEST_CODE);
+            // ✅ NEW: Sử dụng Intent mới với userName
+            Intent successIntent = FaceIdSuccessActivity.createVerifySuccessIntent(
+                requireContext(),
+                userId,
+                AuthManager.getInstance(requireContext()).getCurrentUserName()
+            );
+            startActivity(successIntent);
 
             Log.d(TAG, "🎉 Navigating to Success Activity");
 
@@ -1331,6 +1334,7 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
         stopCamera();
         resetComponents();
         uiController.showScreen(FaceVerificationUIController.UIScreenState.SETUP);
+        // ✅ REMOVED: Không cần hiện navbar vì đang chạy trong Activity riêng biệt
     }
 
     /**
@@ -1677,7 +1681,9 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
     public void onDestroyView() {
         super.onDestroyView();
 
-        stopCamera();
+        // ✅ REMOVED: Không cần hiện navbar vì đang chạy trong Activity riêng biệt
+
+        stopCameraSafe();
 
         // Cleanup components
         if (stateManager != null) {
