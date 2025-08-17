@@ -30,20 +30,18 @@ import vn.edu.fpt.zentryapp.lecturer.data.model.responsedto.StudentAttendanceDto
 
 public class LecturerReportSessionDetailViewModel extends ViewModel {
     private final String TAG = "LecturerReportSessionDetail";
-
-    /* ---------- LiveData ---------- */
     private final MutableLiveData<Boolean> _isLoading = new MutableLiveData<>(false);
     private final MutableLiveData<SessionDetailInfo> _sessionInfo = new MutableLiveData<>();
     private final MutableLiveData<List<Student>> _students = new MutableLiveData<>();
     private final MutableLiveData<String> _errorMessage = new MutableLiveData<>();
     private final MutableLiveData<Boolean> _attendanceUpdated = new MutableLiveData<>();
-
+    private final MutableLiveData<Boolean> _isUpdatingAttendance = new MutableLiveData<>(false);
     public LiveData<Boolean> isLoading() { return _isLoading; }
     public LiveData<SessionDetailInfo> sessionInfo() { return _sessionInfo; }
     public LiveData<List<Student>> students() { return _students; }
     public LiveData<String> errorMessage() { return _errorMessage; }
     public LiveData<Boolean> attendanceUpdated() { return _attendanceUpdated; }
-
+    public LiveData<Boolean> isUpdatingAttendance() { return _isUpdatingAttendance; }
     // API service
     private LecturerApiService apiService;
     private AuthManager authManager;
@@ -168,27 +166,82 @@ public class LecturerReportSessionDetailViewModel extends ViewModel {
 
     /* ---------- Toggle attendance ---------- */
     public void toggleStudentAttendance(Student student) {
+        if (sessionId == null || sessionId.isEmpty()) {
+            _errorMessage.setValue("Session ID is required");
+            return;
+        }
+
+        if (student.getStudentId() == null || student.getStudentId().isEmpty()) {
+            _errorMessage.setValue("Student ID is required");
+            return;
+        }
+
+        // ✅ Call API to update attendance
+        updateAttendanceOnServer(student);
+    }
+
+    private void updateAttendanceOnServer(Student student) {
+        _isUpdatingAttendance.setValue(true);
+        _errorMessage.setValue(null);
+
+        Log.d(TAG, "🔄 Updating attendance for student: " + student.getFullName() +
+                " (ID: " + student.getStudentId() + ") in session: " + sessionId);
+
+        Call<ApiResponseDto<Void>> call = apiService.updateStudentAttendanceStatus(sessionId, student.getStudentId());
+        call.enqueue(new Callback<ApiResponseDto<Void>>() {
+            @Override
+            public void onResponse(Call<ApiResponseDto<Void>> call, Response<ApiResponseDto<Void>> response) {
+                _isUpdatingAttendance.setValue(false);
+
+                if (response.isSuccessful() && response.body() != null) {
+                    ApiResponseDto<Void> apiResponse = response.body();
+
+                    if (apiResponse.isSuccess()) {
+                        // ✅ API call successful, update UI
+                        updateStudentAttendanceInUI(student);
+                        _attendanceUpdated.setValue(true);
+
+                        Log.d(TAG, "✅ Successfully updated attendance for: " + student.getFullName());
+                    } else {
+                        String error = apiResponse.getError() != null ? apiResponse.getError() : "Failed to update attendance";
+                        _errorMessage.setValue("Update failed: " + error);
+                        Log.e(TAG, "❌ API Error: " + error);
+                    }
+                } else {
+                    String error = "HTTP Error: " + response.code() + " - " + response.message();
+                    _errorMessage.setValue("Update failed: " + error);
+                    Log.e(TAG, "❌ " + error);
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ApiResponseDto<Void>> call, Throwable t) {
+                _isUpdatingAttendance.setValue(false);
+                String error = "Network Error: " + t.getMessage();
+                _errorMessage.setValue("Update failed: " + error);
+                Log.e(TAG, "❌ Network Error", t);
+            }
+        });
+    }
+
+    private void updateStudentAttendanceInUI(Student updatedStudent) {
         List<Student> currentStudents = _students.getValue();
         if (currentStudents == null) return;
 
-        // Update student attendance status
-        for (Student s : currentStudents) {
-            if (s.getStudentId().equals(student.getStudentId())) {
-                s.setPresent(!s.isPresent());
+        // ✅ Find and update the student in the list
+        for (Student student : currentStudents) {
+            if (student.getStudentId().equals(updatedStudent.getStudentId())) {
+                // Toggle the attendance status
+                student.setPresent(!student.isPresent());
                 break;
             }
         }
 
-        // Update the list
+        // ✅ Update the LiveData to refresh UI
         _students.setValue(new ArrayList<>(currentStudents));
 
-        // Update session info with new counts
+        // ✅ Update session attendance counts
         updateSessionAttendanceCounts(currentStudents);
-
-        _attendanceUpdated.setValue(true);
-
-        // TODO: Call API to save attendance changes
-        // saveAttendanceToServer(student);
     }
 
     private void updateSessionAttendanceCounts(List<Student> students) {

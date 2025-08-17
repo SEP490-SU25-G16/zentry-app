@@ -69,8 +69,6 @@ public class StudentHomeViewModel extends ViewModel {
                         _errorMessage.setValue(apiResponse.getError() != null ?
                                 apiResponse.getError() : "Failed to load home data");
                     }
-                } else {
-                    _errorMessage.setValue("Failed to load data: " + response.message());
                 }
             }
 

@@ -15,6 +15,8 @@ public class UserDto {
 
     @SerializedName("UserId")
     private String userId;
+    @SerializedName("Code")
+    private String code;
 
     @SerializedName("AccountId")
     private String accountId;

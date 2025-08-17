@@ -90,7 +90,6 @@ public class StudentReportAdapter extends RecyclerView.Adapter<StudentReportAdap
             // Sử dụng các method đúng từ StudentReport model
             binding.tvCourseTitle.setText(report.getCourseName()); // hoặc getClassName() nếu muốn full name
             binding.tvLecturerName.setText(report.getLecturerDisplayName());
-            binding.tvSessions.setText(report.getSessionProgress());
             binding.tvAttendancePercentage.setText(report.getAttendanceDisplay());
         }
     }

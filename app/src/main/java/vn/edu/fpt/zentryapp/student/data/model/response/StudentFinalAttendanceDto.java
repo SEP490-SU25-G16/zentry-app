@@ -15,6 +15,9 @@ public class StudentFinalAttendanceDto {
     @SerializedName("StudentId")
     private String studentId;
 
+    @SerializedName("StudentCode")
+    private String studentCode;
+
     @SerializedName("FullName")
     private String fullName;
 

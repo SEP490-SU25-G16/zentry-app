@@ -74,7 +74,7 @@ public class LecturerReportListStudentOnSessionAdapter
 
         void bind(Student s) {
             binding.tvStudentName.setText(s.getDisplayName());
-            binding.tvStudentId.setText("ID: " + s.getStudentId().substring(0, 6));
+            binding.tvStudentId.setText("ID: " + s.getStudentCode());
 
             binding.tvStudentStatus.setText(s.getAttendanceStatus());
             binding.tvStudentStatus.setTextColor(s.getAttendanceStatusColor());

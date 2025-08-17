@@ -62,10 +62,7 @@ public class StudentReportListSessionViewModel extends ViewModel {
         courseInfo.setCourseCode(report.getCourseCode());
         courseInfo.setSectionCode(report.getSectionCode());
         courseInfo.setGrade(report.getSectionCode()); // Use section code as grade
-        courseInfo.setTotalSessions(report.getTotalSessions());
-        courseInfo.setAttendedSessions(report.getAttendedSessions());
         courseInfo.setAttendanceRate(report.getAttendanceRate());
-
         _courseInfo.setValue(courseInfo);
     }
 

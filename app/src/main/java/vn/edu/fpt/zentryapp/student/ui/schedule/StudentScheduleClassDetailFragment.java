@@ -86,6 +86,10 @@ public class StudentScheduleClassDetailFragment extends Fragment {
         }
     };
 
+    private void setLoading(boolean loading) {
+        binding.flStudentScheduleClassDetailLoadingOverlay.setVisibility(loading ? View.VISIBLE : View.GONE);
+    }
+
     private void setupUI() {
         // Set basic info from session object if available
         if (session != null) {
@@ -136,9 +140,8 @@ public class StudentScheduleClassDetailFragment extends Fragment {
 
     private void observeViewModel() {
         // Loading state
-        viewModel.isLoading().observe(getViewLifecycleOwner(), isLoading -> {
-            Log.d(TAG, "Loading: " + isLoading);
-        });
+        // Show/hide overlay
+        viewModel.isLoading().observe(getViewLifecycleOwner(), this::setLoading);
 
         viewModel.classSectionDetail().observe(getViewLifecycleOwner(), scheduleDetail -> {
             if (scheduleDetail != null) {
@@ -183,7 +186,7 @@ public class StudentScheduleClassDetailFragment extends Fragment {
     private void updateStudentAttendanceUI(StudentFinalAttendanceDto attendanceData) {
         // ✅ Update student info section
         binding.tvStudentName.setText(attendanceData.getFullName());
-        binding.tvStudentId.setText("ID: " + attendanceData.getStudentId().substring(0, 8).toUpperCase());
+        binding.tvStudentId.setText("ID: " + attendanceData.getStudentCode());
 
         // ✅ Update attendance statistics
         updateAttendanceStatistics(attendanceData);

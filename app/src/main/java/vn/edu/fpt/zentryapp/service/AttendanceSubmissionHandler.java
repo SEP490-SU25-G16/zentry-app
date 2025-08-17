@@ -1,6 +1,8 @@
 package vn.edu.fpt.zentryapp.service;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import java.util.List;
@@ -13,6 +15,8 @@ import vn.edu.fpt.zentryapp.auth.client.ApiClient;
 public class AttendanceSubmissionHandler {
     private static final String TAG = "AttendanceSubmissionHandler";
     private static final int MAX_RETRY_COUNT = 3;
+    private static final int IMMEDIATE_RETRY_DELAY_MS = 2000; // 2 seconds delay between retries
+
     private final AttendanceApiService apiService;
     private final Context context;
     private final OfflineSubmissionManager offlineManager;
@@ -99,11 +103,181 @@ public class AttendanceSubmissionHandler {
             return;
         }
 
-        // ✅ NETWORK AVAILABLE: Perform online submission
-        performOnlineSubmission(submission, callback, false);
+        // ✅ NETWORK AVAILABLE: Perform online submission with immediate retry
+        performOnlineSubmissionWithImmediateRetry(submission, callback, false, 0);
     }
 
-    // ✅ NEW: Handle offline submission
+    // ✅ NEW: Perform online submission with immediate retry logic
+    private void performOnlineSubmissionWithImmediateRetry(AttendanceModels.AttendanceSubmission submission,
+                                                           AttendanceCallbacks.AttendanceSubmissionCallback callback,
+                                                           boolean isRetry,
+                                                           int currentAttempt) {
+
+        Log.d(TAG, "🌐 Online submission attempt " + (currentAttempt + 1) + "/" + MAX_RETRY_COUNT +
+                (isRetry ? " (CACHED RETRY)" : " (NEW SUBMISSION)"));
+
+        // 🔍 LOG API CALL INFO
+        Log.d(TAG, "🌐 API CALL INFORMATION:");
+        Log.d(TAG, "  Endpoint: POST /api/attendance/sessions/scan");
+        Log.d(TAG, "  ApiService: " + (apiService != null ? "Ready" : "NULL"));
+        Log.d(TAG, "  Context: " + context.getClass().getSimpleName());
+        Log.d(TAG, "  Is Retry: " + isRetry);
+        Log.d(TAG, "  Current Attempt: " + (currentAttempt + 1));
+
+        // 🔧 CALL API
+        try {
+            Log.d(TAG, "🚀 Initiating API call...");
+            Call<AttendanceApiResponse> call = apiService.submitAttendanceScan(submission);
+
+            if (call == null) {
+                Log.e(TAG, "❌ FATAL: API call is NULL");
+                handleImmediateRetryOrFail(submission, callback, isRetry, currentAttempt,
+                        "Failed to create API call");
+                return;
+            }
+
+            Log.d(TAG, "📞 API call created successfully");
+            Log.d(TAG, "📞 Call URL: " + call.request().url());
+            Log.d(TAG, "📞 Call method: " + call.request().method());
+
+            call.enqueue(new Callback<AttendanceApiResponse>() {
+                @Override
+                public void onResponse(Call<AttendanceApiResponse> call, Response<AttendanceApiResponse> response) {
+                    handleApiResponseWithImmediateRetry(call, response, submission, callback, isRetry, currentAttempt);
+                }
+
+                @Override
+                public void onFailure(Call<AttendanceApiResponse> call, Throwable t) {
+                    handleApiFailureWithImmediateRetry(call, t, submission, callback, isRetry, currentAttempt);
+                }
+            });
+
+            Log.d(TAG, "📞 API call enqueued successfully");
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ EXCEPTION during API call setup", e);
+            handleImmediateRetryOrFail(submission, callback, isRetry, currentAttempt,
+                    "Exception: " + e.getMessage());
+        }
+    }
+
+    // ✅ NEW: Handle immediate retry or final failure
+    private void handleImmediateRetryOrFail(AttendanceModels.AttendanceSubmission submission,
+                                            AttendanceCallbacks.AttendanceSubmissionCallback callback,
+                                            boolean isRetry,
+                                            int currentAttempt,
+                                            String error) {
+
+        Log.e(TAG, "❌ Attempt " + (currentAttempt + 1) + " failed: " + error);
+
+        if (currentAttempt < MAX_RETRY_COUNT - 1) {
+            // 🔄 RETRY immediately with delay
+            Log.w(TAG, "🔄 Will retry immediately in " + IMMEDIATE_RETRY_DELAY_MS + "ms");
+            Log.w(TAG, "  Next attempt: " + (currentAttempt + 2) + "/" + MAX_RETRY_COUNT);
+
+            // Delay before retry (important for server cold start)
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                Log.d(TAG, "⏰ Retry delay completed, attempting retry...");
+                performOnlineSubmissionWithImmediateRetry(submission, callback, isRetry, currentAttempt + 1);
+            }, IMMEDIATE_RETRY_DELAY_MS);
+
+        } else {
+            // ❌ ALL IMMEDIATE RETRIES FAILED
+            Log.e(TAG, "❌ All " + MAX_RETRY_COUNT + " immediate attempts failed");
+            handleFinalSubmissionFailure(submission, callback, isRetry, error);
+        }
+    }
+
+    // ✅ NEW: Handle final submission failure after all immediate retries
+    private void handleFinalSubmissionFailure(AttendanceModels.AttendanceSubmission submission,
+                                              AttendanceCallbacks.AttendanceSubmissionCallback callback,
+                                              boolean wasRetry,
+                                              String error) {
+
+        Log.e(TAG, "❌ Final submission failure: " + error);
+
+        if (wasRetry) {
+            // This was a retry of cached submission -> increment retry count
+            offlineManager.incrementRetryCount(submission);
+
+            // Check retry count from cache
+            OfflineSubmissionManager.CachedSubmissionWrapper wrapper = findCachedWrapper(submission);
+            if (wrapper != null && wrapper.getRetryCount() >= MAX_RETRY_COUNT) {
+                Log.e(TAG, "❌ Max retries reached for cached submission");
+                Log.e(TAG, "  Retries: " + wrapper.getRetryCount() + "/" + MAX_RETRY_COUNT);
+                callback.onSubmissionFailure(0, "Max retries exceeded: " + error);
+                logSubmissionEnd(false, "MAX_RETRIES_EXCEEDED");
+            } else {
+                Log.w(TAG, "⚠️ Will retry cached submission later");
+                if (wrapper != null) {
+                    Log.w(TAG, "  Current retries: " + wrapper.getRetryCount() + "/" + MAX_RETRY_COUNT);
+                }
+                callback.onSubmissionFailure(0, "Will retry: " + error);
+                logSubmissionEnd(false, "RETRY_PENDING");
+            }
+        } else {
+            // New submission failed after all immediate retries -> cache it for later retry
+            Log.w(TAG, "💾 New submission failed after all immediate retries - caching for later");
+            offlineManager.cacheSubmission(submission);
+
+            // From UX perspective: still "successful" (cached)
+            callback.onSubmissionSuccess(submission);
+            showOfflineNotification();
+            logSubmissionEnd(true, "CACHED_AFTER_IMMEDIATE_RETRIES");
+        }
+    }
+
+    // ✅ UPDATED: Handle API response with immediate retry logic
+    private void handleApiResponseWithImmediateRetry(Call<AttendanceApiResponse> call,
+                                                     Response<AttendanceApiResponse> response,
+                                                     AttendanceModels.AttendanceSubmission submission,
+                                                     AttendanceCallbacks.AttendanceSubmissionCallback callback,
+                                                     boolean isRetry,
+                                                     int currentAttempt) {
+
+        if (response.isSuccessful()) {
+            handleSuccessfulResponse(response, submission, callback, isRetry);
+        } else {
+            // Log submission info on error
+            logSubmissionInfo(submission);
+
+            Log.e(TAG, "❌ HTTP ERROR RESPONSE (Attempt " + (currentAttempt + 1) + ")");
+            Log.e(TAG, "  Status code: " + response.code());
+            Log.e(TAG, "  Status message: '" + response.message() + "'");
+
+            String errorMessage = "HTTP Error: " + response.code();
+            if (response.message() != null && !response.message().isEmpty()) {
+                errorMessage += " - " + response.message();
+            }
+
+            // Try immediate retry or fail
+            handleImmediateRetryOrFail(submission, callback, isRetry, currentAttempt, errorMessage);
+        }
+    }
+
+    // ✅ UPDATED: Handle API failure with immediate retry logic
+    private void handleApiFailureWithImmediateRetry(Call<AttendanceApiResponse> call,
+                                                    Throwable t,
+                                                    AttendanceModels.AttendanceSubmission submission,
+                                                    AttendanceCallbacks.AttendanceSubmissionCallback callback,
+                                                    boolean isRetry,
+                                                    int currentAttempt) {
+
+        Log.e(TAG, "❌ API CALL FAILURE (Attempt " + (currentAttempt + 1) + ")");
+        Log.e(TAG, "  Exception type: " + t.getClass().getSimpleName());
+        Log.e(TAG, "  Exception message: " + t.getMessage());
+        Log.e(TAG, "  Call URL: " + (call != null && call.request() != null ? call.request().url() : "NULL"));
+
+        String errorCategory = categorizeNetworkError(t);
+        Log.e(TAG, "  Error category: " + errorCategory);
+
+        String errorMessage = "Network Error (" + errorCategory + "): " + t.getMessage();
+
+        // Try immediate retry or fail
+        handleImmediateRetryOrFail(submission, callback, isRetry, currentAttempt, errorMessage);
+    }
+
+    // ✅ Handle offline submission (unchanged)
     private void handleOfflineSubmission(AttendanceModels.AttendanceSubmission submission,
                                          AttendanceCallbacks.AttendanceSubmissionCallback callback) {
 
@@ -126,177 +300,6 @@ public class AttendanceSubmissionHandler {
         logSubmissionEnd(true, "CACHED");
     }
 
-    // ✅ NEW: Perform online submission (original logic)
-    private void performOnlineSubmission(AttendanceModels.AttendanceSubmission submission,
-                                         AttendanceCallbacks.AttendanceSubmissionCallback callback,
-                                         boolean isRetry) {
-
-        Log.d(TAG, "🌐 Performing online submission" + (isRetry ? " (RETRY)" : ""));
-
-        // 🔍 LOG API CALL INFO
-        Log.d(TAG, "🌐 API CALL INFORMATION:");
-        Log.d(TAG, "  Endpoint: POST /api/attendance/sessions/scan");
-        Log.d(TAG, "  ApiService: " + (apiService != null ? "Ready" : "NULL"));
-        Log.d(TAG, "  Context: " + context.getClass().getSimpleName());
-        Log.d(TAG, "  Is Retry: " + isRetry);
-
-        // 🔧 CALL API
-        try {
-            Log.d(TAG, "🚀 Initiating API call...");
-            Call<AttendanceApiResponse> call = apiService.submitAttendanceScan(submission);
-
-            if (call == null) {
-                Log.e(TAG, "❌ FATAL: API call is NULL");
-                handleSubmissionFailure(submission, callback, isRetry, "Failed to create API call");
-                return;
-            }
-
-            Log.d(TAG, "📞 API call created successfully");
-            Log.d(TAG, "📞 Call URL: " + call.request().url());
-            Log.d(TAG, "📞 Call method: " + call.request().method());
-
-            call.enqueue(new Callback<AttendanceApiResponse>() {
-                @Override
-                public void onResponse(Call<AttendanceApiResponse> call, Response<AttendanceApiResponse> response) {
-                    handleApiResponse(call, response, submission, callback, isRetry);
-                }
-
-                @Override
-                public void onFailure(Call<AttendanceApiResponse> call, Throwable t) {
-                    handleApiFailure(call, t, submission, callback, isRetry);
-                }
-            });
-
-            Log.d(TAG, "📞 API call enqueued successfully");
-
-        } catch (Exception e) {
-            Log.e(TAG, "❌ EXCEPTION during API call setup", e);
-            handleSubmissionFailure(submission, callback, isRetry, "Exception: " + e.getMessage());
-        }
-    }
-
-    // ✅ UPDATED: Handle submission failure with retry logic
-    private void handleSubmissionFailure(AttendanceModels.AttendanceSubmission submission,
-                                         AttendanceCallbacks.AttendanceSubmissionCallback callback,
-                                         boolean wasRetry,
-                                         String error) {
-        Log.e(TAG, "❌ Submission failed: " + error);
-
-        if (wasRetry) {
-            // This was a retry of cached submission -> increment retry count
-            offlineManager.incrementRetryCount(submission);
-
-            // Check retry count from cache
-            OfflineSubmissionManager.CachedSubmissionWrapper wrapper = findCachedWrapper(submission);
-            if (wrapper != null && wrapper.getRetryCount() >= MAX_RETRY_COUNT) {
-                Log.e(TAG, "❌ Max retries reached for cached submission");
-                Log.e(TAG, "  Retries: " + wrapper.getRetryCount() + "/" + MAX_RETRY_COUNT);
-                callback.onSubmissionFailure(0, "Max retries exceeded: " + error);
-                logSubmissionEnd(false, "MAX_RETRIES_EXCEEDED");
-            } else {
-                Log.w(TAG, "⚠️ Will retry cached submission later");
-                if (wrapper != null) {
-                    Log.w(TAG, "  Current retries: " + wrapper.getRetryCount() + "/" + MAX_RETRY_COUNT);
-                }
-                callback.onSubmissionFailure(0, "Will retry: " + error);
-                logSubmissionEnd(false, "RETRY_PENDING");
-            }
-        } else {
-            // New submission failed -> cache it for later retry
-            Log.w(TAG, "💾 New submission failed - caching for later retry");
-            offlineManager.cacheSubmission(submission);
-
-            // From UX perspective: still "successful"
-            callback.onSubmissionSuccess(submission);
-            showOfflineNotification();
-            logSubmissionEnd(true, "CACHED_ON_FAILURE");
-        }
-    }
-
-    // ✅ NEW: Find cached wrapper for retry count management
-    private OfflineSubmissionManager.CachedSubmissionWrapper findCachedWrapper(AttendanceModels.AttendanceSubmission submission) {
-        for (OfflineSubmissionManager.CachedSubmissionWrapper wrapper : offlineManager.getCachedSubmissionsWithMetadata()) {
-            if (wrapper.getSubmission() != null &&
-                    wrapper.getSubmission().getSessionId().equals(submission.getSessionId()) &&
-                    wrapper.getSubmission().getTimestamp().equals(submission.getTimestamp())) {
-                return wrapper;
-            }
-        }
-        return null;
-    }
-
-    // ✅ NEW: Sync all cached submissions when network becomes available
-    public void syncCachedSubmissions() {
-        List<OfflineSubmissionManager.CachedSubmissionWrapper> cachedWrappers = offlineManager.getCachedSubmissionsWithMetadata();
-        if (!networkManager.isNetworkAvailable()) {
-            Log.d(TAG, "❌ Network not available during sync attempt");
-            return;
-        }
-
-        if (cachedWrappers.isEmpty()) {
-            Log.d(TAG, "No cached submissions to sync");
-            return;
-        }
-
-        Log.d(TAG, "🔄 Syncing " + cachedWrappers.size() + " cached submissions");
-
-        for (OfflineSubmissionManager.CachedSubmissionWrapper wrapper : cachedWrappers) {
-            // Skip if max retries reached
-            if (wrapper.getRetryCount() >= MAX_RETRY_COUNT) {
-                Log.w(TAG, "⚠️ Skipping submission with max retries");
-                Log.w(TAG, "  Session: " + wrapper.getSubmission().getSessionId());
-                Log.w(TAG, "  Retries: " + wrapper.getRetryCount() + "/" + MAX_RETRY_COUNT);
-                continue;
-            }
-
-            Log.d(TAG, "♻️ Retrying cached submission");
-            Log.d(TAG, "  Session: " + wrapper.getSubmission().getSessionId());
-            Log.d(TAG, "  Attempt: " + (wrapper.getRetryCount() + 1) + "/" + MAX_RETRY_COUNT);
-
-            // Retry submission with dummy callback for background sync
-            performOnlineSubmission(wrapper.getSubmission(), new AttendanceCallbacks.AttendanceSubmissionCallback() {
-                @Override
-                public void onSubmissionSuccess(AttendanceModels.AttendanceSubmission submission) {
-                    Log.d(TAG, "✅ Cached submission synced successfully: " + submission.getSessionId());
-                }
-
-                @Override
-                public void onSubmissionFailure(int roundNumber, String error) {
-                    Log.e(TAG, "❌ Cached submission sync failed: " + error);
-                }
-            }, true);
-        }
-    }
-
-    // ✅ NEW: Show offline notification
-    private void showOfflineNotification() {
-        int cachedCount = offlineManager.getCachedSubmissionCount();
-        Log.d(TAG, "📱 Offline Mode Active:");
-        Log.d(TAG, "  Total cached submissions: " + cachedCount);
-        Log.d(TAG, "  Will sync automatically when network available");
-
-        // TODO: Implement actual notification or broadcast to UI
-        // Intent broadcast = new Intent("vn.edu.fpt.zentryapp.OFFLINE_SUBMISSION");
-        // broadcast.putExtra("cachedCount", cachedCount);
-        // context.sendBroadcast(broadcast);
-    }
-
-    // ✅ UPDATED: Handle API response with retry logic
-    private void handleApiResponse(Call<AttendanceApiResponse> call,
-                                   Response<AttendanceApiResponse> response,
-                                   AttendanceModels.AttendanceSubmission submission,
-                                   AttendanceCallbacks.AttendanceSubmissionCallback callback,
-                                   boolean isRetry) {
-
-        if (response.isSuccessful()) {
-            handleSuccessfulResponse(response, submission, callback, isRetry);
-        } else {
-            // Log submission info on error
-            logSubmissionInfo(submission);
-            handleErrorResponse(response, submission, callback, isRetry);
-        }
-    }
-
     // ✅ UPDATED: Handle successful response with cache cleanup
     private void handleSuccessfulResponse(Response<AttendanceApiResponse> response,
                                           AttendanceModels.AttendanceSubmission submission,
@@ -307,7 +310,7 @@ public class AttendanceSubmissionHandler {
 
         if (response.body() == null) {
             Log.e(TAG, "❌ Response body is NULL despite successful HTTP status");
-            handleSubmissionFailure(submission, callback, isRetry, "Empty response body");
+            handleFinalSubmissionFailure(submission, callback, isRetry, "Empty response body");
             return;
         }
 
@@ -346,67 +349,80 @@ public class AttendanceSubmissionHandler {
             Log.e(TAG, "❌ API OPERATION FAILED");
             Log.e(TAG, "  API Error: " + apiResponse.getError());
 
-            handleSubmissionFailure(submission, callback, isRetry, "API Error: " + apiResponse.getError());
+            handleFinalSubmissionFailure(submission, callback, isRetry, "API Error: " + apiResponse.getError());
         }
     }
 
-    // ✅ UPDATED: Handle error response with retry logic
-    private void handleErrorResponse(Response<AttendanceApiResponse> response,
-                                     AttendanceModels.AttendanceSubmission submission,
-                                     AttendanceCallbacks.AttendanceSubmissionCallback callback,
-                                     boolean isRetry) {
-
-        Log.e(TAG, "❌ HTTP ERROR RESPONSE");
-        Log.e(TAG, "  Status code: " + response.code());
-        Log.e(TAG, "  Status message: '" + response.message() + "'");
-        Log.e(TAG, "  Request URL: " + response.raw().request().url());
-        Log.e(TAG, "  Is Retry: " + isRetry);
-
-        // Try to log error body
-        try {
-            if (response.errorBody() != null) {
-                String errorBody = response.errorBody().string();
-                Log.e(TAG, "  Error body: " + errorBody);
-            } else {
-                Log.e(TAG, "  Error body: NULL");
+    // ✅ Find cached wrapper for retry count management (unchanged)
+    private OfflineSubmissionManager.CachedSubmissionWrapper findCachedWrapper(AttendanceModels.AttendanceSubmission submission) {
+        for (OfflineSubmissionManager.CachedSubmissionWrapper wrapper : offlineManager.getCachedSubmissionsWithMetadata()) {
+            if (wrapper.getSubmission() != null &&
+                    wrapper.getSubmission().getSessionId().equals(submission.getSessionId()) &&
+                    wrapper.getSubmission().getTimestamp().equals(submission.getTimestamp())) {
+                return wrapper;
             }
-        } catch (Exception e) {
-            Log.e(TAG, "  Could not read error body", e);
         }
-
-        String errorMessage = "HTTP Error: " + response.code();
-        if (response.message() != null && !response.message().isEmpty()) {
-            errorMessage += " - " + response.message();
-        }
-
-        handleSubmissionFailure(submission, callback, isRetry, errorMessage);
+        return null;
     }
 
-    // ✅ UPDATED: Handle API failure with retry logic
-    private void handleApiFailure(Call<AttendanceApiResponse> call,
-                                  Throwable t,
-                                  AttendanceModels.AttendanceSubmission submission,
-                                  AttendanceCallbacks.AttendanceSubmissionCallback callback,
-                                  boolean isRetry) {
+    // ✅ UPDATED: Sync cached submissions with immediate retry
+    public void syncCachedSubmissions() {
+        List<OfflineSubmissionManager.CachedSubmissionWrapper> cachedWrappers = offlineManager.getCachedSubmissionsWithMetadata();
+        if (!networkManager.isNetworkAvailable()) {
+            Log.d(TAG, "❌ Network not available during sync attempt");
+            return;
+        }
 
-        Log.e(TAG, "❌ API CALL FAILURE");
-        Log.e(TAG, "  Exception type: " + t.getClass().getSimpleName());
-        Log.e(TAG, "  Exception message: " + t.getMessage());
-        Log.e(TAG, "  Call URL: " + (call != null && call.request() != null ? call.request().url() : "NULL"));
-        Log.e(TAG, "  Submitted session: " + submission.getSessionId());
-        Log.e(TAG, "  Submitted devices: " + submission.getScannedDevices().size());
-        Log.e(TAG, "  Is Retry: " + isRetry);
-        Log.e(TAG, "  Full exception:", t);
+        if (cachedWrappers.isEmpty()) {
+            Log.d(TAG, "No cached submissions to sync");
+            return;
+        }
 
-        String errorCategory = categorizeNetworkError(t);
-        Log.e(TAG, "  Error category: " + errorCategory);
+        Log.d(TAG, "🔄 Syncing " + cachedWrappers.size() + " cached submissions");
 
-        String errorMessage = "Network Error (" + errorCategory + "): " + t.getMessage();
+        for (OfflineSubmissionManager.CachedSubmissionWrapper wrapper : cachedWrappers) {
+            // Skip if max retries reached
+            if (wrapper.getRetryCount() >= MAX_RETRY_COUNT) {
+                Log.w(TAG, "⚠️ Skipping submission with max retries");
+                Log.w(TAG, "  Session: " + wrapper.getSubmission().getSessionId());
+                Log.w(TAG, "  Retries: " + wrapper.getRetryCount() + "/" + MAX_RETRY_COUNT);
+                continue;
+            }
 
-        handleSubmissionFailure(submission, callback, isRetry, errorMessage);
+            Log.d(TAG, "♻️ Retrying cached submission");
+            Log.d(TAG, "  Session: " + wrapper.getSubmission().getSessionId());
+            Log.d(TAG, "  Attempt: " + (wrapper.getRetryCount() + 1) + "/" + MAX_RETRY_COUNT);
+
+            // Retry submission with immediate retry logic
+            performOnlineSubmissionWithImmediateRetry(wrapper.getSubmission(),
+                    new AttendanceCallbacks.AttendanceSubmissionCallback() {
+                        @Override
+                        public void onSubmissionSuccess(AttendanceModels.AttendanceSubmission submission) {
+                            Log.d(TAG, "✅ Cached submission synced successfully: " + submission.getSessionId());
+                        }
+
+                        @Override
+                        public void onSubmissionFailure(int roundNumber, String error) {
+                            Log.e(TAG, "❌ Cached submission sync failed: " + error);
+                        }
+                    }, true, 0);
+        }
     }
 
-    // ✅ NEW: Log submission info for debugging
+    // ✅ Show offline notification (unchanged)
+    private void showOfflineNotification() {
+        int cachedCount = offlineManager.getCachedSubmissionCount();
+        Log.d(TAG, "📱 Offline Mode Active:");
+        Log.d(TAG, "  Total cached submissions: " + cachedCount);
+        Log.d(TAG, "  Will sync automatically when network available");
+
+        // TODO: Implement actual notification or broadcast to UI
+        // Intent broadcast = new Intent("vn.edu.fpt.zentryapp.OFFLINE_SUBMISSION");
+        // broadcast.putExtra("cachedCount", cachedCount);
+        // context.sendBroadcast(broadcast);
+    }
+
+    // ✅ Log submission info for debugging (unchanged)
     private void logSubmissionInfo(AttendanceModels.AttendanceSubmission submission) {
         Log.d(TAG, "📤 ATTENDANCE SUBMISSION INFO:");
         if (submission != null) {
@@ -539,7 +555,7 @@ public class AttendanceSubmissionHandler {
             Log.d(TAG, "  Payload size: " + jsonPayload.length() + " characters");
             Log.d(TAG, "  JSON content:");
 
-            String[] lines = jsonPayload.split("\n");
+            String[] lines = jsonPayload.split("\\n");
             for (String line : lines) {
                 Log.d(TAG, "    " + line);
             }

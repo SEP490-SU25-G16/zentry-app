@@ -70,8 +70,6 @@ public class LecturerHomeViewModel extends ViewModel {
                         _errorMessage.setValue(apiResponse.getError() != null ?
                                 apiResponse.getError() : "Unknown error occurred");
                     }
-                } else {
-                    _errorMessage.setValue("Failed to load data: " + response.message());
                 }
             }
 

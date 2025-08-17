@@ -1,6 +1,11 @@
 package vn.edu.fpt.zentryapp.lecturer.ui.report;
 
+import android.app.Dialog;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
+import android.view.Window;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -16,6 +21,9 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import com.google.android.material.button.MaterialButton;
+
+import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.databinding.FragmentLecturerReportSessionDetailBinding;
 import vn.edu.fpt.zentryapp.lecturer.adapter.LecturerReportListStudentOnSessionAdapter;
@@ -138,7 +146,67 @@ public class LecturerReportSessionDetailFragment extends Fragment implements Lec
 
     @Override
     public void onEditAttendance(Student student) {
-        viewModel.toggleStudentAttendance(student);
+        showAttendanceUpdateConfirmation(student);
+    }
+
+    private void showAttendanceUpdateConfirmation(Student student) {
+        Dialog dialog = new Dialog(requireContext());
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_update_attendance_confirmation);
+        dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+
+        // Get dialog views
+        TextView tvStudentName = dialog.findViewById(R.id.tv_student_name);
+        TextView tvStudentCode = dialog.findViewById(R.id.tv_student_code);
+        TextView tvCurrentStatus = dialog.findViewById(R.id.tv_current_status);
+        TextView tvNewStatus = dialog.findViewById(R.id.tv_new_status);
+        TextView tvMessage = dialog.findViewById(R.id.tv_message);
+        MaterialButton btnCancel = dialog.findViewById(R.id.btn_cancel);
+        MaterialButton btnConfirm = dialog.findViewById(R.id.btn_confirm);
+
+        // Set student info
+        tvStudentName.setText(student.getDisplayName());
+        tvStudentCode.setText(student.getStudentCode());
+
+        // Set current and new status
+        String currentStatus = student.isPresent() ? "Present" : "Absent";
+        String newStatus = student.isPresent() ? "Absent" : "Present";
+
+        tvCurrentStatus.setText(currentStatus);
+        tvNewStatus.setText(newStatus);
+
+        // Set status colors
+        if (student.isPresent()) {
+            // Currently Present -> Will be Absent
+            tvCurrentStatus.setTextColor(0xFF059669); // Green
+            tvCurrentStatus.setBackgroundColor(0xFFECFDF5); // Light green background
+            tvNewStatus.setTextColor(0xFFDC2626); // Red
+            tvNewStatus.setBackgroundColor(0xFFFEF2F2); // Light red background
+        } else {
+            // Currently Absent -> Will be Present
+            tvCurrentStatus.setTextColor(0xFFDC2626); // Red
+            tvCurrentStatus.setBackgroundColor(0xFFFEF2F2); // Light red background
+            tvNewStatus.setTextColor(0xFF059669); // Green
+            tvNewStatus.setBackgroundColor(0xFFECFDF5); // Light green background
+        }
+
+        // Set message
+        String message = String.format("Change %s's attendance from %s to %s?",
+                student.getDisplayName(), currentStatus, newStatus);
+        tvMessage.setText(message);
+
+        // Set button listeners
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+
+        btnConfirm.setOnClickListener(v -> {
+            dialog.dismiss();
+            // Show loading and call API
+            viewModel.toggleStudentAttendance(student);
+        });
+
+        dialog.setCancelable(true);
+        dialog.show();
     }
 
     @Override

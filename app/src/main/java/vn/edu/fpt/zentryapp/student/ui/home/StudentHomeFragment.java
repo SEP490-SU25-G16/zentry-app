@@ -62,6 +62,9 @@ public class StudentHomeFragment extends Fragment {
         viewModel = new ViewModelProvider(this).get(StudentHomeViewModel.class);
         notificationViewModel = new ViewModelProvider(requireActivity()).get(NotificationViewModel.class);
         AuthManager authManager = AuthManager.getInstance(requireContext());
+
+        setupGreeting(authManager.getCurrentUserName());
+
         viewModel.init(requireContext(), authManager);
 
         // Load notifications từ API để có dữ liệu cho badge
@@ -137,7 +140,15 @@ public class StudentHomeFragment extends Fragment {
             // binding.progressLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
         });
     }
+    private void setupGreeting(String fullName) {
+        if (fullName == null || fullName.trim().isEmpty()) return;
 
+        String first = fullName.trim().split("\\s+")[0];      // token đầu tiên
+        first = first.substring(0,1).toUpperCase()            // Viết hoa chữ cái đầu
+                + first.substring(1).toLowerCase();
+
+        binding.tvGreeting.setText("Hi " + first);
+    }
     /* ---------- Exam slider ---------- */
     private void setupExamSlider(java.util.List<ExamModel> examList) {
         binding.rvExams.setLayoutManager(new LinearLayoutManager(getContext(), RecyclerView.HORIZONTAL, false));

@@ -16,8 +16,9 @@
         android:layout_marginTop="?attr/actionBarSize"
         android:layout_marginHorizontal="16dp"
         app:cardBackgroundColor="#FFFFFF"
+        app:strokeColor="#FFFFFF"
         app:cardCornerRadius="20dp"
-        app:cardElevation="8dp">
+       >
 
         <!-- ✅ LinearLayout để split header và viewpager -->
         <LinearLayout
@@ -244,5 +245,21 @@
             app:layout_constraintTop_toTopOf="@+id/btnScheduleClassDetailNotification" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <FrameLayout
+        android:id="@+id/flScheduleClassDetailLoadingOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ProgressBar
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:indeterminateTint="#0961F5"
+            android:layout_gravity="center" />
+    </FrameLayout>
+
 
 </FrameLayout>

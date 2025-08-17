@@ -290,6 +290,8 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
                 navController.navigateUp();
             }
         });
+        // show/hide overlay như hướng dẫn ở trên
+        viewModel.isLoading().observe(getViewLifecycleOwner(), this::setLoading);
     }
 
     private void showEndSessionConfirmation() {
@@ -369,6 +371,9 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
         updateRequestButtonEnabled();
         // Schedule a re-check to re-enable later
         binding.btnScheduleClassDetailRequestFaceId.postDelayed(this::updateRequestButtonEnabled, lockMs);
+    }
+    private void setLoading(boolean loading) {
+        binding.flScheduleClassDetailLoadingOverlay.setVisibility(loading ? View.VISIBLE : View.GONE);
     }
 
     private boolean faceIdObserversAttached = false;
