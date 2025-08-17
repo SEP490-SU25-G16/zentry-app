@@ -62,6 +62,9 @@ public class MainActivity extends AppCompatActivity {
                         android.util.Log.w("MainActivity", "⚠️ Failed to navigate to student settings", e);
                     }
                 }
+                
+                // ✅ NEW: Xử lý Face ID verification deeplink
+                handleFaceIdVerificationDeepLink(getIntent());
             }
         } catch (Exception ignored) {}
         android.util.Log.d("MainActivity", "Using default navigation starting with login screen");
@@ -89,6 +92,9 @@ public class MainActivity extends AppCompatActivity {
                         android.util.Log.w("MainActivity", "⚠️ Failed to navigate to student settings", e);
                     }
                 }
+                
+                // ✅ NEW: Xử lý Face ID verification deeplink
+                handleFaceIdVerificationDeepLink(intent);
             }
         } catch (Exception ignored) {}
     }
@@ -270,5 +276,57 @@ public class MainActivity extends AppCompatActivity {
     // ➕ PUBLIC METHOD để Fragment request permissions lại
     public void requestBLEPermissions() {
         requestBLEPermissionsIfNeeded();
+    }
+
+    // ✅ NEW: Xử lý Face ID verification deeplink
+    private void handleFaceIdVerificationDeepLink(android.content.Intent intent) {
+        if (intent == null) return;
+        
+        android.net.Uri data = intent.getData();
+        if (data != null && "zentry".equals(data.getScheme()) && "face-verify".equals(data.getHost())) {
+            android.util.Log.d("MainActivity", "🔗 Handling Face ID verification deeplink: " + data);
+            
+            String requestId = data.getQueryParameter("requestId");
+            String sessionId = data.getQueryParameter("sessionId");
+            
+            if (requestId != null && sessionId != null) {
+                android.util.Log.d("MainActivity", "✅ Face ID verification request: " + requestId + " for session: " + sessionId);
+                
+                // Navigate to student settings with verification args
+                try {
+                    androidx.navigation.fragment.NavHostFragment host = (androidx.navigation.fragment.NavHostFragment)
+                            getSupportFragmentManager().findFragmentById(R.id.nav_host_fragment);
+                    if (host != null) {
+                        androidx.navigation.NavController navController = host.getNavController();
+                        
+                        // Navigate to student settings first
+                        navController.navigate(vn.edu.fpt.zentryapp.R.id.nav_graph_student);
+                        
+                        // Store the verification args for later use when settings tab is ready
+                        storeVerificationArgs(requestId, sessionId);
+                        
+                        // The actual navigation to Face ID fragment will be handled by StudentMainFragment
+                        // after the settings tab is initialized
+                    }
+                } catch (Exception e) {
+                    android.util.Log.e("MainActivity", "❌ Failed to navigate to student settings", e);
+                }
+            } else {
+                android.util.Log.w("MainActivity", "⚠️ Missing requestId or sessionId in deeplink");
+            }
+        }
+    }
+    
+    // ✅ NEW: Store verification args for later use
+    private void storeVerificationArgs(String requestId, String sessionId) {
+        // Store in SharedPreferences or use a static variable for now
+        android.content.SharedPreferences prefs = getSharedPreferences("face_verification", MODE_PRIVATE);
+        prefs.edit()
+                .putString("pending_request_id", requestId)
+                .putString("pending_session_id", sessionId)
+                .putLong("pending_timestamp", System.currentTimeMillis())
+                .apply();
+        
+        android.util.Log.d("MainActivity", "💾 Stored verification args for later navigation");
     }
 }

@@ -1,11 +1,17 @@
 package vn.edu.fpt.zentryapp.student.ui;
 
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.navigation.NavController;
+import androidx.navigation.fragment.NavHostFragment;
 
 import android.view.LayoutInflater;
 import android.view.View;
@@ -63,6 +69,9 @@ public class StudentMainFragment extends Fragment {
 
         navigationHelper.selectInitialTab(R.id.navigation_home);
 
+        // ✅ NEW: Check for pending Face ID verification and handle it
+        checkAndHandlePendingVerification();
+
         // Đăng ký callback xử lý Back hệ thống
         backCallback = new OnBackPressedCallback(true) {
             @Override
@@ -118,5 +127,45 @@ public class StudentMainFragment extends Fragment {
             backCallback.remove();
         }
         binding = null;
+    }
+    
+    // ✅ NEW: Check for pending Face ID verification and navigate to settings tab
+    private void checkAndHandlePendingVerification() {
+        try {
+            SharedPreferences prefs = requireActivity().getSharedPreferences("face_verification", android.content.Context.MODE_PRIVATE);
+            String requestId = prefs.getString("pending_request_id", null);
+            String sessionId = prefs.getString("pending_session_id", null);
+            long timestamp = prefs.getLong("pending_timestamp", 0);
+            
+            // Check if we have pending verification (within last 30 seconds)
+            if (requestId != null && sessionId != null && 
+                (System.currentTimeMillis() - timestamp) < 30000) {
+                
+                android.util.Log.d("StudentMainFragment", "🔗 Found pending Face ID verification: " + requestId);
+                
+                // Clear the stored args
+                prefs.edit().clear().apply();
+                
+                // ✅ NEW: Launch dedicated Activity instead of navigating to fragment
+                // This ensures full-screen experience without navbar (consistent with register/update)
+                try {
+                    Intent verifyIntent = new Intent(requireContext(), 
+                            vn.edu.fpt.zentryapp.faceid.ui.setting.StudentSettingVerifyFaceIdActivity.class);
+                    verifyIntent.putExtra("requestId", requestId);
+                    verifyIntent.putExtra("sessionId", sessionId);
+                    
+                    // Add flags to ensure proper navigation
+                    verifyIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    
+                    startActivity(verifyIntent);
+                    
+                    android.util.Log.d("StudentMainFragment", "✅ Successfully launched Face ID verification Activity");
+                } catch (Exception e) {
+                    android.util.Log.e("StudentMainFragment", "❌ Failed to launch Face ID verification Activity", e);
+                }
+            }
+        } catch (Exception e) {
+            android.util.Log.e("StudentMainFragment", "❌ Error checking pending verification", e);
+        }
     }
 }

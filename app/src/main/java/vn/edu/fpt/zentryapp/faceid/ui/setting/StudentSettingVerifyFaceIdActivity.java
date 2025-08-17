@@ -3,6 +3,7 @@ package vn.edu.fpt.zentryapp.faceid.ui.setting;
 import android.os.Bundle;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.FragmentTransaction;
+import android.util.Log;
 
 import vn.edu.fpt.zentryapp.R;
 
@@ -13,9 +14,25 @@ public class StudentSettingVerifyFaceIdActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_face_id_verify);
 
-        // Tạo và hiển thị fragment verify Face ID
+        // ✅ NEW: Tạo và hiển thị fragment verify Face ID với arguments từ intent
         if (savedInstanceState == null) {
             StudentSettingVerifyFaceIdFragment fragment = new StudentSettingVerifyFaceIdFragment();
+            
+            // Pass verification arguments from intent to fragment
+            Bundle args = new Bundle();
+            String requestId = getIntent().getStringExtra("requestId");
+            String sessionId = getIntent().getStringExtra("sessionId");
+            
+            if (requestId != null && sessionId != null) {
+                args.putString("requestId", requestId);
+                args.putString("sessionId", sessionId);
+                Log.d("VerifyActivity", "✅ Passing verification args: " + requestId + ", " + sessionId);
+            } else {
+                Log.w("VerifyActivity", "⚠️ No verification args found in intent");
+            }
+            
+            fragment.setArguments(args);
+            
             FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
             transaction.replace(R.id.fragment_container, fragment);
             transaction.commit();

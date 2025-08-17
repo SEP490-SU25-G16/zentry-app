@@ -29,11 +29,13 @@ import androidx.fragment.app.Fragment;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Locale;
 
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.auth.client.AuthManager;
-import vn.edu.fpt.zentryapp.databinding.FragmentStudentSettingRegisterFaceIdBinding;
 import vn.edu.fpt.zentryapp.databinding.FragmentStudentSettingVerifyFaceIdBinding;
 import vn.edu.fpt.zentryapp.faceid.data.service.FaceIdConfig;
 import vn.edu.fpt.zentryapp.faceid.data.service.FaceIdEnhancer;
@@ -47,7 +49,7 @@ import vn.edu.fpt.zentryapp.faceid.ui.setting.detection.SpoofDetectionManager;
 import vn.edu.fpt.zentryapp.faceid.ui.setting.state.FaceRegistrationState;
 import vn.edu.fpt.zentryapp.faceid.ui.setting.state.FaceRegistrationStateManager;
 import vn.edu.fpt.zentryapp.faceid.ui.setting.success.FaceIdSuccessActivity;
-import vn.edu.fpt.zentryapp.faceid.ui.setting.controller.FaceRegistrationUIController;
+import vn.edu.fpt.zentryapp.faceid.data.service.FaceIdRequestManager;
 
 
 public class StudentSettingVerifyFaceIdFragment extends Fragment
@@ -65,6 +67,9 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
     private FaceIdService faceIdService;
     private FaceIdEnhancer faceIdEnhancer; // Add FaceIdEnhancer
     private boolean faceIdEnhancerInitialized = false;
+    
+    // ✅ NEW: Face ID Request Manager để quản lý request lifecycle
+    private FaceIdRequestManager requestManager;
 
 
     // 🔍 ERROR TRACKING
@@ -145,8 +150,16 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
     private void setupVerificationWindowFromArgs() {
         long now = System.currentTimeMillis();
         long deadline = 0L;
+        String requestId = null;
+        String sessionId = null;
+        
         Bundle args = getArguments();
         if (args != null) {
+            // Get requestId and sessionId from deeplink
+            requestId = args.getString("requestId", null);
+            sessionId = args.getString("sessionId", null);
+            
+            // Get expiration time
             if (args.containsKey("verify_deadline_ms")) {
                 deadline = args.getLong("verify_deadline_ms", 0L);
             } else if (args.containsKey("expires_in_sec")) {
@@ -158,17 +171,40 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
             } else if (args.containsKey("expires_at")) {
                 String iso = args.getString("expires_at");
                 try {
-                    java.time.Instant inst = java.time.Instant.parse(iso);
-                    deadline = inst.toEpochMilli();
-                } catch (Exception ignored) {}
+                    // Use SimpleDateFormat instead of java.time.Instant for API 24 compatibility
+                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
+                    sdf.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+                    Date date = sdf.parse(iso);
+                    deadline = date.getTime();
+                } catch (ParseException e) {
+                    // Try alternative format without milliseconds
+                    try {
+                        SimpleDateFormat sdf2 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
+                        sdf2.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+                        Date date2 = sdf2.parse(iso);
+                        deadline = date2.getTime();
+                    } catch (ParseException ignored) {
+                        Log.w(TAG, "Failed to parse ISO timestamp: " + iso);
+                    }
+                }
             }
         }
+        
         if (deadline == 0L) {
             // Fallback default 5 minutes
             deadline = now + 5 * 60_000L;
         }
+        
         verifyDeadlineMs = deadline;
         Log.d(TAG, "Verify deadline set to: " + verifyDeadlineMs + " (in " + ((verifyDeadlineMs - now) / 1000) + "s)");
+        
+        // ✅ NEW: Initialize FaceIdRequestManager nếu có requestId
+        if (requestId != null && sessionId != null) {
+            Log.d(TAG, "🚀 Initializing Face ID request: " + requestId + " for session: " + sessionId);
+            requestManager.initializeRequest(requestId, sessionId, deadline);
+        } else {
+            Log.d(TAG, "⚠️ No requestId/sessionId found, using legacy verification mode");
+        }
     }
 
     private void startVerificationCountdown() {
@@ -224,6 +260,12 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
         // 4. Face Tracker with optimized settings for stability
         faceTracker = new FaceTracker(10); // Increased from 8 to 10 frames for better stability (~ 0.33 seconds)
 
+        // ✅ NEW: Initialize FaceIdRequestManager
+        requestManager = new FaceIdRequestManager(requireContext());
+        
+        // ✅ NEW: Setup request manager callbacks
+        setupRequestManagerCallbacks();
+        
         Log.d(TAG, "📦 All components initialized successfully");
     }
 
@@ -1685,6 +1727,11 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
 
         stopCameraSafe();
 
+        // ✅ NEW: Cleanup FaceIdRequestManager
+        if (requestManager != null) {
+            requestManager.cleanup();
+        }
+
         // Cleanup components
         if (stateManager != null) {
             stateManager.cleanup();
@@ -1955,6 +2002,127 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
         }
 
         return feedback.toString();
+    }
+
+    /**
+     * ✅ NEW: Setup callbacks cho FaceIdRequestManager
+     */
+    private void setupRequestManagerCallbacks() {
+        requestManager.setStatusCallback(new FaceIdRequestManager.RequestStatusCallback() {
+            @Override
+            public void onRequestStatusUpdated(FaceIdRequestManager.RequestState state, 
+                                            vn.edu.fpt.zentryapp.faceid.data.model.response.FaceIdRequestStatusResponse response) {
+                if (!isAdded()) return;
+                
+                Log.d(TAG, "🔄 Request status updated: " + state);
+                
+                switch (state) {
+                    case VERIFIED:
+                        handleRequestVerified();
+                        break;
+                    case EXPIRED:
+                        handleRequestExpired();
+                        break;
+                    case CANCELLED:
+                        handleRequestCancelled();
+                        break;
+                    case FAILED:
+                        handleRequestFailed("Request verification failed");
+                        break;
+                }
+            }
+            
+            @Override
+            public void onRequestExpired() {
+                if (!isAdded()) return;
+                handleRequestExpired();
+            }
+            
+            @Override
+            public void onRequestCancelled() {
+                if (!isAdded()) return;
+                handleRequestCancelled();
+            }
+            
+            @Override
+            public void onRequestFailed(String error) {
+                if (!isAdded()) return;
+                handleRequestFailed(error);
+            }
+        });
+        
+        requestManager.setExpiredCallback(() -> {
+            if (!isAdded()) return;
+            handleRequestExpired();
+        });
+    }
+    
+    /**
+     * ✅ NEW: Handle request verified successfully
+     */
+    private void handleRequestVerified() {
+        Log.d(TAG, "✅ Request verified successfully");
+        stopCameraSafe();
+        
+        // Navigate to success screen
+        String userId = AuthManager.getInstance(requireContext()).getCurrentUserId();
+        String userName = AuthManager.getInstance(requireContext()).getCurrentUserName();
+        
+        Intent successIntent = FaceIdSuccessActivity.createVerifySuccessIntent(
+            requireContext(),
+            userId,
+            userName
+        );
+        startActivity(successIntent);
+        requireActivity().finish();
+    }
+    
+    /**
+     * ✅ NEW: Handle request expired
+     */
+    private void handleRequestExpired() {
+        Log.d(TAG, "⏰ Request expired");
+        stopCameraSafe();
+        
+        // Show expired message
+        Toast.makeText(requireContext(), "Verification window expired", Toast.LENGTH_LONG).show();
+        
+        // Go back to previous screen
+        requireActivity().onBackPressed();
+    }
+    
+    /**
+     * ✅ NEW: Handle request cancelled
+     */
+    private void handleRequestCancelled() {
+        Log.d(TAG, "❌ Request cancelled");
+        stopCameraSafe();
+        
+        // Show cancelled message
+        Toast.makeText(requireContext(), "Verification request was cancelled", Toast.LENGTH_LONG).show();
+        
+        // Go back to previous screen
+        requireActivity().onBackPressed();
+    }
+    
+    /**
+     * ✅ NEW: Handle request failed
+     */
+    private void handleRequestFailed(String error) {
+        Log.e(TAG, "❌ Request failed: " + error);
+        
+        // Show error message
+        Toast.makeText(requireContext(), "Verification failed: " + error, Toast.LENGTH_LONG).show();
+        
+        // Allow retry if not expired
+        if (!requestManager.isExpired()) {
+            // Reset state for retry
+            resetComponents();
+            startFaceRegistration();
+        } else {
+            // Request expired, go back
+            requireActivity().onBackPressed();
+        }
     }
 }
 
