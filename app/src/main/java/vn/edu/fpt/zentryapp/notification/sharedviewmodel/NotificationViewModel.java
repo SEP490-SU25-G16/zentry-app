@@ -20,6 +20,7 @@ import vn.edu.fpt.zentryapp.notification.data.model.NotificationDto;
 
 import lombok.Getter;
 import vn.edu.fpt.zentryapp.notification.data.NotificationItem;
+import org.json.JSONException;
 
 public class NotificationViewModel extends ViewModel {
 
@@ -88,6 +89,9 @@ public class NotificationViewModel extends ViewModel {
                 List<NotificationItem> items = new ArrayList<>();
                 if (response.isSuccessful() && response.body() != null) {
                     for (NotificationDto dto : response.body()) {
+                        // ✅ NEW: Extract expiration from notification data
+                        String expiresAt = extractExpirationFromData(dto.getData());
+                        
                         items.add(new NotificationItem(
                                 dto.getId(),
                                 dto.getTitle(),
@@ -95,7 +99,8 @@ public class NotificationViewModel extends ViewModel {
                                 dto.getCreatedAt(),
                                 dto.isRead(),
                                 false,
-                                dto.getData()
+                                dto.getData(),
+                                expiresAt // ✅ NEW: 8th parameter
                         ));
                     }
                 } else {
@@ -142,6 +147,9 @@ public class NotificationViewModel extends ViewModel {
                 List<NotificationItem> items = new ArrayList<>();
                 if (response.isSuccessful() && response.body() != null) {
                     for (NotificationDto dto : response.body()) {
+                        // ✅ NEW: Extract expiration from notification data
+                        String expiresAt = extractExpirationFromData(dto.getData());
+                        
                         items.add(new NotificationItem(
                                 dto.getId(),
                                 dto.getTitle(),
@@ -149,7 +157,8 @@ public class NotificationViewModel extends ViewModel {
                                 dto.getCreatedAt(),
                                 dto.isRead(),
                                 false,
-                                dto.getData()
+                                dto.getData(),
+                                expiresAt // ✅ NEW: 8th parameter
                         ));
                     }
                 } else {
@@ -198,6 +207,9 @@ public class NotificationViewModel extends ViewModel {
                 List<NotificationItem> items = new ArrayList<>();
                 if (response.isSuccessful() && response.body() != null) {
                     for (NotificationDto dto : response.body()) {
+                        // ✅ NEW: Extract expiration from notification data
+                        String expiresAt = extractExpirationFromData(dto.getData());
+                        
                         items.add(new NotificationItem(
                                 dto.getId(),
                                 dto.getTitle(),
@@ -205,7 +217,8 @@ public class NotificationViewModel extends ViewModel {
                                 dto.getCreatedAt(),
                                 dto.isRead(),
                                 false,
-                                dto.getData()
+                                dto.getData(),
+                                expiresAt // ✅ NEW: 8th parameter
                         ));
                     }
                 } else {
@@ -287,6 +300,41 @@ public class NotificationViewModel extends ViewModel {
         filteredNotifications.setValue(new ArrayList<>());
         resetPagination();
         updateUnseenCount();
+    }
+    
+    // ✅ NEW: Helper method to extract expiration from notification data
+    private String extractExpirationFromData(String data) {
+        if (data == null || data.isEmpty()) {
+            android.util.Log.d("NotificationVM", "🔍 No data to extract expiration from");
+            return null;
+        }
+        
+        try {
+            org.json.JSONObject json = new org.json.JSONObject(data);
+            String type = json.optString("type", "");
+            android.util.Log.d("NotificationVM", "🔍 Notification type: " + type);
+            
+            // Only extract expiration for Face ID verification requests
+            if ("FACE_VERIFICATION_REQUEST".equalsIgnoreCase(type)) {
+                String expiresAt = json.optString("expiresAt", "");
+                android.util.Log.d("NotificationVM", "🔍 Raw expiresAt from JSON: " + expiresAt);
+                
+                if (expiresAt != null && !expiresAt.isEmpty()) {
+                    android.util.Log.d("NotificationVM", "✅ Extracted expiration for Face ID request: " + expiresAt);
+                    return expiresAt;
+                } else {
+                    android.util.Log.w("NotificationVM", "⚠️ Face ID request but no expiration found");
+                }
+            } else {
+                android.util.Log.d("NotificationVM", "🔍 Not a Face ID request, no expiration needed");
+            }
+            
+            return null; // No expiration for other notification types
+            
+        } catch (JSONException e) {
+            android.util.Log.w("NotificationVM", "⚠️ Failed to parse notification data for expiration: " + data, e);
+            return null;
+        }
     }
     
     public boolean canLoadMoreByScroll() {
@@ -487,6 +535,9 @@ public class NotificationViewModel extends ViewModel {
                     List<NotificationItem> items = new ArrayList<>();
                     if (response.isSuccessful() && response.body() != null) {
                         for (NotificationDto dto : response.body()) {
+                            // ✅ NEW: Extract expiration from notification data
+                            String expiresAt = extractExpirationFromData(dto.getData());
+                            
                             items.add(new NotificationItem(
                                     dto.getId(),
                                     dto.getTitle(),
@@ -494,7 +545,8 @@ public class NotificationViewModel extends ViewModel {
                                     dto.getCreatedAt(),
                                     dto.isRead(),
                                     false,
-                                    dto.getData()
+                                    dto.getData(),
+                                    expiresAt // ✅ NEW: 8th parameter
                             ));
                         }
                         Log.d("NotificationVM", "✅ FORCE REFRESH: loaded " + items.size() + " notifications");
@@ -551,6 +603,9 @@ public class NotificationViewModel extends ViewModel {
                     List<NotificationItem> items = new ArrayList<>();
                     if (response.isSuccessful() && response.body() != null) {
                         for (NotificationDto dto : response.body()) {
+                            // ✅ NEW: Extract expiration from notification data
+                            String expiresAt = extractExpirationFromData(dto.getData());
+                            
                             items.add(new NotificationItem(
                                     dto.getId(),
                                     dto.getTitle(),
@@ -558,7 +613,8 @@ public class NotificationViewModel extends ViewModel {
                                     dto.getCreatedAt(),
                                     dto.isRead(),
                                     false,
-                                    dto.getData()
+                                    dto.getData(),
+                                    expiresAt // ✅ NEW: 8th parameter
                             ));
                         }
                         Log.d("NotificationVM", "✅ Real-time refresh: loaded " + items.size() + " notifications");

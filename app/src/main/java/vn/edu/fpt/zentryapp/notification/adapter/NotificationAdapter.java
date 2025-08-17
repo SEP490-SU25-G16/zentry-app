@@ -91,7 +91,21 @@ public class NotificationAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
         }
 
         public void bind(final NotificationItem item, final OnItemClickListener listener) {
-            itemView.setOnClickListener(v -> listener.onItemClick(item));
+            // ✅ NEW: Disable clicks on expired notifications
+            if (item.isExpired()) {
+                itemView.setEnabled(false);
+                itemView.setAlpha(0.5f); // Gray out expired notifications
+                itemView.setOnClickListener(null); // Disable click
+                
+                // Add visual indication that notification is expired
+                if (tvTitle != null) {
+                    tvTitle.setText(tvTitle.getText() + " (Expired)");
+                }
+            } else {
+                itemView.setEnabled(true);
+                itemView.setAlpha(1.0f); // Normal opacity for valid notifications
+                itemView.setOnClickListener(v -> listener.onItemClick(item));
+            }
         }
     }
 

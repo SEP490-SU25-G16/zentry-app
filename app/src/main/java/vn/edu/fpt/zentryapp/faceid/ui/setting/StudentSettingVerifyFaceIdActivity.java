@@ -22,11 +22,15 @@ public class StudentSettingVerifyFaceIdActivity extends AppCompatActivity {
             Bundle args = new Bundle();
             String requestId = getIntent().getStringExtra("requestId");
             String sessionId = getIntent().getStringExtra("sessionId");
+            String expiresAt = getIntent().getStringExtra("expiresAt");
             
             if (requestId != null && sessionId != null) {
                 args.putString("requestId", requestId);
                 args.putString("sessionId", sessionId);
-                Log.d("VerifyActivity", "✅ Passing verification args: " + requestId + ", " + sessionId);
+                if (expiresAt != null) {
+                    args.putString("expiresAt", expiresAt);
+                }
+                Log.d("VerifyActivity", "✅ Passing verification args: " + requestId + ", " + sessionId + ", expiresAt: " + expiresAt);
             } else {
                 Log.w("VerifyActivity", "⚠️ No verification args found in intent");
             }

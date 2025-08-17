@@ -5,6 +5,12 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.widget.Toast;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+import java.util.TimeZone;
+import android.util.Log;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -278,7 +284,7 @@ public class MainActivity extends AppCompatActivity {
         requestBLEPermissionsIfNeeded();
     }
 
-    // ✅ NEW: Xử lý Face ID verification deeplink
+    // ✅ NEW: Xử lý Face ID verification deeplink với expiration check
     private void handleFaceIdVerificationDeepLink(android.content.Intent intent) {
         if (intent == null) return;
         
@@ -288,45 +294,105 @@ public class MainActivity extends AppCompatActivity {
             
             String requestId = data.getQueryParameter("requestId");
             String sessionId = data.getQueryParameter("sessionId");
+            String expiresAt = data.getQueryParameter("expiresAt");
             
             if (requestId != null && sessionId != null) {
-                android.util.Log.d("MainActivity", "✅ Face ID verification request: " + requestId + " for session: " + sessionId);
-                
-                // Navigate to student settings with verification args
-                try {
-                    androidx.navigation.fragment.NavHostFragment host = (androidx.navigation.fragment.NavHostFragment)
-                            getSupportFragmentManager().findFragmentById(R.id.nav_host_fragment);
-                    if (host != null) {
-                        androidx.navigation.NavController navController = host.getNavController();
-                        
-                        // Navigate to student settings first
-                        navController.navigate(vn.edu.fpt.zentryapp.R.id.nav_graph_student);
-                        
-                        // Store the verification args for later use when settings tab is ready
-                        storeVerificationArgs(requestId, sessionId);
-                        
-                        // The actual navigation to Face ID fragment will be handled by StudentMainFragment
-                        // after the settings tab is initialized
+                // ✅ NEW: Validate expiration before proceeding
+                if (!isRequestExpired(expiresAt)) {
+                    Log.d("MainActivity", "✅ Face ID verification request: " + requestId + " for session: " + sessionId);
+                    
+                    // Navigate to student settings with verification args
+                    try {
+                        androidx.navigation.fragment.NavHostFragment host = (androidx.navigation.fragment.NavHostFragment)
+                                getSupportFragmentManager().findFragmentById(R.id.nav_host_fragment);
+                        if (host != null) {
+                            androidx.navigation.NavController navController = host.getNavController();
+                            
+                            // Navigate to student settings first
+                            navController.navigate(vn.edu.fpt.zentryapp.R.id.nav_graph_student);
+                            
+                            // Store the verification args for later use when settings tab is ready
+                            storeVerificationArgs(requestId, sessionId, expiresAt);
+                            
+                            // The actual navigation to Face ID fragment will be handled by StudentMainFragment
+                            // after the settings tab is initialized
+                        }
+                    } catch (Exception e) {
+                        Log.e("MainActivity", "❌ Failed to navigate to student settings", e);
                     }
-                } catch (Exception e) {
-                    android.util.Log.e("MainActivity", "❌ Failed to navigate to student settings", e);
+                } else {
+                    // ✅ NEW: Show error for expired request
+                    Log.w("MainActivity", "⏰ Face ID verification request expired: " + requestId);
+                    showExpiredRequestError();
                 }
             } else {
-                android.util.Log.w("MainActivity", "⚠️ Missing requestId or sessionId in deeplink");
+                Log.w("MainActivity", "⚠️ Missing requestId or sessionId in deeplink");
             }
         }
     }
     
     // ✅ NEW: Store verification args for later use
-    private void storeVerificationArgs(String requestId, String sessionId) {
+    private void storeVerificationArgs(String requestId, String sessionId, String expiresAt) {
         // Store in SharedPreferences or use a static variable for now
         android.content.SharedPreferences prefs = getSharedPreferences("face_verification", MODE_PRIVATE);
         prefs.edit()
                 .putString("pending_request_id", requestId)
                 .putString("pending_session_id", sessionId)
+                .putString("pending_expires_at", expiresAt)
                 .putLong("pending_timestamp", System.currentTimeMillis())
                 .apply();
         
-        android.util.Log.d("MainActivity", "💾 Stored verification args for later navigation");
+        Log.d("MainActivity", "💾 Stored verification args for later navigation");
+    }
+    
+    // ✅ NEW: Check if Face ID request is expired
+    private boolean isRequestExpired(String expiresAt) {
+        if (expiresAt == null || expiresAt.isEmpty()) {
+            android.util.Log.w("MainActivity", "⚠️ No expiration timestamp provided, treating as expired for security");
+            return true; // Treat as expired if no timestamp provided
+        }
+        
+        try {
+            // Parse ISO 8601 timestamp (e.g., "2024-01-01T12:00:00Z")
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
+            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+            Date expirationDate = sdf.parse(expiresAt);
+            
+            if (expirationDate == null) {
+                Log.w("MainActivity", "⚠️ Failed to parse expiration timestamp: " + expiresAt);
+                return true; // Treat as expired if parsing fails
+            }
+            
+            long currentTime = System.currentTimeMillis();
+            long expirationTime = expirationDate.getTime();
+            
+            // Add 5-minute buffer for network delays and processing time
+            long bufferTime = 5 * 60 * 1000; // 5 minutes in milliseconds
+            
+            boolean isExpired = currentTime > (expirationTime + bufferTime);
+            
+            if (isExpired) {
+                Log.d("MainActivity", "⏰ Request expired: " + expiresAt);
+            } else {
+                Log.d("MainActivity", "✅ Request still valid: " + expiresAt + " (expires in " + ((expirationTime + bufferTime - currentTime) / 1000) + "s)");
+            }
+            
+            return isExpired;
+            
+        } catch (ParseException e) {
+            Log.e("MainActivity", "❌ Error parsing expiration timestamp: " + expiresAt, e);
+            return true; // Treat as expired if parsing fails
+        }
+    }
+    
+    // ✅ NEW: Show error message for expired request
+    private void showExpiredRequestError() {
+        try {
+            Toast.makeText(this, 
+                "⏰ Face ID verification request has expired. Please ask your lecturer for a new request.", 
+                Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Log.e("MainActivity", "❌ Failed to show expired request error", e);
+        }
     }
 }

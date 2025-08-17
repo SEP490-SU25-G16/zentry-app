@@ -85,12 +85,33 @@ public class UnreadNotificationsFragment extends Fragment {
 
     private void handleNotificationClick(NotificationItem item) {
         if (item == null) return;
+        
+        // ✅ DEBUG: Log notification details for troubleshooting
+        android.util.Log.d("UnreadNotificationsFragment", "🔍 Clicking notification: " + item.getId());
+        android.util.Log.d("UnreadNotificationsFragment", "🔍 ExpiresAt: " + item.getExpiresAt());
+        android.util.Log.d("UnreadNotificationsFragment", "🔍 IsExpired: " + item.isExpired());
+        
+        // ✅ NEW: Check if notification is expired before processing
+        if (item.isExpired()) {
+            android.util.Log.w("UnreadNotificationsFragment", "⏰ Blocked click on expired notification: " + item.getId());
+            showExpiredNotificationError();
+            return;
+        }
+        
         try {
             String raw = item.getRawData();
             if (raw != null) {
                 org.json.JSONObject json = new org.json.JSONObject(raw);
                 String type = json.optString("type", "");
                 if ("FACE_VERIFICATION_REQUEST".equalsIgnoreCase(type)) {
+                    // ✅ FIXED: No need to set expiresAt again - ViewModel already set it
+                    // Just check if it's expired and block if necessary
+                    if (item.isExpired()) {
+                        android.util.Log.w("UnreadNotificationsFragment", "⏰ Blocked expired Face ID verification: " + item.getId());
+                        showExpiredNotificationError();
+                        return;
+                    }
+                    
                     String deeplink = json.optString("deeplink", "");
                     if (!deeplink.isEmpty()) {
                         android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(deeplink));
@@ -104,6 +125,17 @@ public class UnreadNotificationsFragment extends Fragment {
                 }
             }
         } catch (Exception ignored) {}
+    }
+    
+    // ✅ NEW: Show error message for expired notification
+    private void showExpiredNotificationError() {
+        try {
+            android.widget.Toast.makeText(requireContext(), 
+                "⏰ This notification has expired and cannot be processed.", 
+                android.widget.Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            android.util.Log.e("UnreadNotificationsFragment", "❌ Failed to show expired notification error", e);
+        }
     }
 
     @Override

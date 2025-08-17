@@ -129,43 +129,104 @@ public class StudentMainFragment extends Fragment {
         binding = null;
     }
     
-    // ✅ NEW: Check for pending Face ID verification and navigate to settings tab
-    private void checkAndHandlePendingVerification() {
-        try {
-            SharedPreferences prefs = requireActivity().getSharedPreferences("face_verification", android.content.Context.MODE_PRIVATE);
-            String requestId = prefs.getString("pending_request_id", null);
-            String sessionId = prefs.getString("pending_session_id", null);
-            long timestamp = prefs.getLong("pending_timestamp", 0);
-            
-            // Check if we have pending verification (within last 30 seconds)
-            if (requestId != null && sessionId != null && 
-                (System.currentTimeMillis() - timestamp) < 30000) {
-                
-                android.util.Log.d("StudentMainFragment", "🔗 Found pending Face ID verification: " + requestId);
-                
-                // Clear the stored args
-                prefs.edit().clear().apply();
-                
-                // ✅ NEW: Launch dedicated Activity instead of navigating to fragment
-                // This ensures full-screen experience without navbar (consistent with register/update)
-                try {
-                    Intent verifyIntent = new Intent(requireContext(), 
-                            vn.edu.fpt.zentryapp.faceid.ui.setting.StudentSettingVerifyFaceIdActivity.class);
-                    verifyIntent.putExtra("requestId", requestId);
-                    verifyIntent.putExtra("sessionId", sessionId);
-                    
-                    // Add flags to ensure proper navigation
-                    verifyIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    
-                    startActivity(verifyIntent);
-                    
-                    android.util.Log.d("StudentMainFragment", "✅ Successfully launched Face ID verification Activity");
-                } catch (Exception e) {
-                    android.util.Log.e("StudentMainFragment", "❌ Failed to launch Face ID verification Activity", e);
+                    // ✅ NEW: Check for pending Face ID verification and navigate to settings tab
+                private void checkAndHandlePendingVerification() {
+                    try {
+                        SharedPreferences prefs = requireActivity().getSharedPreferences("face_verification", android.content.Context.MODE_PRIVATE);
+                        String requestId = prefs.getString("pending_request_id", null);
+                        String sessionId = prefs.getString("pending_session_id", null);
+                        String expiresAt = prefs.getString("pending_expires_at", null);
+                        long timestamp = prefs.getLong("pending_timestamp", 0);
+                        
+                        // Check if we have pending verification (within last 30 seconds)
+                        if (requestId != null && sessionId != null && 
+                            (System.currentTimeMillis() - timestamp) < 30000) {
+                            
+                            // ✅ NEW: Double-check expiration before launching Activity
+                            if (!isRequestExpired(expiresAt)) {
+                                android.util.Log.d("StudentMainFragment", "🔗 Found pending Face ID verification: " + requestId);
+                                
+                                // Clear the stored args
+                                prefs.edit().clear().apply();
+                                
+                                // ✅ NEW: Launch dedicated Activity instead of navigating to fragment
+                                // This ensures full-screen experience without navbar (consistent with register/update)
+                                try {
+                                    Intent verifyIntent = new Intent(requireContext(), 
+                                            vn.edu.fpt.zentryapp.faceid.ui.setting.StudentSettingVerifyFaceIdActivity.class);
+                                    verifyIntent.putExtra("requestId", requestId);
+                                    verifyIntent.putExtra("sessionId", sessionId);
+                                    verifyIntent.putExtra("expiresAt", expiresAt);
+                                    
+                                    // Add flags to ensure proper navigation
+                                    verifyIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                    
+                                    startActivity(verifyIntent);
+                                    
+                                    android.util.Log.d("StudentMainFragment", "✅ Successfully launched Face ID verification Activity");
+                                } catch (Exception e) {
+                                    android.util.Log.e("StudentMainFragment", "❌ Failed to launch Face ID verification Activity", e);
+                                }
+                            } else {
+                                // ✅ NEW: Clear expired request and show error
+                                android.util.Log.w("StudentMainFragment", "⏰ Pending verification request expired: " + requestId);
+                                prefs.edit().clear().apply();
+                                showExpiredRequestError();
+                            }
+                        }
+                    } catch (Exception e) {
+                        android.util.Log.e("StudentMainFragment", "❌ Error checking pending verification", e);
+                    }
                 }
-            }
-        } catch (Exception e) {
-            android.util.Log.e("StudentMainFragment", "❌ Error checking pending verification", e);
-        }
-    }
+                
+                // ✅ NEW: Check if Face ID request is expired (same logic as MainActivity)
+                private boolean isRequestExpired(String expiresAt) {
+                    if (expiresAt == null || expiresAt.isEmpty()) {
+                        android.util.Log.w("StudentMainFragment", "⚠️ No expiration timestamp provided, treating as expired for security");
+                        return true; // Treat as expired if no timestamp provided
+                    }
+                    
+                    try {
+                        // Parse ISO 8601 timestamp (e.g., "2024-01-01T12:00:00Z")
+                        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US);
+                        sdf.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+                        java.util.Date expirationDate = sdf.parse(expiresAt);
+                        
+                        if (expirationDate == null) {
+                            android.util.Log.w("StudentMainFragment", "⚠️ Failed to parse expiration timestamp: " + expiresAt);
+                            return true; // Treat as expired if parsing fails
+                        }
+                        
+                        long currentTime = System.currentTimeMillis();
+                        long expirationTime = expirationDate.getTime();
+                        
+                        // Add 5-minute buffer for network delays and processing time
+                        long bufferTime = 5 * 60 * 1000; // 5 minutes in milliseconds
+                        
+                        boolean isExpired = currentTime > (expirationTime + bufferTime);
+                        
+                        if (isExpired) {
+                            android.util.Log.d("StudentMainFragment", "⏰ Request expired: " + expiresAt);
+                        } else {
+                            android.util.Log.d("StudentMainFragment", "✅ Request still valid: " + expiresAt + " (expires in " + ((expirationTime + bufferTime - currentTime) / 1000) + "s)");
+                        }
+                        
+                        return isExpired;
+                        
+                    } catch (java.text.ParseException e) {
+                        android.util.Log.e("StudentMainFragment", "❌ Error parsing expiration timestamp: " + expiresAt, e);
+                        return true; // Treat as expired if parsing fails
+                    }
+                }
+                
+                // ✅ NEW: Show error message for expired request
+                private void showExpiredRequestError() {
+                    try {
+                        android.widget.Toast.makeText(requireContext(), 
+                            "⏰ Face ID verification request has expired. Please ask your lecturer for a new request.", 
+                            android.widget.Toast.LENGTH_LONG).show();
+                    } catch (Exception e) {
+                        android.util.Log.e("StudentMainFragment", "❌ Failed to show expired request error", e);
+                    }
+                }
 }
