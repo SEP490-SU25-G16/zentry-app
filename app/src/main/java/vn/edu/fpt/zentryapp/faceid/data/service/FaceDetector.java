@@ -5,6 +5,7 @@ import android.graphics.Bitmap;
 import android.graphics.Rect;
 import android.util.Log;
 
+import vn.edu.fpt.zentryapp.BuildConfig;
 import com.google.mediapipe.tasks.vision.facedetector.FaceDetectorResult;
 import com.google.mediapipe.tasks.vision.facedetector.FaceDetector.FaceDetectorOptions;
 import com.google.mediapipe.tasks.vision.core.RunningMode;
@@ -27,12 +28,17 @@ import java.util.concurrent.TimeUnit;
 public class FaceDetector {
     private static final String TAG = "FaceDetector";
     private static final String MODEL_FILE = "blaze_face_short_range.tflite";
+    // Target minimum dimension (shorter side) for stable detector input across devices
+    private static final int DETECT_TARGET_MIN_DIMENSION = 640;
+    private static final int DETECT_MIN_ALLOWED_DIMENSION = 320;
     
     private final Context context;
     private com.google.mediapipe.tasks.vision.facedetector.FaceDetector detector;
     private final Executor executor = Executors.newSingleThreadExecutor();
     private volatile boolean isInitialized = false;
     private final CountDownLatch initLatch = new CountDownLatch(1);
+    private volatile float minDetectionConfidence = 0.5f;
+    private volatile float minSuppressionThreshold = 0.3f;
     
     public static class FaceDetectionResult {
         private final Bitmap croppedBitmap;
@@ -65,8 +71,8 @@ public class FaceDetector {
                                         .setModelAssetPath(MODEL_FILE)
                                         .build())
                         .setRunningMode(RunningMode.IMAGE)
-                        .setMinDetectionConfidence(0.5f)
-                        .setMinSuppressionThreshold(0.3f)
+                        .setMinDetectionConfidence(minDetectionConfidence)
+                        .setMinSuppressionThreshold(minSuppressionThreshold)
                         .build();
                 detector = com.google.mediapipe.tasks.vision.facedetector.FaceDetector.createFromOptions(context, options);
                 
@@ -78,6 +84,16 @@ public class FaceDetector {
                 initLatch.countDown();
             }
         });
+    }
+
+    public void setMinDetectionConfidence(float confidence) {
+        this.minDetectionConfidence = confidence;
+        Log.d(TAG, "minDetectionConfidence set to " + confidence);
+    }
+
+    public void setMinSuppressionThreshold(float threshold) {
+        this.minSuppressionThreshold = threshold;
+        Log.d(TAG, "minSuppressionThreshold set to " + threshold);
     }
     
     public boolean isInitialized() {
@@ -94,6 +110,23 @@ public class FaceDetector {
      * @return List of face detection results
      */
     public List<FaceDetectionResult> detectFaces(Bitmap bitmap) {
+        if (BuildConfig.DEBUG) {
+            Log.d("DEBUG_FACE_DETECTOR", "Input Bitmap - Size: " + bitmap.getWidth() + "x" + bitmap.getHeight() +
+                    ", Config: " + bitmap.getConfig() + ", HasAlpha: " + bitmap.hasAlpha() +
+                    ", IsMutable: " + bitmap.isMutable());
+
+            if (bitmap.getWidth() < 100 || bitmap.getHeight() < 100) {
+                Log.w("DEBUG_FACE_DETECTOR", "Bitmap too small for face detection");
+            }
+
+            try {
+                int pixel = bitmap.getPixel(0, 0);
+                Log.d("DEBUG_FACE_DETECTOR", "First pixel sample: " + pixel);
+            } catch (Exception e) {
+                Log.e("DEBUG_FACE_DETECTOR", "Bitmap corrupted or invalid", e);
+            }
+        }
+
         List<FaceDetectionResult> results = new ArrayList<>();
 
         try {
@@ -103,29 +136,78 @@ public class FaceDetector {
                 return results;
             }
             
-            // Convert bitmap to MPImage
-            MPImage image = new BitmapImageBuilder(bitmap).build();
+            // Prepare working bitmap with optional downscale to stabilize detector input across devices
+            final int origW = bitmap.getWidth();
+            final int origH = bitmap.getHeight();
+            final int minDim = Math.min(origW, origH);
+            float scaleForDetection = 1.0f;
+            Bitmap detectBitmap = bitmap;
+            if (minDim > DETECT_TARGET_MIN_DIMENSION) {
+                scaleForDetection = (float) DETECT_TARGET_MIN_DIMENSION / (float) minDim;
+                int newW = Math.max(1, Math.round(origW * scaleForDetection));
+                int newH = Math.max(1, Math.round(origH * scaleForDetection));
+                try {
+                    detectBitmap = Bitmap.createScaledBitmap(bitmap, newW, newH, true);
+                    if (BuildConfig.DEBUG) {
+                        Log.d("DEBUG_FACE_DETECTOR", "Downscaled for detection to: " + newW + "x" + newH +
+                                " (scale=" + scaleForDetection + ")");
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "Failed to create downscaled bitmap for detection, using original", e);
+                    detectBitmap = bitmap;
+                    scaleForDetection = 1.0f;
+                }
+            }
 
-            // Detect faces
-            FaceDetectorResult detectionResult = detector.detect(image);
+            // First attempt detection
+            List<Detection> detections = runDetection(detectBitmap);
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "Phát hiện " + detections.size() + " khuôn mặt (attempt#1)");
+            }
 
-            Log.d(TAG, "Phát hiện " + detectionResult.detections().size() + " khuôn mặt");
+            // Simple pyramid retry: try a slight downscale if nothing found and input was small or unchanged
+            Bitmap retryBitmap = null;
+            float retryScale = 1.0f;
+            if (detections.isEmpty()) {
+                int detectMinDim = Math.min(detectBitmap.getWidth(), detectBitmap.getHeight());
+                int targetRetryMin = Math.max(DETECT_MIN_ALLOWED_DIMENSION, Math.round(detectMinDim * 0.75f));
+                if (detectMinDim > targetRetryMin + 4) {
+                    float factor = (float) targetRetryMin / (float) detectMinDim;
+                    int retryW = Math.max(1, Math.round(detectBitmap.getWidth() * factor));
+                    int retryH = Math.max(1, Math.round(detectBitmap.getHeight() * factor));
+                    try {
+                        retryBitmap = Bitmap.createScaledBitmap(detectBitmap, retryW, retryH, true);
+                        retryScale = scaleForDetection * factor;
+                        if (BuildConfig.DEBUG) {
+                            Log.d("DEBUG_FACE_DETECTOR", "Retry downscale for detection: " + retryW + "x" + retryH +
+                                    " (retryScale=" + retryScale + ")");
+                        }
+                        detections = runDetection(retryBitmap);
+                        if (BuildConfig.DEBUG) {
+                            Log.d(TAG, "Phát hiện " + detections.size() + " khuôn mặt (attempt#2)");
+                        }
+                    } catch (Exception e) {
+                        Log.w(TAG, "Retry downscale failed", e);
+                    }
+                }
+            }
 
             // Process detection results
-            for (Detection detection : detectionResult.detections()) {
+            final float inverseScale = (retryBitmap != null && !detections.isEmpty()) ? (1.0f / retryScale)
+                    : (1.0f / scaleForDetection);
+            for (Detection detection : detections) {
                 // Lấy bounding box từ detection
                 android.graphics.RectF rectF = detection.boundingBox();
 
                 Log.d(TAG, "Bounding box raw: " + rectF.toString());
                 Log.d(TAG, "Bitmap size: " + bitmap.getWidth() + "x" + bitmap.getHeight());
 
-                // Chuyển đổi từ tỷ lệ sang pixel - FIX HERE
-                // Chú ý: rectF chứa tọa độ thực tế, không phải tỷ lệ
+                // Map bounding box from detection bitmap scale back to original bitmap coordinates
                 Rect boundingBox = new Rect(
-                        (int) rectF.left,
-                        (int) rectF.top,
-                        (int) rectF.right,
-                        (int) rectF.bottom
+                        (int) Math.round(rectF.left * inverseScale),
+                        (int) Math.round(rectF.top * inverseScale),
+                        (int) Math.round(rectF.right * inverseScale),
+                        (int) Math.round(rectF.bottom * inverseScale)
                 );
 
                 Log.d(TAG, "Bounding box converted: " + boundingBox.toString());
@@ -168,6 +250,17 @@ public class FaceDetector {
 
         Log.d(TAG, "Returning " + results.size() + " face results");
         return results;
+    }
+
+    private List<Detection> runDetection(Bitmap input) {
+        try {
+            MPImage image = new BitmapImageBuilder(input).build();
+            FaceDetectorResult detectionResult = detector.detect(image);
+            return detectionResult.detections();
+        } catch (Exception e) {
+            Log.e(TAG, "Detector.detect failed", e);
+            return new ArrayList<>();
+        }
     }
     
     /**

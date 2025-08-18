@@ -9,6 +9,8 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
+import com.chaos.view.BuildConfig;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.io.File;
@@ -351,7 +353,22 @@ public class FaceIdService {
             return new FaceDecisionEngine.OvalValidationResult(true, "No oval boundary provided");
         }
         
-        boolean isWithinOval = checkFaceWithinOval(boundingBox, ovalRect);
+        // Map ovalRect (view space) to bitmap space using current mapping
+        android.graphics.RectF mappedOval = ovalRect;
+        try {
+            android.graphics.RectF mapped = vn.edu.fpt.zentryapp.faceid.util.CoordinateMapper.getInstance().mapViewRectToBitmap(ovalRect);
+            if (mapped != null) {
+                mappedOval = mapped;
+            }
+        } catch (Exception ignored) {}
+
+        // Apply slight tolerance by expanding oval by 7% for validation only (not UI)
+        android.graphics.RectF tolerantOval = new android.graphics.RectF(mappedOval);
+        float expandX = tolerantOval.width() * 0.07f * 0.5f;
+        float expandY = tolerantOval.height() * 0.07f * 0.5f;
+        tolerantOval.inset(-expandX, -expandY);
+
+        boolean isWithinOval = checkFaceWithinOval(boundingBox, tolerantOval);
         
         // 🔧 NEW: Fallback validation for registration scenario
         if (!isWithinOval && configManager.getConfig().scenario == FaceIdConfig.Scenario.REGISTRATION) {
@@ -409,7 +426,9 @@ public class FaceIdService {
         
         // 🔧 NEW: Use configurable thresholds
         // Ellipse equation returns ≤ 1 for points inside ellipse, so we check if it's within the ellipse
-        boolean isWithinEllipse = ellipseValue <= 1.0f;
+        // Align ellipse tolerance with overlay view tolerance for consistency
+        float ELLIPSE_TOLERANCE = 1.2f; // matches overlay behavior
+        boolean isWithinEllipse = ellipseValue <= ELLIPSE_TOLERANCE;
         boolean isGoodSize = widthRatio >= ovalConfig.minFaceSizeRatio && widthRatio <= ovalConfig.maxFaceSizeRatio && 
                             heightRatio >= ovalConfig.minFaceSizeRatio && heightRatio <= ovalConfig.maxFaceSizeRatio;
         
@@ -481,6 +500,12 @@ public class FaceIdService {
      * @return true if processing was started, false if already processing
      */
     public boolean processContinuousFrame(Bitmap bitmap, android.graphics.RectF ovalRect, ContinuousProcessingCallback callback) {
+
+            Log.d("DEBUG_SERVICE", "=== STARTING FACE PROCESSING ===");
+            Log.d("DEBUG_SERVICE", "Input Bitmap: " + (bitmap != null ?
+                    bitmap.getWidth() + "x" + bitmap.getHeight() : "NULL"));
+            Log.d("DEBUG_SERVICE", "Oval Rect: " + (ovalRect != null ? ovalRect.toString() : "NULL"));
+
         // Skip if already processing a frame or models not initialized
         if (!isInitialized()) {
             return false;
@@ -499,7 +524,17 @@ public class FaceIdService {
             try {
                 // Step 1: Detect face with retry
                 List<FaceDetector.FaceDetectionResult> faces = faceDetector.detectFaces(bitmap);
-                
+
+                    Log.d("DEBUG_SERVICE", "Face detection completed: " + faces.size() + " faces found");
+                    if (faces.isEmpty()) {
+                        Log.e("DEBUG_SERVICE", "❌ NO FACE DETECTED - This is the main problem!");
+                        // Log thêm thông tin về Bitmap để debug
+                        if (bitmap != null) {
+                            Log.d("DEBUG_SERVICE", "Bitmap details - Width: " + bitmap.getWidth() +
+                                    ", Height: " + bitmap.getHeight() + ", Config: " + bitmap.getConfig());
+                        }
+                    }
+
                 if (faces.isEmpty()) {
                     runOnMainThread(() -> {
                         callback.onNoFaceDetected();
