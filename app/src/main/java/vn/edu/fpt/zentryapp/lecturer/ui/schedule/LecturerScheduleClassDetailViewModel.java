@@ -703,17 +703,21 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
 
                 Attendance attendance = new Attendance();
 
-                // ✅ CHANGED: Sử dụng StudentCode từ API thay vì StudentId
-                attendance.setStudentCode(studentDto.getStudentCode()); // Thay đổi này
+                attendance.setStudentCode(studentDto.getStudentCode());
                 attendance.setStudentName(studentDto.getDisplayName());
-                attendance.setFinalStatus(studentDto.isAttended());
+
+                // ✅ SỬA: Set status String dựa trên isAttended
+                String status = studentDto.isAttended() ? "Attended" : "Absent";
+                attendance.setStatus(status);
+
                 attendance.setRoundNumber(roundResult.getRoundNumber());
 
                 attendanceList.add(attendance);
 
                 Log.d(TAG, "✅ Added student: " + studentDto.getDisplayName() +
                         " (Code: " + studentDto.getStudentCode() +
-                        ", ID: " + studentDto.getStudentId() + ")");
+                        ", ID: " + studentDto.getStudentId() +
+                        ", Status: " + status + ")");
 
             } catch (Exception e) {
                 Log.e(TAG, "Error mapping round attendance for student: " + studentDto.getFullName(), e);
@@ -724,7 +728,6 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                 " (excluding lecturer)");
         return attendanceList;
     }
-
 
     private List<Round> mapApiDataToAttendanceRounds(List<RoundDetail> apiData) {
         List<Round> rounds = new ArrayList<>();
@@ -794,14 +797,20 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
                 student.setStudentCode(apiStudent.getStudentCode());
                 student.setStudentName(apiStudent.getStudentFullName());
 
-                boolean isPresent = isStudentPresent(apiStudent.getStatus());                student.setFinalStatus(isPresent);
+                // ✅ SỬA: Set status trực tiếp từ API thay vì convert boolean
+                String status = apiStudent.getStatus(); // Lấy trực tiếp từ API: "Attended", "Absent", "Future"
+                student.setStatus(status);
+
                 student.setTotalRounds(getTotalRoundsFromRoundsData());
-                student.setAttendedRounds(isPresent ? student.getTotalRounds() : 0);
+
+                // ✅ SỬA: Logic attendedRounds dựa trên status String
+                int attendedRounds = "Attended".equalsIgnoreCase(status) ? student.getTotalRounds() : 0;
+                student.setAttendedRounds(attendedRounds);
 
                 finalAttendanceList.add(student);
 
                 Log.d(TAG, "Mapped student: " + student.getStudentName() +
-                        " - Status: " + (isPresent ? "Present" : "Absent"));
+                        " - Status: " + status);
 
             } catch (Exception e) {
                 Log.e(TAG, "Error mapping student: " + apiStudent.getStudentFullName(), e);
@@ -809,13 +818,6 @@ public class LecturerScheduleClassDetailViewModel extends ViewModel {
         }
 
         return finalAttendanceList;
-    }
-
-    private boolean isStudentPresent(String status) {
-        if ("Present".equalsIgnoreCase(status) || "Attended".equalsIgnoreCase(status)) {
-            return true;
-        }
-        return false;
     }
 
     private boolean isSessionEnded() {

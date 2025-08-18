@@ -1,6 +1,7 @@
 package vn.edu.fpt.zentryapp.lecturer.adapter;
 
 import android.view.LayoutInflater;
+import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
@@ -75,12 +76,23 @@ public class LecturerReportListStudentOnSessionAdapter
         void bind(Student s) {
             binding.tvStudentName.setText(s.getDisplayName());
             binding.tvStudentId.setText("ID: " + s.getStudentCode());
-
-            binding.tvStudentStatus.setText(s.getAttendanceStatus());
+            binding.tvStudentStatus.setText(capitalizeFirst(s.getAttendanceStatus()));
             binding.tvStudentStatus.setTextColor(s.getAttendanceStatusColor());
 
-            binding.btnStudentEdit.setEnabled(canEditAttendance);
-            binding.btnStudentEdit.setAlpha(canEditAttendance ? 1f : 0.5f);
+            if (s.isFuture()) {
+                binding.btnStudentEdit.setVisibility(View.GONE); // hoặc View.GONE
+                binding.tvStudentStatus.setText("Future");
+            } else {
+                binding.btnStudentEdit.setVisibility(View.VISIBLE);
+                boolean canEditAttendance = !s.isFuture(); // chỉ edit nếu không phải future
+                binding.btnStudentEdit.setEnabled(canEditAttendance);
+                binding.btnStudentEdit.setAlpha(canEditAttendance ? 1f : 0.5f);
+            }
         }
+        private String capitalizeFirst(String input) {
+            if (input == null || input.isEmpty()) return input;
+            return input.substring(0, 1).toUpperCase() + input.substring(1).toLowerCase();
+        }
+
     }
 }

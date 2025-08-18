@@ -45,6 +45,7 @@ import vn.edu.fpt.zentryapp.lecturer.data.model.response.RoundsDataResponse;
 import vn.edu.fpt.zentryapp.service.AttendanceApiService;
 import vn.edu.fpt.zentryapp.service.AttendanceModels;
 import vn.edu.fpt.zentryapp.service.BLEAttendanceService;
+import vn.edu.fpt.zentryapp.service.ServiceUtils;
 import vn.edu.fpt.zentryapp.student.data.model.response.StudentScheduleClassSection;
 
 public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<StudentScheduleClassSectionAdapter.ViewHolder> {
@@ -131,18 +132,6 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
         return sessions.size();
     }
 
-    // Method để mark session đã join
-    public void markSessionAsJoined(String sessionId) {
-        joinedSessions.add(sessionId);
-        notifyDataSetChanged();
-    }
-
-    // Method để check session đã join chưa
-    public boolean isSessionJoined(String sessionId) {
-        return joinedSessions.contains(sessionId);
-    }
-
-    // ✅ Load joined sessions từ SharedPreferences
     private void loadJoinedSessionsFromPrefs() {
         if (context == null) return;
 
@@ -203,6 +192,8 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
                 context = itemView.getContext();
                 loadJoinedSessionsFromPrefs(); // Load khi lần đầu set context
             }
+            // ✅ SIMPLE: Check if session ended and kill BLE service
+            checkAndKillBLEServiceIfSessionEnded(session);
 
             // Set basic session info
             setBasicInfo(session);
@@ -301,6 +292,83 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
                     return ACTION_UPCOMING;
             }
         }
+        /**
+         * Kiểm tra session đã kết thúc chưa, nếu có thì kill BLE service
+         */
+        private void checkAndKillBLEServiceIfSessionEnded(StudentScheduleClassSection session) {
+            try {
+                String sessionStatus = session.getStatus();
+                boolean hasJoined = isSessionJoinedFromPrefs(session.getSessionId());
+
+                boolean shouldKillService = shouldKillServiceForSession(session);
+
+                Log.d(TAG, String.format("checkAndKillBLE - Session: %s, Status: %s, HasJoined: %s, ShouldKill: %s",
+                        session.getSessionId(), sessionStatus, hasJoined, shouldKillService));
+
+                // Kill service nếu đã join và thỏa mãn điều kiện
+                if (hasJoined && shouldKillService) {
+                    Log.d(TAG, "🛑 Session " + session.getSessionId() + " completed early but still in time range");
+
+                    if (ServiceUtils.isServiceRunning(context, BLEAttendanceService.class)) {
+                        Log.d(TAG, "🛑 BLE service is running, killing it for early-ended session");
+                        ServiceUtils.killServiceIfRunning(context, BLEAttendanceService.class);
+                    } else {
+                        Log.d(TAG, "ℹ️ BLE service is not running");
+                    }
+                }
+
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Error checking session end", e);
+            }
+        }
+
+        /**
+         * ✅ CORRECT: Chỉ check thời gian hiện tại có trong [start, end] không
+         * Logic: Session "Completed" + Current time trong khoảng [start, end] = Kill service
+         */
+        private boolean shouldKillServiceForSession(StudentScheduleClassSection session) {
+            try {
+                String status = session.getStatus();
+                if (!"completed".equalsIgnoreCase(status)) {
+                    return false; // Chỉ check khi status = "Completed"
+                }
+
+                Date currentTime = new Date();
+                Date startTime = parseSessionTimeForLogic(session.getStartTime());
+                Date endTime = parseSessionTimeForLogic(session.getEndTime());
+
+                if (startTime == null || endTime == null) {
+                    return false;
+                }
+
+                // ✅ ONLY CHECK: Thời gian hiện tại có nằm trong khoảng [start, end] không
+                boolean isInSessionTime = isCurrentTimeInSession(currentTime, startTime, endTime);
+
+                Log.d(TAG, String.format("shouldKillService - Status: %s, CurrentTime: %s, StartTime: %s, EndTime: %s, InRange: %s",
+                        status,
+                        formatTimeForLog(currentTime),
+                        formatTimeForLog(startTime),
+                        formatTimeForLog(endTime),
+                        isInSessionTime));
+
+                return isInSessionTime;
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error checking should kill service", e);
+                return false;
+            }
+        }
+
+
+        /**
+         * Helper method để format time cho logging
+         */
+        private String formatTimeForLog(Date date) {
+            if (date == null) return "null";
+            SimpleDateFormat format = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+            return format.format(date);
+        }
+
 
         // Method để parse thời gian chính xác (bao gồm giây)
         private Date parseSessionTimeForLogic(String timeStr) {

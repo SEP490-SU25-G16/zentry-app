@@ -1,80 +1,121 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
+<com.google.android.material.card.MaterialCardView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:padding="@dimen/padding_default"
-    android:background="?attr/selectableItemBackground">
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginVertical="4dp"
+    app:cardCornerRadius="12dp"
+    app:cardBackgroundColor="#FFFFFF"
+    app:strokeColor="#F1F5F9"
+    app:strokeWidth="1dp"
+    app:cardElevation="2dp"
+    android:foreground="?attr/selectableItemBackground">
 
-    <ImageView
-        android:id="@+id/ivNotificationIcon"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:src="@drawable/ic_avatar_placeholder"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        android:contentDescription="@string/notification_icon" />
-
-    <View
-        android:id="@+id/unreadIndicator"
-        android:layout_width="8dp"
-        android:layout_height="8dp"
-        android:background="@drawable/bg_circle_light"
-        app:layout_constraintCircle="@id/ivNotificationIcon"
-        app:layout_constraintCircleRadius="20dp"
-        app:layout_constraintCircleAngle="45"
-        tools:ignore="MissingConstraints"
-        android:visibility="gone"/>
-
-    <TextView
-        android:id="@+id/tvNotificationTitle"
-        android:layout_width="0dp"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:textStyle="bold"
-        android:textSize="@dimen/text_size_normal"
-        android:textColor="@color/primaryText"
-        app:layout_constraintStart_toEndOf="@id/ivNotificationIcon"
-        app:layout_constraintTop_toTopOf="@id/ivNotificationIcon"
-        app:layout_constraintEnd_toEndOf="parent"
-        tools:text="Yêu cầu điểm danh"/>
+        android:padding="16dp">
 
-    <TextView
-        android:id="@+id/tvNotificationMessage"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:textSize="@dimen/text_size_small"
-        android:textColor="@color/gray"
-        android:layout_marginTop="4dp"
-        app:layout_constraintStart_toStartOf="@id/tvNotificationTitle"
-        app:layout_constraintTop_toBottomOf="@id/tvNotificationTitle"
-        app:layout_constraintEnd_toEndOf="parent"
-        tools:text="Bạn có một yêu cầu điểm danh khuôn mặt cho môn Lập trình di động."/>
+        <!-- Notification Icon -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardNotificationIcon"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            app:cardCornerRadius="24dp"
+            app:cardBackgroundColor="#E8F2FF"
+            app:cardElevation="0dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
 
-    <TextView
-        android:id="@+id/tvNotificationDate"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textSize="@dimen/text_size_small"
-        android:textColor="@color/gray"
-        android:layout_marginTop="8dp"
-        app:layout_constraintStart_toStartOf="@id/tvNotificationMessage"
-        app:layout_constraintTop_toBottomOf="@id/tvNotificationMessage"
-        tools:text="Jul 26, 2025, 08:00"/>
+            <ImageView
+                android:id="@+id/ivNotificationIcon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_notification"
+                app:tint="#0961F5"
+                android:contentDescription="Notification icon" />
 
-    <!-- Divider line -->
-    <View
-        android:id="@+id/divider"
-        android:layout_width="0dp"
-        android:layout_height="1dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:background="@color/lightGray"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvNotificationDate" />
+        </com.google.android.material.card.MaterialCardView>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+        <!-- Unread Indicator -->
+        <View
+            android:id="@+id/unreadIndicator"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:background="@drawable/bg_circle_light"
+            android:backgroundTint="#EF4444"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="@id/cardNotificationIcon"
+            app:layout_constraintTop_toTopOf="@id/cardNotificationIcon"
+            tools:visibility="visible" />
+
+        <!-- Notification Title -->
+        <TextView
+            android:id="@+id/tvNotificationTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="8dp"
+            android:fontFamily="@font/jostsemibold"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:textColor="#1E293B"
+            android:maxLines="2"
+            android:ellipsize="end"
+            app:layout_constraintStart_toEndOf="@id/cardNotificationIcon"
+            app:layout_constraintTop_toTopOf="@id/cardNotificationIcon"
+            app:layout_constraintEnd_toStartOf="@id/tvNotificationTime"
+            tools:text="Face ID Verification Request" />
+
+        <!-- Notification Time -->
+        <TextView
+            android:id="@+id/tvNotificationTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/mulishbold"
+            android:textSize="12sp"
+            android:textColor="#64748B"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@id/tvNotificationTitle"
+            tools:text="2m ago" />
+
+        <!-- Notification Message -->
+        <TextView
+            android:id="@+id/tvNotificationMessage"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="6dp"
+            android:fontFamily="@font/mulishbold"
+            android:textSize="14sp"
+            android:textColor="#475569"
+            android:maxLines="3"
+            android:ellipsize="end"
+            android:lineSpacingExtra="2dp"
+            app:layout_constraintStart_toEndOf="@id/cardNotificationIcon"
+            app:layout_constraintTop_toBottomOf="@id/tvNotificationTitle"
+            app:layout_constraintEnd_toEndOf="parent"
+            tools:text="Bạn có một yêu cầu xác thực khuôn mặt cho môn Lập trình di động. Vui lòng hoàn thành trong vòng 5 phút." />
+
+        <!-- Notification Date/Details -->
+        <TextView
+            android:id="@+id/tvNotificationDate"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="8dp"
+            android:fontFamily="@font/mulishextrabold"
+            android:textSize="12sp"
+            android:textColor="#94A3B8"
+            app:layout_constraintStart_toEndOf="@id/cardNotificationIcon"
+            app:layout_constraintTop_toBottomOf="@id/tvNotificationMessage"
+            app:layout_constraintEnd_toEndOf="parent"
+            tools:text="Today, 08:30 AM • Mobile Programming" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</com.google.android.material.card.MaterialCardView>

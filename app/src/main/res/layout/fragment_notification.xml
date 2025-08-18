@@ -1,104 +1,138 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:orientation="vertical"
+    android:id="@+id/flNotificationRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="@dimen/padding_default"
-    android:background="@color/white">
+    android:fitsSystemWindows="true"
+    android:background="#F5F9FF">
 
-    <!-- Header -->
+    <!-- Main content container -->
     <LinearLayout
+        android:id="@+id/llNotificationContainer"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:paddingTop="?attr/actionBarSize">
+
+        <!-- Main Card - contains all notification content -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardNotificationMain"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="48dp"
+            app:cardCornerRadius="16dp"
+            app:cardBackgroundColor="#FFFFFF"
+            app:strokeColor="#FFFFFF"
+            app:cardElevation="4dp">
+
+            <LinearLayout
+                android:id="@+id/llNotificationContent"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+              >
+
+                <!-- Tab Layout -->
+                <com.google.android.material.tabs.TabLayout
+                    android:id="@+id/tabNotification"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@android:color/transparent"
+                    app:tabIndicatorColor="#0961F5"
+                    app:tabMode="scrollable"
+                    app:tabGravity="start"
+                    app:tabTextColor="#64748B"
+                    app:tabSelectedTextColor="#0961F5" />
+
+                <!-- ViewPager2 - takes remaining space -->
+                <androidx.viewpager2.widget.ViewPager2
+                    android:id="@+id/viewPagerNotification"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:layout_marginTop="8dp"
+                    android:clipToPadding="false"
+                    android:overScrollMode="never" />
+
+                <!-- Empty State -->
+                <LinearLayout
+                    android:id="@+id/notificationEmptyState"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:layout_width="120dp"
+                        android:layout_height="120dp"
+                        android:src="@drawable/ic_notification_empty"
+                        app:tint="#CCCCCC" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:text="No notifications yet"
+                        android:textColor="#64748B"
+                        android:textSize="16sp"
+                        android:fontFamily="@font/mulishbold" />
+
+                    <TextView
+                        android:id="@+id/tvNotificationHistory"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="Check notification history"
+                        android:textColor="#0961F5"
+                        android:textSize="14sp"
+                        android:fontFamily="@font/mulishbold" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+
+    <!-- Toolbar custom overlay -->
+    <LinearLayout
+        android:id="@+id/llNotificationToolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingVertical="8dp">
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:background="@android:color/transparent"
+        android:elevation="4dp">
 
-        <ImageButton
+        <ImageView
             android:id="@+id/btnBack"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            app:tint="@color/primary"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_back"
-            android:contentDescription="@string/back" />
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_arrow_back"
+            android:contentDescription="Back"
+            app:tint="#232B42" />
 
         <TextView
             android:id="@+id/tvNotificationTitle"
-            android:layout_width="0dp"
-            android:layout_weight="1"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/notification_title"
-            android:textSize="@dimen/text_size_title"
+            android:layout_marginStart="16dp"
+            android:text="Notifications"
+            android:textColor="#232B42"
+            android:textSize="20sp"
             android:textStyle="bold"
-            android:textColor="@color/primaryText"
-            android:gravity="center" />
+            android:fontFamily="@font/jostsemibold" />
 
-        <ImageButton
-            android:id="@+id/btnSettings"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            app:tint="@color/gray"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_settings"
-            android:contentDescription="@string/settings" />
     </LinearLayout>
 
-    <!-- Tab Layout -->
-    <com.google.android.material.tabs.TabLayout
-        android:id="@+id/tabNotification"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="start"
-        android:background="@android:color/transparent"
-        app:tabIndicatorColor="@color/primary"
-        app:tabMode="scrollable"
-        app:tabGravity="center"
-        app:tabTextColor="@color/gray"
-        app:tabSelectedTextColor="@color/primary" />
-
-    <!-- ViewPager2 -->
-    <androidx.viewpager2.widget.ViewPager2
-        android:id="@+id/viewPagerNotification"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:clipToPadding="false"
-        android:paddingTop="4dp"
-        android:paddingBottom="56dp"
-        android:overScrollMode="never" />
-
-    <!-- Empty State -->
-    <LinearLayout
-        android:id="@+id/notificationEmptyState"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:visibility="gone">
-
-        <ImageView
-            android:layout_width="@dimen/image_empty_state"
-            android:layout_height="@dimen/image_empty_state"
-            android:src="@drawable/ic_notification_empty" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/notification_empty"
-            android:textSize="@dimen/text_size_normal"
-            android:textColor="@color/gray"
-            android:layout_marginTop="@dimen/margin_small" />
-
-        <TextView
-            android:id="@+id/tvNotificationHistory"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/notification_history_link"
-            android:textColor="@color/primary"
-            android:textSize="@dimen/text_size_small"
-            android:layout_marginTop="@dimen/margin_small" />
-    </LinearLayout>
-</LinearLayout>
+</FrameLayout>

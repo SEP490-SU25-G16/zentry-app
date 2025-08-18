@@ -1,5 +1,6 @@
 package vn.edu.fpt.zentryapp.student.ui.schedule;
 
+import android.annotation.SuppressLint;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
@@ -200,8 +201,14 @@ public class StudentScheduleClassDetailFragment extends Fragment {
     }
 
     private void updateAttendanceStatistics(StudentFinalAttendanceDto attendanceData) {
+        Log.d(TAG, "=== ATTENDANCE DATA DEBUG ===");
+        Log.d(TAG, "AttendedRoundsCount: " + attendanceData.getAttendedRoundsCount());
+        Log.d(TAG, "TotalRounds: " + attendanceData.getTotalRounds());
+        Log.d(TAG, "MissedRoundsCount: " + attendanceData.getMissedRoundsCount());
+        Log.d(TAG, "FinalAttendancePercentage: " + attendanceData.getFinalAttendancePercentage());
+        Log.d(TAG, "FinalStatus: " + attendanceData.getFinalStatus());
         // ✅ Update attended rounds
-        binding.tvAttendedRounds.setText(String.valueOf(attendanceData.getAttendedRoundsCount()));
+        binding.tvAttendedRounds.setText(attendanceData.getAttendedRoundsCount() + "");
 
         // ✅ Update missed rounds
         int missedRounds = attendanceData.getTotalRounds() - attendanceData.getAttendedRoundsCount();
@@ -212,95 +219,60 @@ public class StudentScheduleClassDetailFragment extends Fragment {
         binding.tvAttendancePercentage.setText(percentage + "%");
 
         // ✅ Update total rounds display
-        String totalDisplay = String.format("Total: %d/%d",
+        @SuppressLint("DefaultLocale") String totalDisplay = String.format("Total: %d/%d",
                 attendanceData.getAttendedRoundsCount(),
                 attendanceData.getTotalRounds());
         binding.tvTotalRounds.setText(totalDisplay);
-
-        // ✅ Update percentage circle color based on attendance
-        if (percentage >= 80) {
-            // Green for good attendance (80%+)
-            binding.tvAttendancePercentage.getParent(); // MaterialCardView parent will keep green background
-        } else if (percentage >= 50) {
-            // Could add orange/yellow for medium attendance if needed
-        } else {
-            // Could add red background for low attendance if needed
-        }
     }
 
     private void updateFinalStatusButton(StudentFinalAttendanceDto attendanceData) {
-        String status;
+        String status = attendanceData.getFinalStatus(); // "Attended", "Absent", "Future" (hoặc giá trị khác)
+        String displayStatus; // Hiển thị ra nút
         String backgroundColor;
 
-        String sessionStatus = attendanceData.getSessionStatus().toLowerCase();
-
-        // ✅ Check if Active session has ended
-        boolean isActiveSessionEnded = false;
-        if ("active".equals(sessionStatus) && session != null) {
-            Date currentTime = new Date();
-            Date endTime = session.getEndTimeAsDate();
-
-            if (endTime != null) {
-                isActiveSessionEnded = currentTime.after(endTime);
-                Log.d(TAG, String.format("Active session check: CurrentTime=%s, EndTime=%s, HasEnded=%s",
-                        currentTime, endTime, isActiveSessionEnded));
+        if (status == null) {
+            displayStatus = "Unknown";
+            backgroundColor = "#64748B"; // Gray
+        } else {
+            switch (status.toLowerCase()) {
+                case "attended":
+                    displayStatus = "Attended";
+                    backgroundColor = "#10B981"; // Green
+                    break;
+                case "present": // TH nếu backend dùng "Present"
+                    displayStatus = "Present";
+                    backgroundColor = "#10B981"; // Green
+                    break;
+                case "absent":
+                    displayStatus = "Absent";
+                    backgroundColor = "#EF4444"; // Red
+                    break;
+                case "future":   // Tương lai, chưa tới buổi này
+                    displayStatus = "Future";
+                    backgroundColor = "#AAAAAA"; // Gray
+                    break;
+                default:
+                    displayStatus = capitalizeFirst(status); // Nếu có giá trị lạ
+                    backgroundColor = "#64748B"; // Gray
+                    break;
             }
         }
 
-        // ✅ Determine status and color
-        switch (sessionStatus) {
-            case "active":
-                if (isActiveSessionEnded) {
-                    // Active session has ended - check attendance
-                    if (attendanceData.getFinalAttendancePercentage() >= 80.0) {
-                        status = "Attended";
-                        backgroundColor = "#10B981"; // Green
-                    } else {
-                        status = "Absent";
-                        backgroundColor = "#EF4444"; // Red
-                    }
-                } else {
-                    // Active and still ongoing
-                    status = "Ongoing";
-                    backgroundColor = "#F59E0B"; // Orange
-                }
-                break;
-
-            case "completed":
-                // Session completed - check attendance percentage
-                if (attendanceData.getFinalAttendancePercentage() >= 80.0) {
-                    status = "Attended";
-                    backgroundColor = "#10B981"; // Green
-                } else {
-                    status = "Absent";
-                    backgroundColor = "#EF4444"; // Red
-                }
-                break;
-
-            case "missed":
-                // Session was missed
-                status = "Missed";
-                backgroundColor = "#EF4444"; // Red
-                break;
-
-            default:
-                // Fallback
-                status = "Unknown";
-                backgroundColor = "#64748B"; // Gray
-                break;
-        }
-
-        // ✅ Update final status button
-        binding.btnFinalAttendanceStatus.setText(status);
+        binding.btnFinalAttendanceStatus.setText(displayStatus);
         binding.btnFinalAttendanceStatus.setBackgroundTintList(
                 android.content.res.ColorStateList.valueOf(Color.parseColor(backgroundColor))
         );
+        // Nếu muốn disable nút khi future:
+        binding.btnFinalAttendanceStatus.setEnabled(!"future".equalsIgnoreCase(status));
 
-        Log.d(TAG, String.format("Final status updated: %s (Session: %s, IsActiveEnded: %s, Percentage: %.1f%%)",
-                status, attendanceData.getSessionStatus(), isActiveSessionEnded,
-                attendanceData.getFinalAttendancePercentage()));
+        Log.d(TAG, String.format("Final status updated: %s (FinalStatus: %s)", displayStatus, status));
     }
-    
+
+    private String capitalizeFirst(String input) {
+        if (input == null || input.isEmpty()) return "";
+        return input.substring(0, 1).toUpperCase() + input.substring(1).toLowerCase();
+    }
+
     // ✅ NEW: Method to stop BLE attendance service when session ends (fallback for FCM failures)
     private void stopBLEAttendanceServiceIfNeeded() {
         try {

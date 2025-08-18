@@ -55,7 +55,6 @@ public class NotificationFragment extends Fragment {
         emptyStateView = view.findViewById(R.id.notificationEmptyState);
         tvGoToHistory = view.findViewById(R.id.tvNotificationHistory);
         btnBack = view.findViewById(R.id.btnBack);
-        btnSettings = view.findViewById(R.id.btnSettings);
 
         // Initialize ViewModel
         // Scope theo fragment để tránh share giữa Lecturer/Student
@@ -73,10 +72,6 @@ public class NotificationFragment extends Fragment {
 
         // Navigation actions
         btnBack.setOnClickListener(v -> requireActivity().onBackPressed());
-        btnSettings.setOnClickListener(v -> {
-            // Use FragmentManager for manual navigation - more reliable
-            navigateToStudentSettingNotificationFragment();
-        });
         tvGoToHistory.setOnClickListener(v ->
                 Toast.makeText(getContext(), "Navigate to historical notifications...", Toast.LENGTH_SHORT).show());
 
@@ -213,7 +208,7 @@ public class NotificationFragment extends Fragment {
         Log.d("NotificationFragment", "🔄 onResume: Re-registering broadcast receiver");
         
         // Re-register receiver when fragment resumes
-        registerNotificationReceiver();
+       // registerNotificationReceiver();
         
         // 🔧 NEW: In-app polling to refresh periodically (no FCM)
         startInAppPolling();
@@ -247,28 +242,6 @@ public class NotificationFragment extends Fragment {
                     .unregisterReceiver(reloadReceiver);
         } catch (Exception e) {
             Log.e("NotificationFragment", "Error unregistering receiver in onDestroyView", e);
-        }
-    }
-
-    // Alternative navigation method using FragmentManager
-    private void navigateToStudentSettingNotificationFragment() {
-        try {
-            Log.d("NotificationFragment", "Navigating to StudentSettingNotificationFragment");
-            
-            // Tạo fragment với source là NotificationFragment
-            Fragment settingsFragment = StudentSettingNotificationFragment.newInstance(
-                    StudentSettingNotificationFragment.SOURCE_NOTIFICATION);
-            
-            // Sử dụng FragmentTransaction để replace và add to back stack
-            requireActivity().getSupportFragmentManager()
-                    .beginTransaction()
-                    .replace(((ViewGroup)getView().getParent()).getId(), settingsFragment)
-                    .addToBackStack(null) // Sử dụng null để thêm vào back stack mặc định
-                    .commit();
-                    
-        } catch (Exception e) {
-            Log.e("NotificationFragment", "Navigation error", e);
-            Toast.makeText(getContext(), "Không thể mở cài đặt thông báo", Toast.LENGTH_SHORT).show();
         }
     }
 

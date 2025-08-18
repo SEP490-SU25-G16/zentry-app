@@ -64,8 +64,8 @@ public class StudentReportFragment extends Fragment implements StudentReportAdap
         }
 
         // 🔧 NEW: Register broadcast receiver for real-time notification updates
-        androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(requireContext())
-                .registerReceiver(notificationUpdateReceiver, new android.content.IntentFilter("vn.edu.fpt.zentryapp.NOTIFICATIONS_UPDATED"));
+//        androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(requireContext())
+//                .registerReceiver(notificationUpdateReceiver, new android.content.IntentFilter("vn.edu.fpt.zentryapp.NOTIFICATIONS_UPDATED"));
 
         setupRecyclerView();
         setupClickListeners();
@@ -225,12 +225,12 @@ public class StudentReportFragment extends Fragment implements StudentReportAdap
         super.onDestroyView();
         
         // 🔧 NEW: Unregister broadcast receiver
-        try {
-            androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(requireContext())
-                    .unregisterReceiver(notificationUpdateReceiver);
-        } catch (Exception e) {
-            Log.e(TAG, "Error unregistering notification receiver", e);
-        }
+//        try {
+//            androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(requireContext())
+//                    .unregisterReceiver(notificationUpdateReceiver);
+//        } catch (Exception e) {
+//            Log.e(TAG, "Error unregistering notification receiver", e);
+//        }
         
         binding = null;
     }

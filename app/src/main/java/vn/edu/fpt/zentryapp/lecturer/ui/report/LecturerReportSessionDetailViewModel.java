@@ -195,22 +195,10 @@ public class LecturerReportSessionDetailViewModel extends ViewModel {
 
                 if (response.isSuccessful() && response.body() != null) {
                     ApiResponseDto<Void> apiResponse = response.body();
-
                     if (apiResponse.isSuccess()) {
-                        // ✅ API call successful, update UI
-                        updateStudentAttendanceInUI(student);
                         _attendanceUpdated.setValue(true);
-
                         Log.d(TAG, "✅ Successfully updated attendance for: " + student.getFullName());
-                    } else {
-                        String error = apiResponse.getError() != null ? apiResponse.getError() : "Failed to update attendance";
-                        _errorMessage.setValue("Update failed: " + error);
-                        Log.e(TAG, "❌ API Error: " + error);
                     }
-                } else {
-                    String error = "HTTP Error: " + response.code() + " - " + response.message();
-                    _errorMessage.setValue("Update failed: " + error);
-                    Log.e(TAG, "❌ " + error);
                 }
             }
 
@@ -222,46 +210,6 @@ public class LecturerReportSessionDetailViewModel extends ViewModel {
                 Log.e(TAG, "❌ Network Error", t);
             }
         });
-    }
-
-    private void updateStudentAttendanceInUI(Student updatedStudent) {
-        List<Student> currentStudents = _students.getValue();
-        if (currentStudents == null) return;
-
-        // ✅ Find and update the student in the list
-        for (Student student : currentStudents) {
-            if (student.getStudentId().equals(updatedStudent.getStudentId())) {
-                // Toggle the attendance status
-                if ("present".equalsIgnoreCase(student.getAttendanceStatus())) {
-                    student.setAttendanceStatus("absent");
-                } else {
-                    student.setAttendanceStatus("present");
-                }
-                break;
-            }
-        }
-
-        // ✅ Update the LiveData to refresh UI
-        _students.setValue(new ArrayList<>(currentStudents));
-
-        // ✅ Update session attendance counts
-        updateSessionAttendanceCounts(currentStudents);
-    }
-
-
-    private void updateSessionAttendanceCounts(List<Student> students) {
-        SessionDetailInfo currentSessionInfo = _sessionInfo.getValue();
-        if (currentSessionInfo == null) return;
-
-        int presentCount = 0;
-        for (Student student : students) {
-            if (student.isPresent()) {
-                presentCount++;
-            }
-        }
-
-        currentSessionInfo.setPresentStudents(presentCount);
-        _sessionInfo.setValue(currentSessionInfo);
     }
 
     /* ---------- Refresh data ---------- */

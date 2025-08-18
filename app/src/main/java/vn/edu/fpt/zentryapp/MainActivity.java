@@ -1,6 +1,9 @@
 package vn.edu.fpt.zentryapp;
 
 import android.Manifest;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -16,25 +19,26 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.lifecycle.ViewModelProvider;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import vn.edu.fpt.zentryapp.notification.sharedviewmodel.NotificationViewModel;
 import vn.edu.fpt.zentryapp.service.AttendanceModels;
 import vn.edu.fpt.zentryapp.service.ManualAttendanceSyncService;
 import vn.edu.fpt.zentryapp.service.NetworkStateManager;
 import vn.edu.fpt.zentryapp.service.OfflineSubmissionManager;
 
 public class MainActivity extends AppCompatActivity {
+    private static final String TAG = "MainActivity";
     private ManualAttendanceSyncService syncService;
-    // ➕ THÊM PERMISSION LAUNCHER
     private ActivityResultLauncher<String[]> blePermissionLauncher;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
         // ➕ SETUP PERMISSION LAUNCHER TRƯỚC KHI REQUEST
         setupBLEPermissionLauncher();
 

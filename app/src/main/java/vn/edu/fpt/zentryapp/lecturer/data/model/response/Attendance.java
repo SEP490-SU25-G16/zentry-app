@@ -10,9 +10,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Getter
 public class Attendance {
-    private String studentCode;  // Này sẽ lưu StudentCode từ API
+    private String studentCode;
     private String studentName;
-    private boolean finalStatus; // true = attended, false = absent
+    private String status; // "Attended", "Absent", "Future"
     private int totalRounds;
     private int attendedRounds;
     private int roundNumber;
@@ -22,10 +22,23 @@ public class Attendance {
     }
 
     public String getAttendanceStatus() {
-        return finalStatus ? "Attended" : "Absent";
+        // Trả về luôn chữ ban đầu hoặc viết hoa chữ đầu
+        return status != null ? capitalizeFirst(status) : "Unknown";
     }
 
     public int getAttendanceStatusColor() {
-        return finalStatus ? 0xFF4CAF50 : 0xFFE53935; // Green : Red
+        // Green nếu attended, Red nếu absent, Gray nếu future
+        if ("Attended".equalsIgnoreCase(status)) return 0xFF4CAF50;
+        if ("Future".equalsIgnoreCase(status)) return 0xFFAAAAAA;
+        return 0xFFE53935; // Absent
     }
+
+    private String capitalizeFirst(String input) {
+        if (input == null || input.isEmpty()) return input;
+        return input.substring(0, 1).toUpperCase() + input.substring(1).toLowerCase();
+    }
+
+    public boolean isFuture() { return "Future".equalsIgnoreCase(status); }
+    public boolean isAttended() { return "Attended".equalsIgnoreCase(status); }
+    public boolean isAbsent() { return "Absent".equalsIgnoreCase(status); }
 }

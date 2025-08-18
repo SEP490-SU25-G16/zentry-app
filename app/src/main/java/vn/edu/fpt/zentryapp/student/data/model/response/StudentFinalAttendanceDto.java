@@ -38,6 +38,8 @@ public class StudentFinalAttendanceDto {
 
     @SerializedName("MissedRoundsCount")
     private int missedRoundsCount;
+    @SerializedName("FinalStatus")      // ✅ Bổ sung trường này
+    private String finalStatus;         // "Attended", "Absent", "Future"
 
     @SerializedName("RoundDetails")
     private List<RoundAttendanceDetailDto> roundDetails = new ArrayList<>();
