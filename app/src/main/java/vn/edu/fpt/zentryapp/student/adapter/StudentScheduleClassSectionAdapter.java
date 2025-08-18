@@ -571,6 +571,12 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
 
         @RequiresApi(api = Build.VERSION_CODES.O)
         private void showJoinConfirmation(StudentScheduleClassSection session) {
+            if (!isDeviceRegistered()) {
+                Toast.makeText(itemView.getContext(),
+                        "Device not registered. Please register your device first in Settings.",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
             Dialog dialog = new Dialog(itemView.getContext());
             dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
             dialog.setContentView(R.layout.dialog_join_class_confirmation);
@@ -595,6 +601,13 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
 
             dialog.setCancelable(true);
             dialog.show();
+        }
+        private boolean isDeviceRegistered() {
+            boolean registered = authManager.isDeviceRegistered();
+
+            Log.d(TAG, "Device registration check: " + (registered ? "✅ Registered" : "❌ Not Registered"));
+
+            return registered;
         }
 
         @SuppressLint("NotifyDataSetChanged")

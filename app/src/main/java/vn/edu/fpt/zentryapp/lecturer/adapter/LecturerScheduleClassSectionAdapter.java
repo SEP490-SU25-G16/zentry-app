@@ -309,6 +309,13 @@ public class LecturerScheduleClassSectionAdapter extends RecyclerView.Adapter<Le
 
         @RequiresApi(api = Build.VERSION_CODES.O)
         private void showStartConfirmation(LecturerScheduleClassSection session) {
+            if (!isDeviceRegistered()) {
+                Toast.makeText(itemView.getContext(),
+                        "Device not registered. Please register your device first in Settings.",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+
             Dialog dialog = new Dialog(itemView.getContext());
             dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
             dialog.setContentView(R.layout.dialog_start_class_confirmation);
@@ -333,6 +340,14 @@ public class LecturerScheduleClassSectionAdapter extends RecyclerView.Adapter<Le
 
             dialog.setCancelable(true);
             dialog.show();
+        }
+
+        private boolean isDeviceRegistered() {
+            boolean registered = authManager.isDeviceRegistered();
+
+            Log.d(TAG, "Device registration check: " + (registered ? "✅ Registered" : "❌ Not Registered"));
+
+            return registered;
         }
 
         @RequiresApi(api = Build.VERSION_CODES.O)
