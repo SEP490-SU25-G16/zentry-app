@@ -48,15 +48,9 @@ public class LecturerSettingFragment extends Fragment {
         viewModel = new ViewModelProvider(this).get(LecturerSettingViewModel.class);
         AuthManager authManager = AuthManager.getInstance(requireContext());
         viewModel.init(authManager);
-        hasDevice = checkIfDeviceRegistered();
+        hasDevice = authManager.isDeviceRegistered();
         setupClickListeners();
         observeViewModel();
-    }
-
-    // Thêm các phương thức kiểm tra trạng thái như Student
-    private boolean checkIfDeviceRegistered() {
-        return getContext().getSharedPreferences("prefs", 0)
-                .getBoolean("device_registered", false);
     }
 
     private void setupClickListeners() {

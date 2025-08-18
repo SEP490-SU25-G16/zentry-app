@@ -73,7 +73,7 @@ public class StudentSettingFragment extends Fragment {
         navController = NavHostFragment.findNavController(this);
 
         // Khởi tạo trạng thái đăng ký thiết bị và Face ID từ lưu trữ hoặc API
-        hasDevice = checkIfDeviceRegistered();
+        hasDevice = authManager.isDeviceRegistered();
         hasFaceId = checkIfFaceIdRegistered();
 
         // Fetch latest HasFaceId from API and update cache
@@ -246,12 +246,6 @@ public class StudentSettingFragment extends Fragment {
 
         binding.tvStudentSettingName.setText(authManager.getCurrentUserName());
         binding.tvStudentSettingEmail.setText(authManager.getCurrentUserEmail());
-    }
-
-    private boolean checkIfDeviceRegistered() {
-        // Ví dụ: đọc từ SharedPreferences
-        return getContext().getSharedPreferences("prefs", 0)
-                .getBoolean("device_registered", false);
     }
 
     private boolean checkIfFaceIdRegistered() {

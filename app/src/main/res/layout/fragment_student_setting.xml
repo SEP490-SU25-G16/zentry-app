@@ -187,39 +187,6 @@
                     android:background="#E0E0E0"/>
 
                 <!-- Option: Face ID -->
-                <LinearLayout
-                    android:id="@+id/llStudentSettingRowFaceId"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingVertical="12dp">
-
-                    <ImageView
-                        android:id="@+id/ivStudentSettingFaceIdIcon"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@drawable/ic_faceid"
-                        app:tint="#202244"/>
-
-                    <TextView
-                        android:id="@+id/tvStudentSettingFaceId"
-                        android:fontFamily="@font/mulishbold"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginStart="12dp"
-                        android:text="Face ID"
-                        android:textSize="16sp"
-                        android:textColor="#232B42"/>
-
-                    <ImageView
-                        android:id="@+id/ivStudentSettingFaceIdArrow"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@drawable/ic_arrow_right_detail"
-                        app:tint="#666666"/>
-                </LinearLayout>
 
                 <!-- ✅ NEW: Face ID Loading Indicator -->
                 <LinearLayout
@@ -243,6 +210,40 @@
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:indeterminateTint="#6367F1"/>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/llStudentSettingRowFaceId"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingVertical="12dp">
+
+                    <ImageView
+                        android:id="@+id/ivStudentSettingFaceIdIcon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_faceid"
+                        app:tint="#202244" />
+
+                    <TextView
+                        android:id="@+id/tvStudentSettingFaceId"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:fontFamily="@font/mulishbold"
+                        android:text="Face ID"
+                        android:textColor="#232B42"
+                        android:textSize="16sp" />
+
+                    <ImageView
+                        android:id="@+id/ivStudentSettingFaceIdArrow"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_arrow_right_detail"
+                        app:tint="#666666" />
                 </LinearLayout>
 
                 <View

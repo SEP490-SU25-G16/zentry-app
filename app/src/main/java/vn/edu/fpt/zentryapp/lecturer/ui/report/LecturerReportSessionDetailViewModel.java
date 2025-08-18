@@ -232,7 +232,11 @@ public class LecturerReportSessionDetailViewModel extends ViewModel {
         for (Student student : currentStudents) {
             if (student.getStudentId().equals(updatedStudent.getStudentId())) {
                 // Toggle the attendance status
-                student.setPresent(!student.isPresent());
+                if ("present".equalsIgnoreCase(student.getAttendanceStatus())) {
+                    student.setAttendanceStatus("absent");
+                } else {
+                    student.setAttendanceStatus("present");
+                }
                 break;
             }
         }
@@ -243,6 +247,7 @@ public class LecturerReportSessionDetailViewModel extends ViewModel {
         // ✅ Update session attendance counts
         updateSessionAttendanceCounts(currentStudents);
     }
+
 
     private void updateSessionAttendanceCounts(List<Student> students) {
         SessionDetailInfo currentSessionInfo = _sessionInfo.getValue();

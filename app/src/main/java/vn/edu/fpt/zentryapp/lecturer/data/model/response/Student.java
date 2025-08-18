@@ -12,19 +12,19 @@ public class Student {
     private String studentCode;
     private String fullName;
     private String email;
-    private boolean isPresent;
-    private String attendanceStatus;
+    private String attendanceStatus; // "present" hoặc "absent"
     private String enrollmentId;
     private String enrollmentStatus;
     private String enrolledAt;
 
     // Helper methods
-    public String getAttendanceStatus() {
-        return isPresent ? "Attended" : "Absented";
+    public boolean isPresent() {
+        return "present".equalsIgnoreCase(attendanceStatus);
     }
 
     public int getAttendanceStatusColor() {
-        return isPresent ? 0xFF059669 : 0xFFE53935; // Green : Red
+        // Xanh nếu đi học, đỏ nếu vắng
+        return isPresent() ? 0xFF059669 : 0xFFE53935;
     }
 
     public String getDisplayName() {

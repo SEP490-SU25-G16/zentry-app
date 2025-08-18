@@ -46,7 +46,7 @@ public interface LecturerApiService {
     );
     @GET("/api/user/{user_id}")
     Call<ApiResponseDto<UserDto>> getUserProfile(@Path("user_id") String userId);
-    @PUT("attendance/sessions/{sessionId}/students/{studentId}/status")
+    @PUT("/api/attendance/sessions/{sessionId}/students/{studentId}/status")
     Call<ApiResponseDto<Void>> updateStudentAttendanceStatus(
             @Path("sessionId") String sessionId,
             @Path("studentId") String studentId
