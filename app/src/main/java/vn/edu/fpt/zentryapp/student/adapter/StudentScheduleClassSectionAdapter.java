@@ -577,6 +577,12 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
                         Toast.LENGTH_LONG).show();
                 return;
             }
+            if (!isFaceIdRegistered()) {
+                Toast.makeText(itemView.getContext(),
+                        "FaceId not registered. Please register your faceid first in Settings.",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
             Dialog dialog = new Dialog(itemView.getContext());
             dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
             dialog.setContentView(R.layout.dialog_join_class_confirmation);
@@ -608,6 +614,13 @@ public class StudentScheduleClassSectionAdapter extends RecyclerView.Adapter<Stu
             Log.d(TAG, "Device registration check: " + (registered ? "✅ Registered" : "❌ Not Registered"));
 
             return registered;
+        }
+        private boolean isFaceIdRegistered() {
+            boolean faceIdRegistered = authManager.isFaceIdRegistered();
+
+            Log.d(TAG, "FaceID registration check: " + (faceIdRegistered ? "✅ Registered" : "❌ Not Registered"));
+
+            return faceIdRegistered;
         }
 
         @SuppressLint("NotifyDataSetChanged")

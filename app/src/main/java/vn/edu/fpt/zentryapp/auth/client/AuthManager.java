@@ -13,7 +13,7 @@ public class AuthManager {
     private static final String USER_INFO = "user_info";
     private static final String DEVICE_TOKEN = "device_token";
     private static final String DEVICE_ID = "device_id";
-
+    private static final String HAS_FACE_ID_KEY = "has_face_id";
     private static AuthManager instance;
     private final SharedPreferences sharedPreferences;
     private final Gson gson;
@@ -126,4 +126,27 @@ public class AuthManager {
     public boolean isLecturer() {
         return hasRole("Lecturer");
     }
+
+
+
+    // Per-user key
+    private String faceIdKeyForCurrentUser() {
+        String uid = getCurrentUserId();
+        return (uid != null && !uid.isEmpty())
+                ? HAS_FACE_ID_KEY + "_" + uid
+                : HAS_FACE_ID_KEY + "_anonymous";
+    }
+
+    // Setter
+    public void setFaceIdRegistered(boolean value) {
+        sharedPreferences.edit()
+                .putBoolean(faceIdKeyForCurrentUser(), value)
+                .apply();
+    }
+
+    // Getter
+    public boolean isFaceIdRegistered() {
+        return sharedPreferences.getBoolean(faceIdKeyForCurrentUser(), false);
+    }
+
 }

@@ -1,5 +1,7 @@
 package vn.edu.fpt.zentryapp.faceid.data.service;
 
+import static androidx.core.content.ContentProviderCompat.requireContext;
+
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Rect;
@@ -28,6 +30,7 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import vn.edu.fpt.zentryapp.auth.client.ApiClient;
+import vn.edu.fpt.zentryapp.auth.client.AuthManager;
 import vn.edu.fpt.zentryapp.faceid.data.api.FaceIdApiController;
 import vn.edu.fpt.zentryapp.faceid.data.model.response.FaceIdResponse;
 import vn.edu.fpt.zentryapp.faceid.data.model.response.FaceIdVerifyResponse;
@@ -871,6 +874,7 @@ public class FaceIdService {
                             FaceIdResponse responseBody = response.body();
                             if (responseBody.isSuccess()) {
                                 Log.d(TAG, "registerFaceId: SUCCESS - Face ID registered successfully");
+
                                 runOnMainThread(() -> callback.onSuccess("Face ID registered successfully"));
                             } else {
                                 String errorMsg = "Server error: " + responseBody.getMessage();
