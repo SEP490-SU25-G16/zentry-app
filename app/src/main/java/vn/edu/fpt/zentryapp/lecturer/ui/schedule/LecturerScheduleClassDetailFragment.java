@@ -92,8 +92,7 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
         
         // 🔍 Debug authentication state
         Log.d("LecturerScheduleClassDetail", "🔍 Debugging authentication state...");
-        authManager.debugAuthState();
-        
+
         viewModel.init(requireContext(), authManager, session);
 
         // Load notifications từ API để có dữ liệu cho badge
