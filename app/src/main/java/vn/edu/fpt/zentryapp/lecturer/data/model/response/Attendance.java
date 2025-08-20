@@ -29,6 +29,7 @@ public class Attendance {
     public int getAttendanceStatusColor() {
         // Green nếu attended, Red nếu absent, Gray nếu future
         if ("Attended".equalsIgnoreCase(status)) return 0xFF4CAF50;
+        if ("Present".equalsIgnoreCase(status)) return 0xFF4CAF50;
         if ("Future".equalsIgnoreCase(status)) return 0xFFAAAAAA;
         return 0xFFE53935; // Absent
     }
