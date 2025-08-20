@@ -249,10 +249,6 @@ public class MainActivity extends AppCompatActivity {
         if (!permissionsNeeded.isEmpty()) {
             android.util.Log.d("MainActivity", "Requesting " + permissionsNeeded.size() + " BLE permissions");
 
-            // Show explanation toast
-            Toast.makeText(this, "📱 Requesting BLE permissions for attendance features...",
-                    Toast.LENGTH_SHORT).show();
-
             // Request permissions
             blePermissionLauncher.launch(permissionsNeeded.toArray(new String[0]));
         } else {

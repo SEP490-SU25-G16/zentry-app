@@ -111,14 +111,11 @@ public class StudentReportFragment extends Fragment implements StudentReportAdap
                 } else {
                     // Fallback navigation if action isn't available
                     Log.w(TAG, "Navigation action not available, using fallback");
-                    Toast.makeText(requireContext(), "Đang chuyển đến thông báo...", Toast.LENGTH_SHORT).show();
-                    
                     // Try to find notificationFragment by ID
                     navController.navigate(R.id.notificationFragment);
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Navigation error: ", e);
-                Toast.makeText(requireContext(), "Chức năng thông báo đang được phát triển", Toast.LENGTH_SHORT).show();
             }
         });
     }

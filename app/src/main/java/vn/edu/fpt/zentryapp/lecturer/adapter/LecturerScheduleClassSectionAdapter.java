@@ -382,12 +382,8 @@ public class LecturerScheduleClassSectionAdapter extends RecyclerView.Adapter<Le
                 } else if (mainActivity != null) {
                     // ❌ Thiếu permissions, request lại
                     Log.w(TAG, "⚠️ BLE permissions missing, requesting...");
-                    Toast.makeText(itemView.getContext(), "Requesting BLE permissions for attendance...",
-                            Toast.LENGTH_SHORT).show();
 
                     mainActivity.requestBLEPermissions();
-                    Toast.makeText(itemView.getContext(), "Please try starting class again after granting permissions",
-                            Toast.LENGTH_LONG).show();
                 } else {
                     // ❌ Không tìm được MainActivity, fallback
                     Log.w(TAG, "⚠️ Cannot find MainActivity, starting service without permission check");
@@ -396,8 +392,6 @@ public class LecturerScheduleClassSectionAdapter extends RecyclerView.Adapter<Le
 
             } catch (Exception e) {
                 Log.e(TAG, "Failed to start BLE service", e);
-                Toast.makeText(itemView.getContext(), "Failed to start attendance service",
-                        Toast.LENGTH_SHORT).show();
             }
         }
 

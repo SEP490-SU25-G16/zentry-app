@@ -197,14 +197,12 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
                 } else {
                     // Fallback navigation if action isn't available
                     android.util.Log.w("LecturerScheduleClassDetail", "Navigation action not available, using fallback");
-                    Toast.makeText(requireContext(), "Đang chuyển đến thông báo...", Toast.LENGTH_SHORT).show();
-                    
+
                     // Try to find notificationFragment by ID
                     navController.navigate(R.id.notificationFragment);
                 }
             } catch (Exception e) {
                 android.util.Log.e("LecturerScheduleClassDetail", "Navigation error: ", e);
-                Toast.makeText(requireContext(), "Chức năng thông báo đang được phát triển", Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -358,7 +356,6 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
         String body = "Vui lòng xác thực khuôn mặt để tiếp tục.";
 
         Log.d("LecturerScheduleClassDetail", "📤 Calling viewModel.createFaceIdRequest with: " + minutes + " minutes");
-        Toast.makeText(requireContext(), "Đang gửi yêu cầu Face ID...", Toast.LENGTH_SHORT).show();
         viewModel.createFaceIdRequest(minutes, title, body);
         // Attach observers if not yet (idempotent safety)
         attachFaceIdObservers();
