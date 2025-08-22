@@ -8,38 +8,23 @@ import android.graphics.Rect;
 import android.graphics.YuvImage;
 import android.util.AttributeSet;
 import android.util.Log;
-import android.util.Size;
-import android.view.Surface;
 import android.view.ViewGroup;
-import android.view.OrientationEventListener;
-import android.view.Surface;
 import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.OptIn;
-import androidx.camera.core.Camera;
-import androidx.camera.core.CameraSelector;
-import androidx.camera.core.AspectRatio;
-import androidx.camera.core.ExperimentalGetImage;
-import androidx.camera.core.ImageAnalysis;
-import androidx.camera.core.ImageCapture;
-import androidx.camera.core.ImageCaptureException;
-import androidx.camera.core.ImageProxy;
-import androidx.camera.core.Preview;
-import androidx.camera.lifecycle.ProcessCameraProvider;
-import androidx.camera.view.PreviewView;
-import androidx.core.content.ContextCompat;
+
+import com.otaliastudios.cameraview.CameraListener;
+import com.otaliastudios.cameraview.PictureResult;
+import com.otaliastudios.cameraview.frame.Frame;
+import com.otaliastudios.cameraview.frame.FrameProcessor;
+import com.otaliastudios.cameraview.controls.Facing;
+import com.otaliastudios.cameraview.controls.Mode;
 import androidx.lifecycle.LifecycleOwner;
 
 import vn.edu.fpt.zentryapp.BuildConfig;
-import com.google.common.util.concurrent.ListenableFuture;
-
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -48,15 +33,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class CameraView extends FrameLayout {
     private static final String TAG = "CameraView";
     
-    private PreviewView previewView;
-    private Preview preview;
-    private Camera camera;
-    private ProcessCameraProvider cameraProvider;
-    private ImageCapture imageCapture;
-    private ImageAnalysis imageAnalysis;
-    private final Executor executor = Executors.newSingleThreadExecutor();
+    // Switched to natario CameraView as the rendering & capture engine
+    private com.otaliastudios.cameraview.CameraView natarioView;
     private AtomicBoolean processingFrame = new AtomicBoolean(false);
-    private OrientationEventListener orientationEventListener;
     
     // Biến để log info chỉ một lần
     private boolean hasLoggedImageInfo = false;
@@ -87,11 +66,15 @@ public class CameraView extends FrameLayout {
     }
     
     private void init(Context context) {
-        // Create and add PreviewView
-        previewView = new PreviewView(context);
-        addView(previewView, new FrameLayout.LayoutParams(
+        // Create and add natario CameraView
+        natarioView = new com.otaliastudios.cameraview.CameraView(context);
+        natarioView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
+        // Configure defaults
+        natarioView.setFacing(Facing.FRONT);
+        natarioView.setMode(Mode.PICTURE);
+        addView(natarioView);
     }
     
     /**
@@ -108,424 +91,119 @@ public class CameraView extends FrameLayout {
      * @param frameCallback Callback for frame analysis
      */
     public void startCamera(LifecycleOwner lifecycleOwner, @Nullable FrameAnalysisCallback frameCallback) {
-        Log.d(TAG, "Starting camera with frame analysis: " + (frameCallback != null));
-        
-        ListenableFuture<ProcessCameraProvider> cameraProviderFuture = 
-                ProcessCameraProvider.getInstance(getContext());
-        
-        cameraProviderFuture.addListener(() -> {
+        Log.d(TAG, "Starting natario CameraView with frame analysis: " + (frameCallback != null));
+
+        try {
+            // Attach to lifecycle if supported
             try {
-                cameraProvider = cameraProviderFuture.get();
-                bindCameraUseCases(lifecycleOwner, frameCallback);
-            } catch (ExecutionException | InterruptedException e) {
-                Log.e(TAG, "Error starting camera", e);
-            }
-        }, ContextCompat.getMainExecutor(getContext()));
-    }
-    
-    /**
-     * Bind camera use cases
-     */
-    private void bindCameraUseCases(LifecycleOwner lifecycleOwner, @Nullable FrameAnalysisCallback frameCallback) {
-        Log.d(TAG, "Binding camera use cases, frameCallback: " + (frameCallback != null));
-        
-        // Get screen metrics
-        int rotation = previewView.getDisplay().getRotation();
-        
-        // CameraSelector - Front camera for face capture
-        CameraSelector cameraSelector = new CameraSelector.Builder()
-                .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
-                .build();
-        
-        // Preview use case
-        preview = new Preview.Builder()
-                .setTargetRotation(rotation)
-                .build();
-        
-        // ImageCapture use case
-        imageCapture = new ImageCapture.Builder()
-                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                .setTargetRotation(rotation)
-                .build();
-        
-        // ImageAnalysis use case (if callback provided)
-        if (frameCallback != null) {
-            Log.d(TAG, "Setting up ImageAnalysis with YUV format (default)");
-            
-            // Cấu hình phân tích hình ảnh với độ phân giải phù hợp
-            // Không set OUTPUT_IMAGE_FORMAT để sử dụng format mặc định (YUV_420_888)
-            imageAnalysis = new ImageAnalysis.Builder()
-                    .setTargetRotation(rotation)
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .setTargetAspectRatio(AspectRatio.RATIO_16_9)
-                    .build();
-            
-            imageAnalysis.setAnalyzer(executor, image -> {
-                frameCount++;
-                
-                // Log mỗi 30 frames (khoảng 1 giây)
-                if (frameCount % 30 == 0) {
-                    Log.d(TAG, "Processing frame #" + frameCount + ", format: " + image.getFormat() + 
-                            ", size: " + image.getWidth() + "x" + image.getHeight());
-                }
-                
-                // Skip if we're still processing a previous frame
-                if (processingFrame.get()) {
-                    if (frameCount % 30 == 0) {
-                        Log.d(TAG, "Skipping frame #" + frameCount + " - still processing previous frame");
-                    }
-                    image.close();
-                    return;
-                }
-                
-                try {
-                    processingFrame.set(true);
-                    
-                    // Log thông tin về định dạng ảnh (chỉ log lần đầu tiên)
-                    if (!hasLoggedImageInfo) {
-                        logImageInfo(image);
-                        hasLoggedImageInfo = true;
-                    }
-                    
-                    try {
-                        Log.d(TAG, "Converting frame #" + frameCount + " to bitmap");
-                        
-                        // Convert to bitmap
-                        Bitmap bitmap = imageToBitmap(image);
+                natarioView.setLifecycleOwner(lifecycleOwner);
+            } catch (Throwable ignored) {}
 
-
-                            if (bitmap != null) {
-                                Log.d("DEBUG_CAMERA", "Conversion successful - Bitmap: " +
-                                        bitmap.getWidth() + "x" + bitmap.getHeight() +
-                                        ", Config: " + bitmap.getConfig());
-                            } else {
-                                Log.e("DEBUG_CAMERA", "Conversion failed - bitmap is null");
+            if (frameCallback != null) {
+                natarioView.clearFrameProcessors();
+                natarioView.addFrameProcessor(new FrameProcessor() {
+                    @Override
+                    public void process(@NonNull Frame frame) {
+                        frameCount++;
+                        if (processingFrame.get()) {
+                            if (frameCount % 30 == 0) {
+                                Log.d(TAG, "Skipping frame #" + frameCount + " - still processing previous frame");
                             }
-
-                        
-                        if (bitmap == null) {
-                            Log.e(TAG, "Failed to convert frame #" + frameCount + " to bitmap - bitmap is null");
-                            processingFrame.set(false);
                             return;
                         }
-                        
-                        Log.d(TAG, "Successfully converted frame #" + frameCount + " to bitmap: " + 
-                                bitmap.getWidth() + "x" + bitmap.getHeight());
-                        
-                        // Mirror image for front camera (rotation already handled in converter)
-                        Matrix mirrorMatrix = new Matrix();
-                        mirrorMatrix.preScale(-1.0f, 1.0f);
-                        bitmap = Bitmap.createBitmap(
-                                bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), mirrorMatrix, true);
-                        
-                        Log.d(TAG, "Final bitmap for frame #" + frameCount + ": " + 
-                                bitmap.getWidth() + "x" + bitmap.getHeight());
-                        
-                        // Update coordinate mapping (preview view → bitmap). Here we already mirror bitmap, so mirrorX=false.
-                        try {
-                            boolean mirrorX = false;
-                            vn.edu.fpt.zentryapp.faceid.util.CoordinateMapper.getInstance().updateMapping(
-                                    previewView.getWidth(), previewView.getHeight(),
-                                    bitmap.getWidth(), bitmap.getHeight(),
-                                    mirrorX
-                            );
-                        } catch (Exception ignored) {}
 
-                        // Return bitmap via callback
-                        final Bitmap finalBitmap = bitmap;
-                        post(() -> {
-                            Log.d(TAG, "Calling frameCallback for frame #" + frameCount);
-                            frameCallback.onFrameAnalyzed(finalBitmap);
-                            processingFrame.set(false);
-                        });
-                    } catch (Exception e) {
-                        Log.e(TAG, "Error processing frame #" + frameCount, e);
-                        processingFrame.set(false);
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Error analyzing frame #" + frameCount, e);
-                    processingFrame.set(false);
-                } finally {
-                    image.close();
-                }
-            });
-        } else {
-            Log.d(TAG, "No frame callback provided - ImageAnalysis not set up");
-        }
-        
-        // Unbind previous use cases
-        cameraProvider.unbindAll();
-        
-        try {
-            // Bind use cases to camera
-            if (frameCallback != null && imageAnalysis != null) {
-                Log.d(TAG, "Binding camera with Preview, ImageCapture, and ImageAnalysis");
-                camera = cameraProvider.bindToLifecycle(
-                        lifecycleOwner,
-                        cameraSelector,
-                        preview,
-                        imageCapture,
-                        imageAnalysis);
-            } else {
-                Log.d(TAG, "Binding camera with Preview and ImageCapture only");
-                camera = cameraProvider.bindToLifecycle(
-                        lifecycleOwner,
-                        cameraSelector,
-                        preview,
-                        imageCapture);
-            }
-            
-            // Connect preview to previewView
-            preview.setSurfaceProvider(previewView.getSurfaceProvider());
-            
-            // Enable dynamic orientation updates
-            if (orientationEventListener == null) {
-                orientationEventListener = new OrientationEventListener(getContext()) {
-                    @Override
-                    public void onOrientationChanged(int orientation) {
-                        if (orientation == ORIENTATION_UNKNOWN) return;
-                        int newRotation;
-                        if (orientation >= 45 && orientation < 135) {
-                            newRotation = Surface.ROTATION_270;
-                        } else if (orientation >= 135 && orientation < 225) {
-                            newRotation = Surface.ROTATION_180;
-                        } else if (orientation >= 225 && orientation < 315) {
-                            newRotation = Surface.ROTATION_90;
-                        } else {
-                            newRotation = Surface.ROTATION_0;
-                        }
+                        processingFrame.set(true);
                         try {
-                            if (imageAnalysis != null) imageAnalysis.setTargetRotation(newRotation);
-                            if (preview != null) preview.setTargetRotation(newRotation);
-                        } catch (Exception ignored) {}
+                            int width = frame.getSize().getWidth();
+                            int height = frame.getSize().getHeight();
+                            Bitmap bitmap = frameToBitmap(frame, width, height);
+                            if (bitmap == null) {
+                                processingFrame.set(false);
+                                return;
+                            }
+
+                            // Mirror horizontally for front camera to keep consistency with previous pipeline
+                            Matrix mirrorMatrix = new Matrix();
+                            mirrorMatrix.preScale(-1.0f, 1.0f);
+                            bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), mirrorMatrix, true);
+
+                            // Update coordinate mapping using standardized policy
+                            try {
+                                boolean isPreviewMirrored = true;
+                                boolean isBitmapMirrored = true;
+                                vn.edu.fpt.zentryapp.faceid.util.CoordinateMapper.getInstance().updateMappingWithPolicy(
+                                        getWidth(), getHeight(), bitmap.getWidth(), bitmap.getHeight(),
+                                        isPreviewMirrored, isBitmapMirrored
+                                );
+                            } catch (Exception ignored) {}
+
+                            final Bitmap finalBitmap = bitmap;
+                            post(() -> {
+                                try {
+                                    frameCallback.onFrameAnalyzed(finalBitmap);
+                                } catch (Exception e) {
+                                    Log.e(TAG, "Error delivering analyzed frame", e);
+                                } finally {
+                                    processingFrame.set(false);
+                                }
+                            });
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error processing natario frame", e);
+                            processingFrame.set(false);
+                        }
                     }
-                };
+                });
+            } else {
+                natarioView.clearFrameProcessors();
             }
-            if (orientationEventListener != null) orientationEventListener.enable();
-            Log.d(TAG, "Camera binding successful");
+
+            natarioView.open();
+            Log.d(TAG, "natario CameraView opened");
         } catch (Exception e) {
-            Log.e(TAG, "Use case binding failed", e);
+            Log.e(TAG, "Error starting natario CameraView", e);
         }
     }
+    
+    // (Removed legacy CameraX binding completely)
     
     /**
      * Capture a photo
      */
     public void capturePhoto(CaptureCallback callback) {
-        if (imageCapture == null) {
-            callback.onError("Camera not initialized");
-            return;
-        }
-        
-        // Create image capture listener
-        ImageCapture.OnImageCapturedCallback imageCapturedCallback = new ImageCapture.OnImageCapturedCallback() {
-            @Override
-            public void onCaptureSuccess(@NonNull ImageProxy imageProxy) {
-                try {
-                    // Convert ImageProxy to Bitmap
-                    Bitmap bitmap = imageToBitmap(imageProxy);
-                    
-                    // Mirror image for front camera (rotation already handled in converter)
-                    Matrix mirrorMatrix = new Matrix();
-                    mirrorMatrix.preScale(-1.0f, 1.0f);
-                    bitmap = Bitmap.createBitmap(
-                            bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), mirrorMatrix, true);
-                    
-                    // Return bitmap
-                    final Bitmap finalBitmap = bitmap;
-                    imageProxy.close();
-                    
-                    // Post to main thread
-                    post(() -> callback.onCaptured(finalBitmap));
-                } catch (Exception e) {
-                    Log.e(TAG, "Error processing captured image", e);
-                    imageProxy.close();
-                    post(() -> callback.onError("Failed to process captured image: " + e.getMessage()));
-                }
-            }
-            
-            @Override
-            public void onError(@NonNull ImageCaptureException exception) {
-                Log.e(TAG, "Photo capture failed", exception);
-                post(() -> callback.onError("Failed to capture image: " + exception.getMessage()));
-            }
-        };
-        
-        // Capture the image
-        imageCapture.takePicture(executor, imageCapturedCallback);
-    }
-    
-    /**
-     * Convert ImageProxy to Bitmap
-     */
-    @OptIn(markerClass = ExperimentalGetImage.class)
-    private Bitmap imageToBitmap(ImageProxy image) {
         try {
-            // 🔧 DEBUG FLAG 4: Log image format và size
-            if (BuildConfig.DEBUG) {
-                Log.d("DEBUG_CAMERA", "Converting frame - Format: " + image.getFormat() +
-                        ", Size: " + image.getWidth() + "x" + image.getHeight() +
-                        ", Rotation: " + image.getImageInfo().getRotationDegrees());
-            }
-            // Canonical path: always try robust YUV_420_888 → NV21 → JPEG decode
-            android.media.Image mediaImage = image.getImage();
-            if (mediaImage != null && mediaImage.getFormat() == android.graphics.ImageFormat.YUV_420_888) {
-                Bitmap bmp = vn.edu.fpt.zentryapp.faceid.util.YuvToRgbConverter.convert(image, image.getImageInfo().getRotationDegrees());
-                if (bmp != null) return bmp;
-            }
-
-            // Fallback: RGBA fast path (if truly RGBA)
-            if (image.getFormat() == ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888) {
-                Bitmap bmp = rgbaImageProxyToBitmap(image);
-                if (bmp != null) return applyRotation(bmp, image.getImageInfo().getRotationDegrees());
-            }
-
-            // Last resort: JPEG decode from first plane (rare)
-            if (image.getPlanes().length > 0) {
-                ByteBuffer buffer = image.getPlanes()[0].getBuffer();
-                byte[] bytes = new byte[buffer.remaining()];
-                buffer.get(bytes);
-                Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                if (bmp != null) return applyRotation(bmp, image.getImageInfo().getRotationDegrees());
-            }
-
-            // Fallback empty bitmap
-            int width = Math.max(1, image.getWidth());
-            int height = Math.max(1, image.getHeight());
-
-            return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        } catch (Exception e) {
-            Log.e(TAG, "imageToBitmap: Exception occurred", e);
-            return Bitmap.createBitmap(640, 480, Bitmap.Config.ARGB_8888);
-        }
-    }
-
-    private Bitmap applyRotation(Bitmap src, int rotationDegrees) {
-        if (rotationDegrees == 0) return src;
-        try {
-            Matrix m = new Matrix();
-            m.postRotate(rotationDegrees);
-            Bitmap out = Bitmap.createBitmap(src, 0, 0, src.getWidth(), src.getHeight(), m, true);
-            if (out != src) src.recycle();
-            return out;
-        } catch (Exception ignored) {
-            return src;
-        }
-    }
-    
-    /**
-     * Log thông tin về định dạng ảnh từ camera
-     */
-    @OptIn(markerClass = ExperimentalGetImage.class)
-    private void logImageInfo(ImageProxy image) {
-        try {
-            Log.d(TAG, "Image info: " + image.getWidth() + "x" + image.getHeight() + 
-                    ", format=" + image.getFormat() + 
-                    ", cropRect=" + image.getCropRect());
-            
-            if (image.getPlanes() != null && image.getPlanes().length > 0) {
-                for (int i = 0; i < image.getPlanes().length; i++) {
-                    ImageProxy.PlaneProxy plane = image.getPlanes()[i];
-                    Log.d(TAG, "Plane " + i + ": pixelStride=" + plane.getPixelStride() + 
-                            ", rowStride=" + plane.getRowStride() + 
-                            ", bufferSize=" + plane.getBuffer().remaining());
-                }
-            }
-            
-            android.media.Image mediaImage = image.getImage();
-            if (mediaImage != null) {
-                Log.d(TAG, "MediaImage format: " + mediaImage.getFormat() + 
-                        ", timestamp=" + mediaImage.getTimestamp());
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error logging image info", e);
-        }
-    }
-    
-    /**
-     * Convert RGBA_8888 format ImageProxy to Bitmap
-     */
-    private Bitmap rgbaImageProxyToBitmap(ImageProxy image) {
-        try {
-            Log.d(TAG, "rgbaImageProxyToBitmap: Starting RGBA conversion");
-            
-            if (image.getPlanes().length == 0) {
-                Log.e(TAG, "rgbaImageProxyToBitmap: No planes available");
-                return null;
-            }
-            
-            ByteBuffer buffer = image.getPlanes()[0].getBuffer();
-            int pixelStride = image.getPlanes()[0].getPixelStride();
-            int rowStride = image.getPlanes()[0].getRowStride();
-            int width = image.getWidth();
-            int height = image.getHeight();
-            
-            Log.d(TAG, "rgbaImageProxyToBitmap: " + width + "x" + height + 
-                    ", pixelStride=" + pixelStride + ", rowStride=" + rowStride + 
-                    ", bufferSize=" + buffer.remaining());
-            
-            // Nếu pixelStride = 4 (RGBA_8888), chúng ta có thể tạo bitmap trực tiếp
-            if (pixelStride == 4) {
-                Log.d(TAG, "rgbaImageProxyToBitmap: Using direct copy method (pixelStride=4)");
-                try {
-                    Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-                    buffer.rewind();
-                    bitmap.copyPixelsFromBuffer(buffer);
-                    Log.d(TAG, "rgbaImageProxyToBitmap: Direct copy successful");
-                    return bitmap;
-                } catch (Exception e) {
-                    Log.e(TAG, "rgbaImageProxyToBitmap: Direct copy failed", e);
-                    // Fall through to manual method
-                }
-            }
-            
-            // Nếu không, chúng ta cần sao chép dữ liệu theo cách thủ công
-            Log.d(TAG, "rgbaImageProxyToBitmap: Using manual copy method (pixelStride=" + pixelStride + ")");
-            int bufferSize = buffer.remaining();
-            byte[] data = new byte[bufferSize];
-            buffer.get(data);
-            
-            Log.d(TAG, "rgbaImageProxyToBitmap: Read " + data.length + " bytes from buffer");
-            
-            // Tạo bitmap trống
-            Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-            
-            // Sao chép từng pixel
-            int[] pixels = new int[width * height];
-            int offset = 0;
-            int successfulPixels = 0;
-            
-            for (int y = 0; y < height; y++) {
-                for (int x = 0; x < width; x++) {
-                    int pixel = 0;
-                    int bufferIndex = y * rowStride + x * pixelStride;
-                    
-                    if (bufferIndex + 3 < data.length) {
-                        // RGBA -> ARGB
-                        int r = data[bufferIndex] & 0xff;
-                        int g = data[bufferIndex + 1] & 0xff;
-                        int b = data[bufferIndex + 2] & 0xff;
-                        int a = data[bufferIndex + 3] & 0xff;
-                        
-                        pixel = (a << 24) | (r << 16) | (g << 8) | b;
-                        successfulPixels++;
+            natarioView.addCameraListener(new CameraListener() {
+                @Override
+                public void onPictureTaken(@NonNull PictureResult result) {
+                    try {
+                        result.toBitmap(bitmap -> {
+                            try {
+                                if (bitmap == null) {
+                                    post(() -> callback.onError("Failed to convert picture to bitmap"));
+                                    return;
+                                }
+                                Matrix mirrorMatrix = new Matrix();
+                                mirrorMatrix.preScale(-1.0f, 1.0f);
+                                Bitmap mirrored = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), mirrorMatrix, true);
+                                post(() -> callback.onCaptured(mirrored));
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error handling picture bitmap", e);
+                                post(() -> callback.onError("Error handling picture: " + e.getMessage()));
+                            }
+                        });
+                    } catch (Exception e) {
+                        Log.e(TAG, "toBitmap failed", e);
+                        post(() -> callback.onError("Failed to process captured image: " + e.getMessage()));
                     }
-                    
-                    pixels[offset++] = pixel;
                 }
-            }
-            
-            Log.d(TAG, "rgbaImageProxyToBitmap: Processed " + successfulPixels + "/" + (width * height) + " pixels");
-            
-            bitmap.setPixels(pixels, 0, width, 0, 0, width, height);
-            Log.d(TAG, "rgbaImageProxyToBitmap: Manual copy successful");
-            return bitmap;
+            });
+            natarioView.takePictureSnapshot();
         } catch (Exception e) {
-            Log.e(TAG, "rgbaImageProxyToBitmap: Exception occurred", e);
-            return null;
+            Log.e(TAG, "Photo capture failed", e);
+            post(() -> callback.onError("Failed to capture image: " + e.getMessage()));
         }
     }
     
+
     /**
      * Convert YUV_420_888 Image to Bitmap
      */
@@ -731,8 +409,37 @@ public class CameraView extends FrameLayout {
      * Stop camera and release resources
      */
     public void stopCamera() {
-        if (cameraProvider != null) {
-            cameraProvider.unbindAll();
+        try {
+            if (natarioView != null) {
+                natarioView.close();
+            }
+        } catch (Exception ignored) {}
+    }
+
+    // Convert natario Frame to Bitmap (NV21/YUV -> JPEG -> Bitmap)
+    private Bitmap frameToBitmap(Frame frame, int width, int height) {
+        try {
+            Object dataObj = frame.getData();
+            byte[] nv21;
+            if (dataObj instanceof byte[]) {
+                nv21 = (byte[]) dataObj;
+            } else if (dataObj instanceof java.nio.ByteBuffer) {
+                java.nio.ByteBuffer buffer = (java.nio.ByteBuffer) dataObj;
+                nv21 = new byte[buffer.remaining()];
+                buffer.get(nv21);
+            } else {
+                Log.w(TAG, "Unsupported frame data type: " + (dataObj != null ? dataObj.getClass() : "null"));
+                return null;
+            }
+
+            YuvImage yuv = new YuvImage(nv21, android.graphics.ImageFormat.NV21, width, height, null);
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            yuv.compressToJpeg(new Rect(0, 0, width, height), 90, out);
+            byte[] jpeg = out.toByteArray();
+            return BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length);
+        } catch (Exception e) {
+            Log.e(TAG, "frameToBitmap failed", e);
+            return null;
         }
     }
 } 

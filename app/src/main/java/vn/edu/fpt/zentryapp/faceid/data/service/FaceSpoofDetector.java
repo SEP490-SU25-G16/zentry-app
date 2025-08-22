@@ -29,6 +29,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import lombok.Getter;
+import vn.edu.fpt.zentryapp.faceid.util.InterpreterOptionsFactory;
 
 public class FaceSpoofDetector {
     private static final String TAG = "FaceSpoofDetector";
@@ -106,7 +107,7 @@ public class FaceSpoofDetector {
                     Log.d(TAG, "Loading model files...");
 
                     // Initialize TFLiteInterpreter
-                    Interpreter.Options interpreterOptions = vn.edu.fpt.zentryapp.faceid.utils.InterpreterOptionsFactory.createBestOptions(context);
+                    Interpreter.Options interpreterOptions = InterpreterOptionsFactory.createBestOptions(context);
 
                     // Load models from assets
                     MappedByteBuffer model1Buffer = FileUtil.loadMappedFile(context, MODEL_FILE_1);

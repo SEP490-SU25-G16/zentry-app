@@ -79,12 +79,8 @@ dependencies {
     implementation("com.google.ai.edge.litert:litert-support:1.1.2")
     implementation("com.google.mediapipe:tasks-vision:0.10.14")
     
-    // CameraX
-    val cameraxVersion = "1.3.3"
-    implementation("androidx.camera:camera-core:$cameraxVersion")
-    implementation("androidx.camera:camera-camera2:$cameraxVersion")
-    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
-    implementation("androidx.camera:camera-view:$cameraxVersion")
+    // Replace CameraX with natario CameraView
+    implementation("com.otaliastudios:cameraview:2.7.2")
     
     // OkHttp3
     implementation("com.squareup.okhttp3:okhttp:4.9.3")

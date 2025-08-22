@@ -1,4 +1,4 @@
-package vn.edu.fpt.zentryapp.faceid.utils;
+package vn.edu.fpt.zentryapp.faceid.util;
 
 import android.content.Context;
 import android.os.Build;
@@ -7,8 +7,6 @@ import android.util.Log;
 import org.tensorflow.lite.Interpreter;
 import org.tensorflow.lite.nnapi.NnApiDelegate;
 import org.tensorflow.lite.gpu.GpuDelegate;
-
-import vn.edu.fpt.zentryapp.faceid.data.service.TFLiteGpuDelegateManager;
 
 public final class InterpreterOptionsFactory {
     private static final String TAG = "InterpreterOptionsFactory";
