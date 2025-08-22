@@ -20,6 +20,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
 import androidx.camera.core.Camera;
 import androidx.camera.core.CameraSelector;
+import androidx.camera.core.AspectRatio;
 import androidx.camera.core.ExperimentalGetImage;
 import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageCapture;
@@ -31,6 +32,7 @@ import androidx.camera.view.PreviewView;
 import androidx.core.content.ContextCompat;
 import androidx.lifecycle.LifecycleOwner;
 
+import vn.edu.fpt.zentryapp.BuildConfig;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import java.io.ByteArrayOutputStream;
@@ -155,7 +157,7 @@ public class CameraView extends FrameLayout {
             imageAnalysis = new ImageAnalysis.Builder()
                     .setTargetRotation(rotation)
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .setTargetResolution(new Size(640, 480)) // Độ phân giải phù hợp cho face detection
+                    .setTargetAspectRatio(AspectRatio.RATIO_16_9)
                     .build();
             
             imageAnalysis.setAnalyzer(executor, image -> {
@@ -190,6 +192,16 @@ public class CameraView extends FrameLayout {
                         
                         // Convert to bitmap
                         Bitmap bitmap = imageToBitmap(image);
+
+
+                            if (bitmap != null) {
+                                Log.d("DEBUG_CAMERA", "Conversion successful - Bitmap: " +
+                                        bitmap.getWidth() + "x" + bitmap.getHeight() +
+                                        ", Config: " + bitmap.getConfig());
+                            } else {
+                                Log.e("DEBUG_CAMERA", "Conversion failed - bitmap is null");
+                            }
+
                         
                         if (bitmap == null) {
                             Log.e(TAG, "Failed to convert frame #" + frameCount + " to bitmap - bitmap is null");
@@ -209,6 +221,16 @@ public class CameraView extends FrameLayout {
                         Log.d(TAG, "Final bitmap for frame #" + frameCount + ": " + 
                                 bitmap.getWidth() + "x" + bitmap.getHeight());
                         
+                        // Update coordinate mapping (preview view → bitmap). Here we already mirror bitmap, so mirrorX=false.
+                        try {
+                            boolean mirrorX = false;
+                            vn.edu.fpt.zentryapp.faceid.util.CoordinateMapper.getInstance().updateMapping(
+                                    previewView.getWidth(), previewView.getHeight(),
+                                    bitmap.getWidth(), bitmap.getHeight(),
+                                    mirrorX
+                            );
+                        } catch (Exception ignored) {}
+
                         // Return bitmap via callback
                         final Bitmap finalBitmap = bitmap;
                         post(() -> {
@@ -339,6 +361,12 @@ public class CameraView extends FrameLayout {
     @OptIn(markerClass = ExperimentalGetImage.class)
     private Bitmap imageToBitmap(ImageProxy image) {
         try {
+            // 🔧 DEBUG FLAG 4: Log image format và size
+            if (BuildConfig.DEBUG) {
+                Log.d("DEBUG_CAMERA", "Converting frame - Format: " + image.getFormat() +
+                        ", Size: " + image.getWidth() + "x" + image.getHeight() +
+                        ", Rotation: " + image.getImageInfo().getRotationDegrees());
+            }
             // Canonical path: always try robust YUV_420_888 → NV21 → JPEG decode
             android.media.Image mediaImage = image.getImage();
             if (mediaImage != null && mediaImage.getFormat() == android.graphics.ImageFormat.YUV_420_888) {
@@ -364,6 +392,7 @@ public class CameraView extends FrameLayout {
             // Fallback empty bitmap
             int width = Math.max(1, image.getWidth());
             int height = Math.max(1, image.getHeight());
+
             return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         } catch (Exception e) {
             Log.e(TAG, "imageToBitmap: Exception occurred", e);

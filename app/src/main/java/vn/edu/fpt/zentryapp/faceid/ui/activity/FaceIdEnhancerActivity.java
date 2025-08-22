@@ -19,6 +19,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.OptIn;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.camera.core.CameraSelector;
+import androidx.camera.core.AspectRatio;
 import androidx.camera.core.ExperimentalGetImage;
 import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageProxy;
@@ -28,6 +29,7 @@ import androidx.camera.view.PreviewView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import vn.edu.fpt.zentryapp.BuildConfig;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import java.util.List;
@@ -39,6 +41,7 @@ import java.util.concurrent.Executors;
 import vn.edu.fpt.zentryapp.R;
 import vn.edu.fpt.zentryapp.faceid.data.service.FaceIdEnhancer;
 import vn.edu.fpt.zentryapp.faceid.data.service.FaceDetector;
+import vn.edu.fpt.zentryapp.faceid.util.CoordinateMapper;
 
 public class FaceIdEnhancerActivity extends AppCompatActivity implements 
         FaceIdEnhancer.FaceIdEnhancerCallback {
@@ -59,6 +62,8 @@ public class FaceIdEnhancerActivity extends AppCompatActivity implements
     private ImageAnalysis imageAnalysis;
     private ProcessCameraProvider cameraProvider;
     private OrientationEventListener orientationEventListener;
+    // Warm-up frames to let AE/AF/denoise stabilize
+    private int warmupFramesRemaining = 8;
     
     // Face ID enhancer
     private FaceIdEnhancer faceIdEnhancer;
@@ -120,11 +125,12 @@ public class FaceIdEnhancerActivity extends AppCompatActivity implements
                         .build();
                 preview.setSurfaceProvider(previewView.getSurfaceProvider());
                 
-                // Set up the image analysis use case
+                // Set up the image analysis use case (adaptive resolution via aspect ratio)
+                int targetAspect = AspectRatio.RATIO_16_9; // prefer wide for front cameras
                 imageAnalysis = new ImageAnalysis.Builder()
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .setTargetRotation(rotation)
-                        .setTargetResolution(new android.util.Size(640, 480))
+                        .setTargetAspectRatio(targetAspect)
                         .build();
                 
                 imageAnalysis.setAnalyzer(cameraExecutor, this::analyzeFace);
@@ -183,16 +189,57 @@ public class FaceIdEnhancerActivity extends AppCompatActivity implements
      */
     @OptIn(markerClass = ExperimentalGetImage.class)
     private void analyzeFace(ImageProxy imageProxy) {
+        if (BuildConfig.DEBUG) {
+            Log.d("DEBUG_ANALYZE", "Analyzing frame - Format: " + imageProxy.getFormat() +
+                    ", Size: " + imageProxy.getWidth() + "x" + imageProxy.getHeight());
+        }
+
+        // Warm-up phase: skip first few frames for exposure/noise stabilization
+        if (warmupFramesRemaining > 0) {
+            warmupFramesRemaining--;
+            if (BuildConfig.DEBUG && warmupFramesRemaining % 2 == 0) {
+                Log.d("DEBUG_ANALYZE", "Skipping warm-up frame, remaining=" + warmupFramesRemaining);
+            }
+            imageProxy.close();
+            return;
+        }
+
         // Convert ImageProxy to Bitmap
         Bitmap bitmap = imageToBitmap(imageProxy);
+
+        if (BuildConfig.DEBUG) {
+            if (bitmap != null) {
+                Log.d("DEBUG_ANALYZE", "Bitmap conversion OK - Size: " +
+                        bitmap.getWidth() + "x" + bitmap.getHeight());
+            } else {
+                Log.e("DEBUG_ANALYZE", "Bitmap conversion FAILED - imageToBitmap returned null");
+            }
+        }
+
         if (bitmap == null) {
             imageProxy.close();
             return;
         }
+
+        // Update coordinate mapping for oval validation: map from view (PreviewView) to current bitmap
+        try {
+            int viewW = previewView.getWidth();
+            int viewH = previewView.getHeight();
+            // In this activity path, we don't mirror the bitmap; preview is mirrored visually → set mirrorX=true
+            boolean mirrorX = true;
+            CoordinateMapper.getInstance().updateMapping(viewW, viewH, bitmap.getWidth(), bitmap.getHeight(), mirrorX);
+        } catch (Exception ignored) {}
         
         // Process the image with MediaPipe face detector
         List<FaceDetector.FaceDetectionResult> results = faceDetector.detectFaces(bitmap);
-        
+        if (BuildConfig.DEBUG) {
+            Log.d("DEBUG_ANALYZE", "Face detection result: " + results.size() + " faces detected");
+            if (results.isEmpty()) {
+                Log.w("DEBUG_ANALYZE", "NO FACE DETECTED - This is the main issue!");
+            }
+        }
+
+
         if (results.isEmpty()) {
             // No face detected
             runOnUiThread(() -> updateStatus("No face detected"));

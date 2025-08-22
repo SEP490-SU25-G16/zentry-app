@@ -5,9 +5,12 @@ import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.YuvImage;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.camera.core.ImageProxy;
+
+import com.chaos.view.BuildConfig;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
@@ -22,8 +25,18 @@ public final class YuvToRgbConverter {
 
 	@Nullable
 	public static Bitmap convert(ImageProxy proxy, int rotationDegrees) {
+		// �� DEBUG FLAG 1: Kiểm tra input ImageProxy
+
+			Log.d("DEBUG_BITMAP", "Input ImageProxy - Format: " + proxy.getFormat() +
+					", Size: " + proxy.getWidth() + "x" + proxy.getHeight() +
+					", Rotation: " + rotationDegrees);
+
 		android.media.Image image = proxy.getImage();
 		if (image == null || image.getFormat() != android.graphics.ImageFormat.YUV_420_888) {
+			// 🔧 DEBUG FLAG 2: Log lỗi format
+
+				Log.e("DEBUG_BITMAP", "Invalid image format or null image");
+
 			return null;
 		}
 
@@ -62,8 +75,13 @@ public final class YuvToRgbConverter {
 		yuv.compressToJpeg(new Rect(0, 0, width, height), 90, out);
 		byte[] imageBytes = out.toByteArray();
 		Bitmap bmp = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
+
+			Log.d("DEBUG_BITMAP", "Output Bitmap - Size: " + bmp.getWidth() + "x" + bmp.getHeight() +
+					", Config: " + bmp.getConfig() + ", HasAlpha: " + bmp.hasAlpha());
+
 		if (bmp == null) return null;
 		if (rotationDegrees == 0) return bmp;
+
 		try {
 			Matrix m = new Matrix();
 			m.postRotate(rotationDegrees);
@@ -73,6 +91,7 @@ public final class YuvToRgbConverter {
 		} catch (Exception ignored) {
 			return bmp;
 		}
+
 	}
 }
 
