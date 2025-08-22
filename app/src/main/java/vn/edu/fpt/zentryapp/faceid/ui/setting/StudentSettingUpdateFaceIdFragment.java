@@ -277,13 +277,13 @@ public class StudentSettingUpdateFaceIdFragment extends Fragment
             case FACE_STABLE:
                 if (!isAnalyzing) {
                     // Hiển thị UI thông báo
-                    Log.d(TAG, "Khuôn mặt đã ổn định, bắt đầu phân tích...");
+                    Log.d(TAG, "Face stabilized, starting analysis...");
                     stateManager.transitionTo(FaceRegistrationState.ANALYZING,
-                            "Đang phân tích khuôn mặt...");
+                            "Analyzing face...");
 
                     // Cập nhật UI để người dùng biết đang phân tích
                     if (binding != null && binding.tvStatusMessage != null) {
-                        binding.tvStatusMessage.setText("Đang phân tích khuôn mặt...");
+                        binding.tvStatusMessage.setText("Analyzing face...");
                     }
 
                     // Bắt đầu phân tích
@@ -314,9 +314,9 @@ public class StudentSettingUpdateFaceIdFragment extends Fragment
 
             case LIVENESS_CHALLENGE:
                 // Hiển thị UI cho liveness challenge
-                Log.d(TAG, "🔄 Kích hoạt Liveness Challenge");
+                Log.d(TAG, "🔄 Activating Liveness Challenge");
                 if (binding != null && binding.tvStatusMessage != null) {
-                    binding.tvStatusMessage.setText("Hãy nhìn vào camera và nhấp mắt");
+                    binding.tvStatusMessage.setText("Look at the camera and blink");
                 }
                 if (faceOverlayView != null) {
                     faceOverlayView.setOvalColor(ContextCompat.getColor(requireContext(), R.color.primary));
@@ -1617,7 +1617,7 @@ public class StudentSettingUpdateFaceIdFragment extends Fragment
     private void startAnalysis() {
         // Kiểm tra nếu đã đang phân tích
         if (isAnalyzing) {
-            Log.d(TAG, "Đã đang phân tích, bỏ qua yêu cầu mới");
+            Log.d(TAG, "Already analyzing, ignoring new request");
             return;
         }
 
@@ -1636,7 +1636,7 @@ public class StudentSettingUpdateFaceIdFragment extends Fragment
         }
 
         // Start with initial analyzing state message
-        stateManager.transitionTo(FaceRegistrationState.ANALYZING, "Đang phân tích... Giữ nguyên");
+        stateManager.transitionTo(FaceRegistrationState.ANALYZING, "Analyzing... Hold still");
 
         // Hiển thị và cập nhật progressBar
         if (analysisProgressBar != null) {
@@ -1670,7 +1670,7 @@ public class StudentSettingUpdateFaceIdFragment extends Fragment
                 secondsLeft[0]--;
                 if (secondsLeft[0] > 0) {
                     // Update countdown message and UI
-                    String message = "Đang phân tích... " + secondsLeft[0] + "s";
+                    String message = "Analyzing... " + secondsLeft[0] + "s";
                     stateManager.transitionTo(FaceRegistrationState.ANALYZING, message);
 
                     // Cập nhật text đếm ngược
@@ -1748,12 +1748,12 @@ public class StudentSettingUpdateFaceIdFragment extends Fragment
             if (isHighQuality && isConsistent) {
                 // High quality and consistent - proceed with registration
                 stateManager.transitionTo(FaceRegistrationState.PROCESSING,
-                        "Kiểm tra chất lượng đạt. Đang đăng ký...");
+                        "Quality check passed. Registering...");
                 captureAndUpdateFace();
             } else if (isAcceptableQuality) {
                 // Acceptable but not ideal - warn user but proceed
                 stateManager.transitionTo(FaceRegistrationState.PROCESSING,
-                        "Chất lượng chấp nhận được. Đang tiến hành đăng ký...");
+                        "Acceptable quality. Proceeding with registration...");
                 captureAndUpdateFace();
             } else {
                 // Low quality - provide specific feedback based on issues
@@ -1825,20 +1825,20 @@ public class StudentSettingUpdateFaceIdFragment extends Fragment
         StringBuilder feedback = new StringBuilder();
 
         if (variance > 0.05) {
-            feedback.append("Phát hiện khuôn mặt không ổn định. Vui lòng giữ khuôn mặt ổn định hơn và thử lại.");
-            feedback.append("\n\nLỗi chi tiết: Chỉ số biến thiên (variance) = ").append(String.format(Locale.US, "%.5f", variance));
-            feedback.append(" (vượt quá ngưỡng 0.05)");
+            feedback.append("Detected unstable face. Please hold your face steadier and try again.");
+            feedback.append("\n\nDetails: Variance = ").append(String.format(Locale.US, "%.5f", variance));
+            feedback.append(" (exceeds threshold 0.05)");
         } else if (averageScore < 0.4f) {
-            feedback.append("Chất lượng phát hiện rất thấp. Vui lòng thử lại trong điều kiện ánh sáng tốt hơn.");
-            feedback.append("\n\nLỗi chi tiết: Điểm trung bình = ").append(String.format(Locale.US, "%.3f", averageScore));
-            feedback.append(" (thấp hơn ngưỡng tối thiểu 0.4)");
+            feedback.append("Very low detection quality. Please try again with better lighting.");
+            feedback.append("\n\nDetails: Average score = ").append(String.format(Locale.US, "%.3f", averageScore));
+            feedback.append(" (below minimum 0.4)");
         } else if (averageScore < 0.6f) {
-            feedback.append("Chất lượng phát hiện thấp. Cải thiện ánh sáng và giảm chuyển động khuôn mặt.");
-            feedback.append("\n\nLỗi chi tiết: Điểm trung bình = ").append(String.format(Locale.US, "%.3f", averageScore));
-            feedback.append(" (thấp hơn ngưỡng khuyến nghị 0.6)");
+            feedback.append("Low detection quality. Improve lighting and reduce face movement.");
+            feedback.append("\n\nDetails: Average score = ").append(String.format(Locale.US, "%.3f", averageScore));
+            feedback.append(" (below recommended 0.6)");
         } else {
-            feedback.append("Không thể có được hình ảnh đủ rõ ràng. Vui lòng thử lại với ánh sáng và vị trí tốt hơn.");
-            feedback.append("\n\nLỗi chi tiết: Kết hợp giữa điểm phát hiện và độ ổn định không đáp ứng yêu cầu");
+            feedback.append("Unable to capture a clear image. Please try again with better lighting and positioning.");
+            feedback.append("\n\nDetails: Combination of detection score and stability did not meet requirements");
         }
 
         return feedback.toString();

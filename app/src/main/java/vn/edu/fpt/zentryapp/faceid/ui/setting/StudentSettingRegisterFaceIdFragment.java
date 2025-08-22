@@ -1,7 +1,5 @@
 package vn.edu.fpt.zentryapp.faceid.ui.setting;
 
-import static androidx.core.content.ContentProviderCompat.requireContext;
-
 import android.Manifest;
 import android.animation.ValueAnimator;
 import android.content.Intent;
@@ -955,9 +953,7 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
                             Log.w(TAG, "Fragment not attached during success callback");
                             return;
                         }
-                        AuthManager.getInstance(requireContext())
-                                .setFaceIdRegistered(true);
-                        Log.d(TAG, "✅ Check faceid successful: " + AuthManager.getInstance(requireContext()).isFaceIdRegistered());
+
                         Log.d(TAG, "✅ Registration successful: " + message);
                         stateManager.transitionTo(FaceRegistrationState.SUCCESS, message);
                     }

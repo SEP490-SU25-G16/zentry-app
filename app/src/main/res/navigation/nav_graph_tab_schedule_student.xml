@@ -54,6 +54,6 @@
     <fragment
         android:id="@+id/notificationFragment"
         android:name="vn.edu.fpt.zentryapp.notification.ui.NotificationFragment"
-        android:label="Thông báo"
+        android:label="Notifications"
         tools:layout="@layout/fragment_notification" />
 </navigation>
