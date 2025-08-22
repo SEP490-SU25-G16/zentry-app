@@ -44,8 +44,8 @@ public class FaceIdInfoActivity extends AppCompatActivity {
         String userName = getIntent().getStringExtra(EXTRA_USER_NAME);
 
         
-        // Hiển thị thông tin Face ID đã đăng ký
-        binding.tvFaceIdStatus.setText("Register Face ID successfully!");
+        // Display Face ID registration info
+        binding.tvFaceIdStatus.setText("Face ID has been registered successfully!");
         
         // Hiển thị button update
         binding.btnUpdateFaceId.setVisibility(View.VISIBLE);
@@ -56,14 +56,14 @@ public class FaceIdInfoActivity extends AppCompatActivity {
         
         // Button update Face ID
         binding.btnUpdateFaceId.setOnClickListener(v -> {
-            Log.d(TAG, "✅ Button Update Face ID được click");
+            Log.d(TAG, "✅ Update Face ID button clicked");
             try {
                 Intent updateIntent = new Intent(this, StudentSettingUpdateFaceIdActivity.class);
                 startActivity(updateIntent);
-                Log.d(TAG, "✅ Đã launch StudentSettingUpdateFaceIdActivity");
+                Log.d(TAG, "✅ Launched StudentSettingUpdateFaceIdActivity");
             } catch (Exception e) {
-                Log.e(TAG, "❌ Lỗi khi launch Update Face ID Activity", e);
-                Toast.makeText(this, "Không thể mở màn hình Update Face ID", Toast.LENGTH_SHORT).show();
+                Log.e(TAG, "❌ Error launching Update Face ID Activity", e);
+                Toast.makeText(this, "Unable to open the Update Face ID screen", Toast.LENGTH_SHORT).show();
             }
         });
         

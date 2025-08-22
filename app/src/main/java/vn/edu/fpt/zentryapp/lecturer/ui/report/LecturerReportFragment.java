@@ -85,11 +85,15 @@ public class LecturerReportFragment extends Fragment implements LecturerReportCl
                 } else {
                     // Fallback navigation if action isn't available
                     android.util.Log.w("LecturerReport", "Navigation action not available, using fallback");
-
+                    Toast.makeText(requireContext(), "Navigating to notifications…", Toast.LENGTH_SHORT).show();
+                    
                     // Try to find notificationFragment by ID
                     navController.navigate(R.id.notificationFragment);
                 }
             } catch (Exception e) {
+                // Fallback nếu action không tồn tại
+                android.util.Log.e("LecturerReport", "Navigation error: ", e);
+                Toast.makeText(requireContext(), "Notification feature is under development", Toast.LENGTH_SHORT).show();
             }
         });
     }

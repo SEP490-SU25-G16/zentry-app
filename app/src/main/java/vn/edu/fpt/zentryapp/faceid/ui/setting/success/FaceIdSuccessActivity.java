@@ -170,23 +170,23 @@ public class FaceIdSuccessActivity extends AppCompatActivity {
         String userName = getIntent().getStringExtra(EXTRA_USER_NAME);
         
         if (userName == null || userName.isEmpty()) {
-            userName = "Bạn";
+            userName = "You";
         }
         
         switch (action) {
             case "register":
-                binding.tvSuccessTitle.setText("Chúc mừng bạn đã đăng ký Face ID thành công!");
-                binding.tvSuccessSubtitle.setText("Giờ đây " + userName + " có thể sử dụng Face ID để nhanh chóng điểm danh và truy cập ứng dụng một cách an toàn.");
+                binding.tvSuccessTitle.setText("Congratulations! Your Face ID has been registered successfully!");
+                binding.tvSuccessSubtitle.setText("Now " + userName + " can use Face ID for quick attendance and secure access to the app.");
                 break;
                 
             case "update":
-                binding.tvSuccessTitle.setText("Chúc mừng bạn đã cập nhật Face ID thành công!");
-                binding.tvSuccessSubtitle.setText("Face ID của " + userName + " đã được cập nhật với thông tin mới nhất.");
+                binding.tvSuccessTitle.setText("Your Face ID has been updated successfully!");
+                binding.tvSuccessSubtitle.setText("" + userName + "'s Face ID has been updated with the latest information.");
                 break;
                 
             case "verify":
-                binding.tvSuccessTitle.setText("Chúc mừng bạn đã xác thực Face ID thành công!");
-                binding.tvSuccessSubtitle.setText("Face ID của " + userName + " đã được xác thực và hoạt động bình thường.");
+                binding.tvSuccessTitle.setText("Face ID verification successful!");
+                binding.tvSuccessSubtitle.setText("" + userName + "'s Face ID has been verified and is working properly.");
                 break;
                 
             default:
@@ -333,16 +333,16 @@ public class FaceIdSuccessActivity extends AppCompatActivity {
         
         // ✅ NEW: Xử lý button Update Face ID (nếu cần)
         binding.btnUpdateFaceId.setOnClickListener(v -> {
-            Log.d(TAG, "✅ Button Update Face ID được click");
+            Log.d(TAG, "✅ Update Face ID button clicked");
             // ✅ NEW: Reset auto-finish timer khi user tương tác
             resetAutoFinishTimer();
             try {
                 Intent updateIntent = new Intent(this, vn.edu.fpt.zentryapp.faceid.ui.setting.StudentSettingUpdateFaceIdActivity.class);
                 startActivity(updateIntent);
-                Log.d(TAG, "✅ Đã launch StudentSettingUpdateFaceIdActivity");
+                Log.d(TAG, "✅ Launched StudentSettingUpdateFaceIdActivity");
             } catch (Exception e) {
-                Log.e(TAG, "❌ Lỗi khi launch Update Face ID Activity", e);
-                Toast.makeText(this, "Không thể mở màn hình Update Face ID", Toast.LENGTH_SHORT).show();
+                Log.e(TAG, "❌ Error launching Update Face ID Activity", e);
+                Toast.makeText(this, "Unable to open the Update Face ID screen", Toast.LENGTH_SHORT).show();
             }
         });
         
