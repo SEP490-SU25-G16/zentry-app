@@ -122,7 +122,8 @@ public class LecturerAttendanceFragment extends Fragment implements LecturerAtte
         int attendedStudents = 0;
 
         for (Attendance student : attendanceList) {
-            if (student.isFinalStatus()) { // hoặc student.isPresent() tùy theo logic
+            // ✅ SỬA: Check status String thay vì boolean
+            if ("Attended".equalsIgnoreCase(student.getStatus())) {
                 attendedStudents++;
             }
         }
@@ -133,12 +134,13 @@ public class LecturerAttendanceFragment extends Fragment implements LecturerAtte
             headerText = String.format("%d/%d students attended - Final Result",
                     attendedStudents, totalStudents);
         } else {
-            headerText = String.format("%d/%d students attended - Round %d",
-                    attendedStudents, totalStudents, currentRoundNumber);
+            headerText = String.format("%d students joined - Round %d",
+                    totalStudents, currentRoundNumber);
         }
 
         binding.tvAttendanceHeader.setText(headerText);
     }
+
 
     @Override
     public void onStudentClick(Attendance student) {

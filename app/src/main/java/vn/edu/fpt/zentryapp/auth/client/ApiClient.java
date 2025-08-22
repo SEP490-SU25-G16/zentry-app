@@ -22,10 +22,10 @@ public class ApiClient {
 
             OkHttpClient client = new OkHttpClient.Builder()
                     .addInterceptor(new AuthInterceptor(authManager))
-                    .addInterceptor(logging) // Chỉ cho development
-                    .connectTimeout(200, TimeUnit.SECONDS) // 🔧 NEW: Connection timeout
-                    .readTimeout(200, TimeUnit.SECONDS)    // 🔧 NEW: Read timeout for large data
-                    .writeTimeout(200, TimeUnit.SECONDS)   // 🔧 NEW: Write timeout for large data
+                    .addInterceptor(logging)
+                    .connectTimeout(200, TimeUnit.SECONDS)
+                    .readTimeout(200, TimeUnit.SECONDS)
+                    .writeTimeout(200, TimeUnit.SECONDS)
                     .build();
 
             retrofit = new Retrofit.Builder()

@@ -8,7 +8,6 @@
     android:fitsSystemWindows="true"
     android:background="#F5F9FF">
 
-    <!-- Content chính, paddingTop để lùi xuống dưới toolbar overlay -->
     <LinearLayout
         android:id="@+id/llDeviceInfoContent"
         android:layout_width="match_parent"
@@ -18,7 +17,6 @@
         android:paddingTop="?attr/actionBarSize"
         android:background="@android:color/transparent">
 
-        <!-- Card View Device Info -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardDeviceInfo"
             android:layout_width="match_parent"
@@ -36,103 +34,202 @@
                 android:orientation="vertical"
                 android:padding="20dp">
 
-                <!-- Name row -->
+                <!-- Device Name -->
                 <LinearLayout
-                    android:id="@+id/llDeviceInfoNameRow"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical">
-
                     <TextView
                         android:id="@+id/tvDeviceInfoNameLabel"
-                        android:fontFamily="@font/jostsemibold"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Name"
-                        android:textStyle="bold"
+                        android:text="Device Name"
                         android:textColor="#232B42"
-                        android:textSize="15sp"/>
-
+                        android:textStyle="bold"
+                        android:textSize="15sp"
+                        android:fontFamily="@font/jostsemibold"/>
                     <TextView
                         android:id="@+id/tvDeviceInfoNameValue"
-                        android:fontFamily="@font/mulishbold"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Samsung S25"
+                        android:text=""
                         android:textColor="#232B42"
-                        android:textSize="15sp"/>
+                        android:textSize="15sp"
+                        android:fontFamily="@font/mulishbold"/>
                 </LinearLayout>
 
-                <!-- ID row -->
+                <!-- Registered Date -->
                 <LinearLayout
-                    android:id="@+id/llDeviceInfoIdRow"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
                     android:layout_marginTop="8dp">
-
-                    <TextView
-                        android:id="@+id/tvDeviceInfoIdLabel"
-                        android:fontFamily="@font/jostsemibold"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="ID"
-                        android:textStyle="bold"
-                        android:textColor="#232B42"
-                        android:textSize="15sp"/>
-
-                    <TextView
-                        android:id="@+id/tvDeviceInfoIdValue"
-                        android:fontFamily="@font/mulishbold"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="SK345680976"
-                        android:textColor="#232B42"
-                        android:textSize="15sp"/>
-                </LinearLayout>
-
-                <!-- Date row -->
-                <LinearLayout
-                    android:id="@+id/llDeviceInfoDateRow"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginTop="8dp">
-
                     <TextView
                         android:id="@+id/tvDeviceInfoDateLabel"
-                        android:fontFamily="@font/jostsemibold"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Date"
-                        android:textStyle="bold"
+                        android:text="Registered Date"
                         android:textColor="#232B42"
-                        android:textSize="15sp"/>
-
+                        android:textStyle="bold"
+                        android:textSize="15sp"
+                        android:fontFamily="@font/jostsemibold"/>
                     <TextView
                         android:id="@+id/tvDeviceInfoDateValue"
-                        android:fontFamily="@font/mulishbold"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="JAN 20, 2025  /  15:45"
+                        android:text=""
                         android:textColor="#232B42"
-                        android:textSize="15sp"/>
+                        android:textSize="15sp"
+                        android:fontFamily="@font/mulishbold"/>
                 </LinearLayout>
+
+                <!-- Model -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="8dp">
+                    <TextView
+                        android:id="@+id/tvDeviceModelLabel"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Model"
+                        android:textColor="#232B42"
+                        android:textStyle="bold"
+                        android:textSize="15sp"
+                        android:fontFamily="@font/jostsemibold"/>
+                    <TextView
+                        android:id="@+id/tvDeviceModelValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text=""
+                        android:textColor="#232B42"
+                        android:textSize="15sp"
+                        android:fontFamily="@font/mulishbold"/>
+                </LinearLayout>
+
+                <!-- Manufacturer -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="8dp">
+                    <TextView
+                        android:id="@+id/tvDeviceManufacturerLabel"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Manufacturer"
+                        android:textColor="#232B42"
+                        android:textStyle="bold"
+                        android:textSize="15sp"
+                        android:fontFamily="@font/jostsemibold"/>
+                    <TextView
+                        android:id="@+id/tvDeviceManufacturerValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text=""
+                        android:textColor="#232B42"
+                        android:textSize="15sp"
+                        android:fontFamily="@font/mulishbold"/>
+                </LinearLayout>
+
+                <!-- Platform -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="8dp">
+                    <TextView
+                        android:id="@+id/tvDevicePlatformLabel"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Platform"
+                        android:textColor="#232B42"
+                        android:textStyle="bold"
+                        android:textSize="15sp"
+                        android:fontFamily="@font/jostsemibold"/>
+                    <TextView
+                        android:id="@+id/tvDevicePlatformValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text=""
+                        android:textColor="#232B42"
+                        android:textSize="15sp"
+                        android:fontFamily="@font/mulishbold"/>
+                </LinearLayout>
+
+                <!-- OS Version -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="8dp">
+                    <TextView
+                        android:id="@+id/tvDeviceOsVersionLabel"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="OS Version"
+                        android:textColor="#232B42"
+                        android:textStyle="bold"
+                        android:textSize="15sp"
+                        android:fontFamily="@font/jostsemibold"/>
+                    <TextView
+                        android:id="@+id/tvDeviceOsVersionValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text=""
+                        android:textColor="#232B42"
+                        android:textSize="15sp"
+                        android:fontFamily="@font/mulishbold"/>
+                </LinearLayout>
+
+                <!-- App Version -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="8dp">
+                    <TextView
+                        android:id="@+id/tvDeviceAppVersionLabel"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="App Version"
+                        android:textColor="#232B42"
+                        android:textStyle="bold"
+                        android:textSize="15sp"
+                        android:fontFamily="@font/jostsemibold"/>
+                    <TextView
+                        android:id="@+id/tvDeviceAppVersionValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text=""
+                        android:textColor="#232B42"
+                        android:textSize="15sp"
+                        android:fontFamily="@font/mulishbold"/>
+                </LinearLayout>
+
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Update Button -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnDeviceInfoUpdate"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:text="Update"
+            android:text="Request change"
             android:textAllCaps="true"
             android:fontFamily="@font/jostsemibold"
             android:textStyle="bold"
@@ -141,9 +238,9 @@
             android:layout_marginTop="8dp"
             app:backgroundTint="#AEACF5"
             app:cornerRadius="28dp"/>
+
     </LinearLayout>
 
-    <!-- Toolbar custom overlay -->
     <LinearLayout
         android:id="@+id/llDeviceInfoToolbar"
         android:layout_width="match_parent"
@@ -165,13 +262,13 @@
 
         <TextView
             android:id="@+id/tvDeviceInfoTitle"
-            android:fontFamily="@font/jostsemibold"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
             android:text="Device"
             android:textColor="#232B42"
             android:textSize="20sp"
-            android:textStyle="bold"/>
+            android:textStyle="bold"
+            android:fontFamily="@font/jostsemibold"/>
     </LinearLayout>
 </FrameLayout>

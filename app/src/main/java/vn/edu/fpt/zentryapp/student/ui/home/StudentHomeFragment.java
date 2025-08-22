@@ -73,44 +73,9 @@ public class StudentHomeFragment extends Fragment {
             notificationViewModel.loadNotifications(userId, requireContext());
         }
 
-        // 🔧 NEW: Register broadcast receiver for real-time notification updates
-        androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(requireContext())
-                .registerReceiver(notificationUpdateReceiver, new android.content.IntentFilter("vn.edu.fpt.zentryapp.NOTIFICATIONS_UPDATED"));
-
         setupClickListeners();
         observeViewModel();
-
     }
-
-
-
-    // 🔧 NEW: Broadcast receiver for real-time notification updates
-    private final BroadcastReceiver notificationUpdateReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(android.content.Context context, android.content.Intent intent) {
-            Log.d(TAG, "📢 StudentHome: Received notification update broadcast");
-            
-            // Force refresh notification count for badge
-            String userId = intent.getStringExtra("userId");
-            if (userId != null) {
-                Log.d(TAG, "🔄 Refreshing notification count for badge update");
-                // 🔧 FIX: Use forceRefresh instead of forceRefreshNotifications
-                notificationViewModel.forceRefresh(userId, requireContext());
-                
-                // ✅ NEW: Check if this is a session end notification and handle BLE service stopping
-                // This serves as a fallback when FCM fails due to network restrictions
-                String notificationBody = intent.getStringExtra("notificationBody");
-                if (notificationBody != null && notificationBody.contains("Tiết học đã kết thúc sớm")) {
-                    Log.d(TAG, "🛑 Received session end notification, checking if BLE service needs to be stopped");
-                    stopBLEAttendanceServiceIfNeeded();
-                }
-                
-                // 🔧 NOTE: StudentHomeFragment doesn't have notification badge UI
-                // So we only refresh the data, not update any badge
-                Log.d(TAG, "ℹ️ No notification badge UI in StudentHomeFragment");
-            }
-        }
-    };
 
     /* ---------- Observe ---------- */
     private void observeViewModel() {
@@ -266,15 +231,6 @@ public class StudentHomeFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        
-        // 🔧 NEW: Unregister broadcast receiver
-        try {
-            androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(requireContext())
-                    .unregisterReceiver(notificationUpdateReceiver);
-        } catch (Exception e) {
-            Log.e(TAG, "Error unregistering notification receiver", e);
-        }
-        
         binding = null;
     }
     

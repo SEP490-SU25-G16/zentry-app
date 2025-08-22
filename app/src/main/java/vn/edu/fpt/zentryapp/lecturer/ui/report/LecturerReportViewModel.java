@@ -71,7 +71,7 @@ public class LecturerReportViewModel extends ViewModel {
         _isLoading.setValue(true);
 
         String lecturerId = authManager.getCurrentUserId();
-        String semesterCode = "FA24"; // Có thể dynamic sau này
+        String semesterCode = "SU25"; // Có thể dynamic sau này
 
         Call<ApiResponseDto<SemesterCoursesDataDto>> call = apiService.getSemesterCourses(lecturerId, semesterCode);
         call.enqueue(new Callback<ApiResponseDto<SemesterCoursesDataDto>>() {

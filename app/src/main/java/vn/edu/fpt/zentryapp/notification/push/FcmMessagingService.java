@@ -58,7 +58,7 @@ public class FcmMessagingService extends FirebaseMessagingService {
                 Log.d(TAG, "👤 User ID found: " + userId);
                 
                 // Fire-and-forget: start a lightweight service to refresh via API
-                NotificationRefreshService.enqueueWork(getApplicationContext(), userId);
+               // NotificationRefreshService.enqueueWork(getApplicationContext(), userId);
                 
                 // 🔧 IMPROVED: Send detailed broadcast with notification info
                 Intent broadcastIntent = new Intent("vn.edu.fpt.zentryapp.NOTIFICATIONS_UPDATED");
@@ -68,6 +68,7 @@ public class FcmMessagingService extends FirebaseMessagingService {
                 // Add notification details if available
                 if (remoteMessage.getData() != null && !remoteMessage.getData().isEmpty()) {
                     String dataJson = remoteMessage.getData().get("Data");
+                    Log.d(TAG, "onMessageReceived: " + dataJson);
                     if (dataJson != null) {
                         try {
                             JSONObject json = new JSONObject(dataJson);
@@ -108,49 +109,54 @@ public class FcmMessagingService extends FirebaseMessagingService {
                 Log.w(TAG, "⚠️ No user ID found, cannot send broadcast");
             }
 
-            // If push includes deeplink or server-side action, handle extras
+            // ✅ SỬA: Tách riêng logic xử lý từng loại notification
             if (remoteMessage.getData() != null && !remoteMessage.getData().isEmpty()) {
                 String dataJson = remoteMessage.getData().get("Data");
                 if (dataJson != null) {
                     try {
                         JSONObject json = new JSONObject(dataJson);
-                        // Use the variables declared above, only update if not already set
-                        if (notificationType.isEmpty()) {
-                            notificationType = json.optString("type", "");
-                        }
+                        notificationType = json.optString("type", "");
                         deeplink = json.optString("deeplink", "");
-                        action = json.optString("action", "");
-                        
+
+                        // Handle Face ID verification
                         if ("FACE_VERIFICATION_REQUEST".equalsIgnoreCase(notificationType) && !deeplink.isEmpty()) {
-                            // Post a local broadcast or notification click intent can be configured to open deeplink.
-                            // Here we just log; UI click will open deeplink.
                             Log.d(TAG, "🎭 Received face verification request deeplink: " + deeplink);
-                        } else if (notificationBody != null && notificationBody.contains(SESSION_END_TEXT)) {
-                            // ✅ NEW: Check flag to prevent duplicate BLE service stops
-                            if (!isBLEServiceStopped) {
-                                // Stop BLE attendance for students on session end notification
-                                try {
-                                    Intent stopBle = new Intent(getApplicationContext(), vn.edu.fpt.zentryapp.service.BLEAttendanceService.class);
-                                    stopBle.setAction("STOP_ATTENDANCE");
-                                    // ✅ FIX: Use startService to send Intent to service instead of stopService
-                                    getApplicationContext().startService(stopBle);
-                                    
-                                    // ✅ NEW: Set flag to prevent duplicate calls
-                                    isBLEServiceStopped = true;
-                                    
-                                    Log.d(TAG, "✅ FCM: Sent STOP_ATTENDANCE intent to BLE service - Session ended: " + notificationBody);
-                                    Log.d(TAG, "🛡️ FCM: BLE service stop flag set to prevent duplicates");
-                                } catch (Exception e) {
-                                    Log.e(TAG, "❌ FCM: Error sending STOP_ATTENDANCE intent to BLE service", e);
-                                }
-                            } else {
-                                Log.d(TAG, "ℹ️ FCM: BLE service already stopped, skipping duplicate call");
-                            }
                         }
+
                     } catch (Exception e) {
                         Log.e(TAG, "Error parsing notification data for extras", e);
                     }
                 }
+            }
+
+            // ✅ SỬA: Kiểm tra session end RIÊNG BIỆT, không trong else if
+            // Check for session end in title OR body
+            boolean isSessionEnd = false;
+            if (notificationTitle != null && notificationTitle.contains(SESSION_END_TEXT)) {
+                isSessionEnd = true;
+                Log.d(TAG, "🔍 Session end detected in TITLE: " + notificationTitle);
+            }
+            if (notificationBody != null && notificationBody.contains(SESSION_END_TEXT)) {
+                isSessionEnd = true;
+                Log.d(TAG, "🔍 Session end detected in BODY: " + notificationBody);
+            }
+
+            if (isSessionEnd && !isBLEServiceStopped) {
+                try {
+                    Intent stopBle = new Intent(getApplicationContext(), vn.edu.fpt.zentryapp.service.BLEAttendanceService.class);
+                    stopBle.setAction("STOP_ATTENDANCE");
+                    getApplicationContext().startService(stopBle);
+
+                    isBLEServiceStopped = true;
+
+                    Log.d(TAG, "✅ FCM: Sent STOP_ATTENDANCE intent to BLE service");
+                    Log.d(TAG, "🛡️ FCM: BLE service stop flag set to prevent duplicates");
+
+                } catch (Exception e) {
+                    Log.e(TAG, "❌ FCM: Error sending STOP_ATTENDANCE intent to BLE service", e);
+                }
+            } else if (isSessionEnd) {
+                Log.d(TAG, "ℹ️ FCM: Session end detected but BLE service already stopped");
             }
         } catch (Exception e) {
             Log.e(TAG, "❌ Error handling FCM message", e);

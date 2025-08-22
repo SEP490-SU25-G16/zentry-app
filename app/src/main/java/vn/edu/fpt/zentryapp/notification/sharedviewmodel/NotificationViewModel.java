@@ -33,7 +33,6 @@ public class NotificationViewModel extends ViewModel {
     
     // Pagination constants
     private static final int INITIAL_LOAD_COUNT = 6; // Số thông báo load lần đầu
-    private static final int PAGE_SIZE = 4; // Số thông báo load mỗi lần "See More"
     private int currentDisplayCount = INITIAL_LOAD_COUNT; // Số thông báo hiện đang hiển thị
     private boolean seeMoreClicked = false; // Flag để biết đã click "See More" chưa
 
@@ -49,15 +48,10 @@ public class NotificationViewModel extends ViewModel {
         return filteredNotifications;
     }
     
-    // 🔧 NEW: Getter for allNotifications to allow direct observation
     public LiveData<List<NotificationItem>> allNotifications() {
         return allNotifications;
     }
-    
-    public LiveData<Boolean> shouldShowSeeMoreButton() {
-        return showSeeMoreButton;
-    }
-    
+
     public LiveData<Integer> getUnseenCount() {
         return unseenCount;
     }
@@ -124,67 +118,6 @@ public class NotificationViewModel extends ViewModel {
         });
     }
 
-    // Overload cho phép caller truyền vào userId (lấy từ AuthManager ở layer có context)
-    public void loadNotifications(String userId) {
-        // Reload if user changes
-        if (lastLoadedUserId == null || !lastLoadedUserId.equals(userId)) {
-            clearDataForNewUser();
-        } else if (isDataLoaded) {
-            return;
-        }
-        if (userId == null || userId.isEmpty()) {
-            allNotifications.setValue(new ArrayList<>());
-            applyFilter(currentFilter);
-            isDataLoaded = true;
-            updateUnseenCount();
-            return;
-        }
-
-        NotificationApiService api = ApiClient.getClient(null).create(NotificationApiService.class);
-        api.getNotifications(userId).enqueue(new Callback<List<NotificationDto>>() {
-            @Override
-            public void onResponse(@NonNull Call<List<NotificationDto>> call, @NonNull Response<List<NotificationDto>> response) {
-                List<NotificationItem> items = new ArrayList<>();
-                if (response.isSuccessful() && response.body() != null) {
-                    for (NotificationDto dto : response.body()) {
-                        // ✅ NEW: Extract expiration from notification data
-                        String expiresAt = extractExpirationFromData(dto.getData());
-                        
-                        items.add(new NotificationItem(
-                                dto.getId(),
-                                dto.getTitle(),
-                                dto.getBody(),
-                                dto.getCreatedAt(),
-                                dto.isRead(),
-                                false,
-                                dto.getData(),
-                                expiresAt // ✅ NEW: 8th parameter
-                        ));
-                    }
-                } else {
-                    Log.e("NotificationVM", "HTTP Error loading notifications: " + response.code());
-                }
-
-                allNotifications.setValue(items);
-                applyFilter(currentFilter);
-                isDataLoaded = true;
-                lastLoadedUserId = userId;
-                updateUnseenCount();
-            }
-
-            @Override
-            public void onFailure(@NonNull Call<List<NotificationDto>> call, @NonNull Throwable t) {
-                Log.e("NotificationVM", "Network error loading notifications", t);
-                allNotifications.setValue(new ArrayList<>());
-                applyFilter(currentFilter);
-                isDataLoaded = true;
-                lastLoadedUserId = userId;
-                updateUnseenCount();
-            }
-        });
-    }
-
-    // Preferred overload: caller supplies context (for AuthInterceptor) and userId
     public void loadNotifications(String userId, Context context) {
         // Reload if user changes
         if (lastLoadedUserId == null || !lastLoadedUserId.equals(userId)) {
@@ -283,12 +216,6 @@ public class NotificationViewModel extends ViewModel {
         showSeeMoreButton.setValue(hasMoreItems && !seeMoreClicked);
     }
     
-    public void loadMoreNotifications() {
-        currentDisplayCount += PAGE_SIZE;
-        seeMoreClicked = true; // Đánh dấu đã click "See More"
-        applyFilter(currentFilter); // Re-apply filter với display count mới
-    }
-    
     public void resetPagination() {
         currentDisplayCount = INITIAL_LOAD_COUNT;
         seeMoreClicked = false;
@@ -337,10 +264,7 @@ public class NotificationViewModel extends ViewModel {
         }
     }
     
-    public boolean canLoadMoreByScroll() {
-        return seeMoreClicked;
-    }
-    
+
     /**
      * Đánh dấu tất cả thông báo là đã seen khi người dùng vào màn hình notification
      */
@@ -371,18 +295,6 @@ public class NotificationViewModel extends ViewModel {
         // Also mark all as read via API if we have userId
         if (lastLoadedUserId != null && !lastLoadedUserId.isEmpty()) {
             markAllAsRead(context);
-        }
-    }
-
-
-    public void deleteNotification(String id) {
-        List<NotificationItem> current = allNotifications.getValue();
-        if (current != null) {
-            boolean changed = current.removeIf(n -> n.getId().equals(id));
-            if (changed) {
-                allNotifications.setValue(current);
-                applyFilter(currentFilter);
-            }
         }
     }
 
@@ -497,19 +409,6 @@ public class NotificationViewModel extends ViewModel {
         unseenCount.setValue(count);
     }
 
-    // �� Helper: kiểm tra 2 list có giống nhau không (tránh re-render)
-    private boolean isSameList(List<NotificationItem> oldList, List<NotificationItem> newList) {
-        if (oldList == null || newList == null) return false;
-        if (oldList.size() != newList.size()) return false;
-        for (int i = 0; i < oldList.size(); i++) {
-            if (!oldList.get(i).getId().equals(newList.get(i).getId()) ||
-                    oldList.get(i).isRead() != newList.get(i).isRead()) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     // 🔧 NEW: Force refresh method that actually works
     public void forceRefresh(String userId, Context context) {
         Log.d("NotificationVM", "🔄 FORCE REFRESH: Bypassing cache and calling API directly");
@@ -584,59 +483,4 @@ public class NotificationViewModel extends ViewModel {
         }
     }
 
-    // 🔧 IMPROVED: Fix existing forceRefreshNotifications
-    public void forceRefreshNotifications(String userId, Context context) {
-        Log.d("NotificationVM", "🔄 Force refreshing notifications for real-time updates");
-        
-        // Reset pagination for fresh data
-        resetPagination();
-        
-        // 🔧 FIX: Reset isDataLoaded to force reload
-        isDataLoaded = false;
-        
-        // Force reload from API
-        if (userId != null && !userId.isEmpty()) {
-            NotificationApiService api = ApiClient.getClient(context).create(NotificationApiService.class);
-            api.getNotifications(userId).enqueue(new Callback<List<NotificationDto>>() {
-                @Override
-                public void onResponse(@NonNull Call<List<NotificationDto>> call, @NonNull Response<List<NotificationDto>> response) {
-                    List<NotificationItem> items = new ArrayList<>();
-                    if (response.isSuccessful() && response.body() != null) {
-                        for (NotificationDto dto : response.body()) {
-                            // ✅ NEW: Extract expiration from notification data
-                            String expiresAt = extractExpirationFromData(dto.getData());
-                            
-                            items.add(new NotificationItem(
-                                    dto.getId(),
-                                    dto.getTitle(),
-                                    dto.getBody(),
-                                    dto.getCreatedAt(),
-                                    dto.isRead(),
-                                    false,
-                                    dto.getData(),
-                                    expiresAt // ✅ NEW: 8th parameter
-                            ));
-                        }
-                        Log.d("NotificationVM", "✅ Real-time refresh: loaded " + items.size() + " notifications");
-                    } else {
-                        Log.e("NotificationVM", "❌ Real-time refresh HTTP Error: " + response.code());
-                    }
-
-                    // Update data immediately
-                    allNotifications.setValue(items);
-                    applyFilter(currentFilter);
-                    isDataLoaded = true;
-                    lastLoadedUserId = userId;
-                    updateUnseenCount();
-                    
-                    Log.d("NotificationVM", "✅ Data updated, unseenCount: " + unseenCount.getValue());
-                }
-
-                @Override
-                public void onFailure(@NonNull Call<List<NotificationDto>> call, @NonNull Throwable t) {
-                    Log.e("NotificationVM", "❌ Real-time refresh failed", t);
-                }
-            });
-        }
-    }
 }

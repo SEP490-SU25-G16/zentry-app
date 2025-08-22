@@ -64,8 +64,8 @@ public class StudentReportFragment extends Fragment implements StudentReportAdap
         }
 
         // 🔧 NEW: Register broadcast receiver for real-time notification updates
-        androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(requireContext())
-                .registerReceiver(notificationUpdateReceiver, new android.content.IntentFilter("vn.edu.fpt.zentryapp.NOTIFICATIONS_UPDATED"));
+//        androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(requireContext())
+//                .registerReceiver(notificationUpdateReceiver, new android.content.IntentFilter("vn.edu.fpt.zentryapp.NOTIFICATIONS_UPDATED"));
 
         setupRecyclerView();
         setupClickListeners();
@@ -111,14 +111,11 @@ public class StudentReportFragment extends Fragment implements StudentReportAdap
                 } else {
                     // Fallback navigation if action isn't available
                     Log.w(TAG, "Navigation action not available, using fallback");
-                    Toast.makeText(requireContext(), "Đang chuyển đến thông báo...", Toast.LENGTH_SHORT).show();
-                    
                     // Try to find notificationFragment by ID
                     navController.navigate(R.id.notificationFragment);
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Navigation error: ", e);
-                Toast.makeText(requireContext(), "Chức năng thông báo đang được phát triển", Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -225,12 +222,12 @@ public class StudentReportFragment extends Fragment implements StudentReportAdap
         super.onDestroyView();
         
         // 🔧 NEW: Unregister broadcast receiver
-        try {
-            androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(requireContext())
-                    .unregisterReceiver(notificationUpdateReceiver);
-        } catch (Exception e) {
-            Log.e(TAG, "Error unregistering notification receiver", e);
-        }
+//        try {
+//            androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(requireContext())
+//                    .unregisterReceiver(notificationUpdateReceiver);
+//        } catch (Exception e) {
+//            Log.e(TAG, "Error unregistering notification receiver", e);
+//        }
         
         binding = null;
     }

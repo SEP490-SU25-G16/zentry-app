@@ -12,21 +12,24 @@ public class Student {
     private String studentCode;
     private String fullName;
     private String email;
-    private boolean isPresent;
-    private String attendanceStatus;
+    private String attendanceStatus; // "present" | "absent" | "future"
     private String enrollmentId;
     private String enrollmentStatus;
     private String enrolledAt;
 
-    // Helper methods
-    public String getAttendanceStatus() {
-        return isPresent ? "Attended" : "Absented";
+    public boolean isPresent() {
+        return "present".equalsIgnoreCase(attendanceStatus);
     }
-
+    public boolean isAbsent() {
+        return "absent".equalsIgnoreCase(attendanceStatus);
+    }
+    public boolean isFuture() {
+        return "future".equalsIgnoreCase(attendanceStatus);
+    }
     public int getAttendanceStatusColor() {
-        return isPresent ? 0xFF059669 : 0xFFE53935; // Green : Red
+        if (isFuture()) return 0xFFAAAAAA;
+        return isPresent() ? 0xFF059669 : 0xFFE53935;
     }
-
     public String getDisplayName() {
         return fullName != null ? fullName : "Student " + studentCode;
     }

@@ -132,9 +132,14 @@ public class LecturerReportSessionDetailFragment extends Fragment implements Lec
         // Observe attendance updates
         viewModel.attendanceUpdated().observe(getViewLifecycleOwner(), updated -> {
             if (Boolean.TRUE.equals(updated)) {
-                Toast.makeText(requireContext(), "Attendance updated", Toast.LENGTH_SHORT).show();
+                viewModel.refreshData();
             }
         });
+
+        viewModel.isUpdatingAttendance().observe(getViewLifecycleOwner(), updating -> {
+                 viewModel.refreshData(); // hoặc load lại danh sách mới nhất
+        });
+
 
         // Observe errors
         viewModel.errorMessage().observe(getViewLifecycleOwner(), error -> {

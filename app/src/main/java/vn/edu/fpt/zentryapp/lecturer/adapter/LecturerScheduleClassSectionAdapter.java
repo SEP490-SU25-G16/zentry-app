@@ -309,6 +309,13 @@ public class LecturerScheduleClassSectionAdapter extends RecyclerView.Adapter<Le
 
         @RequiresApi(api = Build.VERSION_CODES.O)
         private void showStartConfirmation(LecturerScheduleClassSection session) {
+            if (!isDeviceRegistered()) {
+                Toast.makeText(itemView.getContext(),
+                        "Device not registered. Please register your device first in Settings.",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+
             Dialog dialog = new Dialog(itemView.getContext());
             dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
             dialog.setContentView(R.layout.dialog_start_class_confirmation);
@@ -333,6 +340,14 @@ public class LecturerScheduleClassSectionAdapter extends RecyclerView.Adapter<Le
 
             dialog.setCancelable(true);
             dialog.show();
+        }
+
+        private boolean isDeviceRegistered() {
+            boolean registered = authManager.isDeviceRegistered();
+
+            Log.d(TAG, "Device registration check: " + (registered ? "✅ Registered" : "❌ Not Registered"));
+
+            return registered;
         }
 
         @RequiresApi(api = Build.VERSION_CODES.O)
@@ -367,12 +382,8 @@ public class LecturerScheduleClassSectionAdapter extends RecyclerView.Adapter<Le
                 } else if (mainActivity != null) {
                     // ❌ Thiếu permissions, request lại
                     Log.w(TAG, "⚠️ BLE permissions missing, requesting...");
-                    Toast.makeText(itemView.getContext(), "Requesting BLE permissions for attendance...",
-                            Toast.LENGTH_SHORT).show();
 
                     mainActivity.requestBLEPermissions();
-                    Toast.makeText(itemView.getContext(), "Please try starting class again after granting permissions",
-                            Toast.LENGTH_LONG).show();
                 } else {
                     // ❌ Không tìm được MainActivity, fallback
                     Log.w(TAG, "⚠️ Cannot find MainActivity, starting service without permission check");
@@ -381,8 +392,6 @@ public class LecturerScheduleClassSectionAdapter extends RecyclerView.Adapter<Le
 
             } catch (Exception e) {
                 Log.e(TAG, "Failed to start BLE service", e);
-                Toast.makeText(itemView.getContext(), "Failed to start attendance service",
-                        Toast.LENGTH_SHORT).show();
             }
         }
 

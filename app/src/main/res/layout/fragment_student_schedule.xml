@@ -41,7 +41,6 @@
             android:id="@+id/ivStudentNotification"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:background="@drawable/circle_background_white"
             android:contentDescription="Notifications"
             android:clickable="true"
             android:focusable="true"
@@ -195,7 +194,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:fontFamily="@font/mulishbold"
-                android:text="Your class studentSessions will appear here"
+                android:text="Your class sessions will appear here"
                 android:textColor="#999999"
                 android:textSize="14sp" />
 

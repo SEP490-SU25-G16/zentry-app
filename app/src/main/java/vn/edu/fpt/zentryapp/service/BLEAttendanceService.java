@@ -50,7 +50,7 @@ import vn.edu.fpt.zentryapp.student.data.model.response.StudentScheduleClassSect
  *
  * Chức năng chính:
  * 1. Advertise device ID và room info liên tục
- * 2. Scan device theo lịch trình (1 giây mỗi round)
+ * 2. Scan device theo lịch trình (3 giây mỗi round)
  * 3. Submit attendance data khi có lệnh từ AttendanceRoundScheduler
  * 4. Calculate attendance (chỉ cho lecturer)
  */
@@ -264,7 +264,7 @@ public class BLEAttendanceService extends Service {
         // Extract session data từ intent
         extractSessionData(intent);
 
-        // Extract rounds data (đã được convert sang UTC+7 ở mapping layer)
+        // Extract rounds data
         @SuppressWarnings("unchecked")
         List<AttendanceModels.AttendanceRound> rounds =
                 (List<AttendanceModels.AttendanceRound>) intent.getSerializableExtra("rounds");
@@ -666,9 +666,11 @@ public class BLEAttendanceService extends Service {
      */
     @Override
     public void onTaskRemoved(Intent rootIntent) {
-        Log.d(TAG, "Task removed, stopping service");
-        stopForeground(true);
-        stopSelf();
+//        Log.d(TAG, "Task removed, stopping service");
+//        stopForeground(true);
+//        stopSelf();
+//        super.onTaskRemoved(rootIntent);
+        Log.d(TAG, "App swiped - service continues");
         super.onTaskRemoved(rootIntent);
     }
 

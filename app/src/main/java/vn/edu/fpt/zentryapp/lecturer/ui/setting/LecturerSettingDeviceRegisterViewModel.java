@@ -96,6 +96,7 @@ public class LecturerSettingDeviceRegisterViewModel extends ViewModel {
 
                                 Log.d(TAG, "✅ Lecturer device registered successfully");
                                 Log.d(TAG, "  Device ID: " + apiResponse.getData().getDeviceId());
+                                Log.d(TAG, "  Device Token: " + apiResponse.getData().getDeviceToken());
                             } else {
                                 String error = apiResponse.getError() != null ? apiResponse.getError() : "Registration failed";
                                 _errorMessage.setValue(error);
