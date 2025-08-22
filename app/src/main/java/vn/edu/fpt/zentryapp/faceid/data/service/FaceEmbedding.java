@@ -66,7 +66,7 @@ public class FaceEmbedding {
                 logAssetsContent(context);
                 
                 try {
-                    Log.d(TAG, "Đang tải model FaceNet...");
+                    Log.d(TAG, "Loading FaceNet model...");
                     
                     // Initialize TFLiteInterpreter
                     Interpreter.Options interpreterOptions = TFLiteGpuDelegateManager.getInstance().getInterpreterOptions();
@@ -83,23 +83,23 @@ public class FaceEmbedding {
                             .add(new StandardizeOp())
                             .build();
                     
-                    Log.d(TAG, "Đã tải model FaceNet thành công");
+                    Log.d(TAG, "Loaded FaceNet model successfully");
                     
                     // Kiểm tra model
                     inspectModel();
                     
                     isInitialized = true;
                 } catch (Exception e) {
-                    Log.e(TAG, "Lỗi khi khởi tạo model TensorFlow Lite: " + e.getMessage(), e);
+                    Log.e(TAG, "Error initializing TensorFlow Lite model: " + e.getMessage(), e);
                     mainHandler.post(() -> 
-                        Toast.makeText(context, "Lỗi khi tải model face embedding: " + e.getMessage(), Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Error loading face embedding model: " + e.getMessage(), Toast.LENGTH_LONG).show()
                     );
                     useMockEmbedding = true;
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Lỗi khi kiểm tra file model: " + e.getMessage(), e);
+                Log.e(TAG, "Error checking model file: " + e.getMessage(), e);
                 mainHandler.post(() -> 
-                    Toast.makeText(context, "Lỗi khi kiểm tra model face embedding: " + e.getMessage(), Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Error validating face embedding model: " + e.getMessage(), Toast.LENGTH_LONG).show()
                 );
                 useMockEmbedding = true;
             } finally {
@@ -119,21 +119,21 @@ public class FaceEmbedding {
     private void logAssetsContent(Context context) {
         try {
             String[] files = context.getAssets().list("");
-            Log.d(TAG, "Nội dung thư mục assets: " + Arrays.toString(files));
+            Log.d(TAG, "Assets directory content: " + Arrays.toString(files));
             
             // Kiểm tra chi tiết về các file model
             for (String file : files) {
                 if (file.endsWith(".tflite")) {
                     try {
                         MappedByteBuffer buffer = FileUtil.loadMappedFile(context, file);
-                        Log.d(TAG, "File model: " + file + ", kích thước: " + buffer.capacity() + " bytes");
+                        Log.d(TAG, "Model file: " + file + ", size: " + buffer.capacity() + " bytes");
                     } catch (Exception e) {
-                        Log.e(TAG, "Lỗi khi kiểm tra file model " + file + ": " + e.getMessage(), e);
+                        Log.e(TAG, "Error inspecting model file " + file + ": " + e.getMessage(), e);
                     }
                 }
             }
         } catch (IOException e) {
-            Log.e(TAG, "Lỗi khi liệt kê thư mục assets: " + e.getMessage(), e);
+            Log.e(TAG, "Error listing assets directory: " + e.getMessage(), e);
         }
     }
     
@@ -179,16 +179,16 @@ public class FaceEmbedding {
     public float[] getFaceEmbedding(Bitmap bitmap) {
         // Nếu đang sử dụng mock embedding hoặc interpreter không được khởi tạo, tạo một embedding ngẫu nhiên nhưng nhất quán
         if (useMockEmbedding || interpreter == null || imageProcessor == null) {
-            Log.d(TAG, "Đang sử dụng mock face embedding");
+            Log.d(TAG, "Using mock face embedding");
             return generateMockEmbedding();
         }
 
         try {
-            Log.d(TAG, "Bắt đầu tạo face embedding cho ảnh kích thước: " + bitmap.getWidth() + "x" + bitmap.getHeight());
+            Log.d(TAG, "Start generating face embedding for image size: " + bitmap.getWidth() + "x" + bitmap.getHeight());
 
             // Đảm bảo bitmap có kích thước đúng
             Bitmap resizedBitmap = Bitmap.createScaledBitmap(bitmap, IMG_SIZE, IMG_SIZE, true);
-            Log.d(TAG, "Đã resize bitmap thành: " + resizedBitmap.getWidth() + "x" + resizedBitmap.getHeight());
+            Log.d(TAG, "Resized bitmap to: " + resizedBitmap.getWidth() + "x" + resizedBitmap.getHeight());
 
             // Chuyển đổi bitmap thành float array
             float[][][][] inputArray = new float[1][IMG_SIZE][IMG_SIZE][3];
@@ -211,9 +211,9 @@ public class FaceEmbedding {
             // Chạy inference
             try {
                 interpreter.run(inputArray, outputBuffer);
-                Log.d(TAG, "Inference thành công");
+                Log.d(TAG, "Inference succeeded");
             } catch (Exception e) {
-                Log.e(TAG, "Lỗi khi chạy inference: " + e.getMessage(), e);
+                Log.e(TAG, "Error running inference: " + e.getMessage(), e);
 
                 // Thử phương pháp khác
                 try {
@@ -236,25 +236,25 @@ public class FaceEmbedding {
                     // Đặt lại vị trí buffer về đầu
                     inputBuffer.flip();
 
-                    Log.d(TAG, "Tạo buffer mới với capacity: " + inputBuffer.capacity() + " bytes");
+                    Log.d(TAG, "Created new buffer with capacity: " + inputBuffer.capacity() + " bytes");
 
                     // Thử chạy lại inference
                     interpreter.run(inputBuffer, outputBuffer);
-                    Log.d(TAG, "Inference thành công với buffer mới");
+                    Log.d(TAG, "Inference succeeded with new buffer");
                 } catch (Exception e2) {
-                    Log.e(TAG, "Lỗi khi chạy inference với buffer mới: " + e2.getMessage(), e2);
+                    Log.e(TAG, "Error running inference with new buffer: " + e2.getMessage(), e2);
                     return generateMockEmbedding();
                 }
             }
 
             // Lấy embedding
             float[] embedding = outputBuffer[0];
-            Log.d(TAG, "Đã tạo embedding với kích thước: " + embedding.length);
+            Log.d(TAG, "Generated embedding with length: " + embedding.length);
 
             // L2 normalize embedding
             return l2Normalize(embedding);
         } catch (Exception e) {
-            Log.e(TAG, "Lỗi khi tạo face embedding: " + e.getMessage(), e);
+            Log.e(TAG, "Error generating face embedding: " + e.getMessage(), e);
             // Trả về mock embedding trong trường hợp lỗi
             return generateMockEmbedding();
         }

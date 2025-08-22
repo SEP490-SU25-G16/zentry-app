@@ -29,7 +29,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center"
-                android:text="Đang phân tích khuôn mặt"
+                android:text="Analyzing face"
                 android:textColor="#333333"
                 android:textSize="18sp"
                 android:textStyle="bold" />
@@ -40,7 +40,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
                 android:gravity="center"
-                android:text="Đang phân tích... 5s"
+                android:text="Analyzing... 5s"
                 android:textColor="#555555"
                 android:textSize="16sp" />
 
@@ -58,7 +58,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:gravity="center"
-                android:text="Vui lòng giữ khuôn mặt ở giữa và không di chuyển"
+                android:text="Please keep your face centered and do not move"
                 android:textColor="#555555"
                 android:textSize="14sp" />
 

@@ -3,12 +3,12 @@
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
     <!-- Notification Text Samples -->
-    <string name="notification_title_sample">Thông báo</string>
-    <string name="notification_message_sample">Đây là nội dung thông báo mẫu</string>
+    <string name="notification_title_sample">Notification</string>
+    <string name="notification_message_sample">This is a sample notification content</string>
     <string name="notification_time_sample">2025-07-26 14:30</string>
 
     <!-- UI Label -->
-    <string name="notifications">Thông báo</string>
+    <string name="notifications">Notification</string>
     <string name="notification_title">Notifications</string>
     <string name="notification_empty">You have no new notifications.</string>
     <string name="notification_history_link">Go to notification history</string>

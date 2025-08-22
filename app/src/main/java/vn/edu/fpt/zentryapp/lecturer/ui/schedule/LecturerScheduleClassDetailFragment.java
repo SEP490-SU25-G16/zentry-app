@@ -92,7 +92,7 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
         
         // 🔍 Debug authentication state
         Log.d("LecturerScheduleClassDetail", "🔍 Debugging authentication state...");
-
+        
         viewModel.init(requireContext(), authManager, session);
 
         // Load notifications từ API để có dữ liệu cho badge
@@ -197,12 +197,14 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
                 } else {
                     // Fallback navigation if action isn't available
                     android.util.Log.w("LecturerScheduleClassDetail", "Navigation action not available, using fallback");
-
+                    Toast.makeText(requireContext(), "Navigating to notifications…", Toast.LENGTH_SHORT).show();
+                    
                     // Try to find notificationFragment by ID
                     navController.navigate(R.id.notificationFragment);
                 }
             } catch (Exception e) {
                 android.util.Log.e("LecturerScheduleClassDetail", "Navigation error: ", e);
+                Toast.makeText(requireContext(), "Notification feature is under development", Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -352,10 +354,11 @@ public class LecturerScheduleClassDetailFragment extends Fragment implements Lec
         Log.d("LecturerScheduleClassDetail", "🎯 scheduleFaceIdVerification called with: " + totalSeconds + "s");
         int minutes = (totalSeconds + 59) / 60; // round up to minutes
         if (minutes <= 0) minutes = 1;
-        String title = "Yêu cầu xác thực Face ID";
-        String body = "Vui lòng xác thực khuôn mặt để tiếp tục.";
+        String title = "Face ID verification request";
+        String body = "Please verify your face to continue.";
 
         Log.d("LecturerScheduleClassDetail", "📤 Calling viewModel.createFaceIdRequest with: " + minutes + " minutes");
+        Toast.makeText(requireContext(), "Sending Face ID request…", Toast.LENGTH_SHORT).show();
         viewModel.createFaceIdRequest(minutes, title, body);
         // Attach observers if not yet (idempotent safety)
         attachFaceIdObservers();
