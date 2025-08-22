@@ -116,5 +116,53 @@ public final class CoordinateMapper {
 
         return new RectF(l, t, r, b);
     }
+
+    /**
+     * Map a rectangle from bitmap coordinates to view coordinates using the current mapping.
+     * Returns null if mapping not available.
+     */
+    public RectF mapBitmapRectToView(RectF bitmapRect) {
+        Mapping m = current.get();
+        if (m == null || bitmapRect == null) return null;
+
+        float scale = Math.max((float) m.viewWidth / (float) m.bitmapWidth,
+                               (float) m.viewHeight / (float) m.bitmapHeight);
+        float displayW = m.bitmapWidth * scale;
+        float displayH = m.bitmapHeight * scale;
+        float offsetX = (m.viewWidth - displayW) * 0.5f;
+        float offsetY = (m.viewHeight - displayH) * 0.5f;
+
+        // Scale to display space
+        float left = bitmapRect.left * scale;
+        float right = bitmapRect.right * scale;
+        float top = bitmapRect.top * scale;
+        float bottom = bitmapRect.bottom * scale;
+
+        if (m.mirrorX) {
+            // Mirror around display center
+            left = displayW - left;
+            right = displayW - right;
+            float tmp = left; left = right; right = tmp;
+        }
+
+        // Translate into view space
+        left += offsetX;
+        right += offsetX;
+        top += offsetY;
+        bottom += offsetY;
+
+        // Normalize and clamp
+        float l = Math.min(left, right);
+        float r = Math.max(left, right);
+        float t = Math.min(top, bottom);
+        float b = Math.max(top, bottom);
+
+        l = Math.max(0f, Math.min(l, m.viewWidth));
+        r = Math.max(0f, Math.min(r, m.viewWidth));
+        t = Math.max(0f, Math.min(t, m.viewHeight));
+        b = Math.max(0f, Math.min(b, m.viewHeight));
+
+        return new RectF(l, t, r, b);
+    }
 }
 

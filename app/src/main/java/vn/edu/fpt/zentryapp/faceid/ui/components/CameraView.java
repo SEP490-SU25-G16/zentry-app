@@ -6,6 +6,8 @@ import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.YuvImage;
+import android.net.Uri;
+import android.graphics.Color;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.ViewGroup;
@@ -20,12 +22,18 @@ import com.otaliastudios.cameraview.frame.Frame;
 import com.otaliastudios.cameraview.frame.FrameProcessor;
 import com.otaliastudios.cameraview.controls.Facing;
 import com.otaliastudios.cameraview.controls.Mode;
+import com.otaliastudios.cameraview.controls.Audio;
 import androidx.lifecycle.LifecycleOwner;
 
 import vn.edu.fpt.zentryapp.BuildConfig;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
+import android.os.Handler;
+import android.os.Looper;
 
 /**
  * Custom camera view for face capture with continuous frame analysis
@@ -36,15 +44,25 @@ public class CameraView extends FrameLayout {
     // Switched to natario CameraView as the rendering & capture engine
     private com.otaliastudios.cameraview.CameraView natarioView;
     private AtomicBoolean processingFrame = new AtomicBoolean(false);
-    
-    // Biến để log info chỉ một lần
-    private boolean hasLoggedImageInfo = false;
+    private final Handler testFrameHandler = new Handler(Looper.getMainLooper());
+    private Runnable activeTestFrameRunnable;
+    private boolean testFrameInjectionEnabled = false;
+    private Bitmap testFrameBitmap;
+    private Bitmap preparedTestFrameBitmap; // mirrored & prepared to match pipeline
+    private int testFrameIntervalMs = 66; // ~15 FPS by default
+
+    // Quality gate configuration (high impact first)
+    private boolean qualityGateEnabled = true;
+    // Acceptable luminance mean range on Y channel (0..255)
+    private int minLumaMean = 60;
+    private int maxLumaMean = 200;
+    // Minimum dynamic range (maxY - minY) on Y channel
+    private float minDynamicRange = 40f;
+    // Minimum blur metric (variance of Laplacian on downscaled grayscale)
+    private float minLaplacianVariance = 120f;
+
     private int frameCount = 0;
-    
-    public interface CaptureCallback {
-        void onCaptured(Bitmap bitmap);
-        void onError(String message);
-    }
+
     
     public interface FrameAnalysisCallback {
         void onFrameAnalyzed(Bitmap bitmap);
@@ -74,6 +92,8 @@ public class CameraView extends FrameLayout {
         // Configure defaults
         natarioView.setFacing(Facing.FRONT);
         natarioView.setMode(Mode.PICTURE);
+        // Disable audio to avoid requiring RECORD_AUDIO permission
+        natarioView.setAudio(Audio.OFF);
         addView(natarioView);
     }
     
@@ -94,6 +114,27 @@ public class CameraView extends FrameLayout {
         Log.d(TAG, "Starting natario CameraView with frame analysis: " + (frameCallback != null));
 
         try {
+            // If test frame injection is enabled, bypass real camera and feed constant frames
+            if (testFrameInjectionEnabled && preparedTestFrameBitmap != null && frameCallback != null) {
+                Log.d(TAG, "Test frame injection mode enabled. Skipping real camera.");
+                // Initialize coordinate mapping for test frames (front preview mirrored, bitmap mirrored)
+                try {
+                    boolean isPreviewMirrored = true;
+                    boolean isBitmapMirrored = true; // preparedTestFrameBitmap already mirrored
+                    vn.edu.fpt.zentryapp.faceid.util.CoordinateMapper.getInstance().updateMappingWithPolicy(
+                            getWidth(), getHeight(), preparedTestFrameBitmap.getWidth(), preparedTestFrameBitmap.getHeight(),
+                            isPreviewMirrored, isBitmapMirrored
+                    );
+                } catch (Exception ignored) {}
+                startTestFrameLoop(bitmap -> {
+                    if (!passesQualityGate(bitmap)) {
+                        return;
+                    }
+                    frameCallback.onFrameAnalyzed(bitmap);
+                });
+                return;
+            }
+
             // Attach to lifecycle if supported
             try {
                 natarioView.setLifecycleOwner(lifecycleOwner);
@@ -122,10 +163,26 @@ public class CameraView extends FrameLayout {
                                 return;
                             }
 
+                            // Rotate to user orientation if needed
+                            try {
+                                int rotationToUser = frame.getRotationToUser();
+                                if (rotationToUser != 0) {
+                                    Matrix rot = new Matrix();
+                                    rot.postRotate(rotationToUser);
+                                    bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), rot, true);
+                                }
+                            } catch (Throwable ignored) {}
+
                             // Mirror horizontally for front camera to keep consistency with previous pipeline
                             Matrix mirrorMatrix = new Matrix();
                             mirrorMatrix.preScale(-1.0f, 1.0f);
                             bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), mirrorMatrix, true);
+
+                            // Quality gate check
+                            if (!passesQualityGate(bitmap)) {
+                                processingFrame.set(false);
+                                return;
+                            }
 
                             // Update coordinate mapping using standardized policy
                             try {
@@ -163,257 +220,188 @@ public class CameraView extends FrameLayout {
             Log.e(TAG, "Error starting natario CameraView", e);
         }
     }
-    
-    // (Removed legacy CameraX binding completely)
-    
-    /**
-     * Capture a photo
-     */
-    public void capturePhoto(CaptureCallback callback) {
-        try {
-            natarioView.addCameraListener(new CameraListener() {
-                @Override
-                public void onPictureTaken(@NonNull PictureResult result) {
-                    try {
-                        result.toBitmap(bitmap -> {
-                            try {
-                                if (bitmap == null) {
-                                    post(() -> callback.onError("Failed to convert picture to bitmap"));
-                                    return;
-                                }
-                                Matrix mirrorMatrix = new Matrix();
-                                mirrorMatrix.preScale(-1.0f, 1.0f);
-                                Bitmap mirrored = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), mirrorMatrix, true);
-                                post(() -> callback.onCaptured(mirrored));
-                            } catch (Exception e) {
-                                Log.e(TAG, "Error handling picture bitmap", e);
-                                post(() -> callback.onError("Error handling picture: " + e.getMessage()));
-                            }
-                        });
-                    } catch (Exception e) {
-                        Log.e(TAG, "toBitmap failed", e);
-                        post(() -> callback.onError("Failed to process captured image: " + e.getMessage()));
-                    }
-                }
-            });
-            natarioView.takePictureSnapshot();
-        } catch (Exception e) {
-            Log.e(TAG, "Photo capture failed", e);
-            post(() -> callback.onError("Failed to capture image: " + e.getMessage()));
-        }
-    }
-    
 
-    /**
-     * Convert YUV_420_888 Image to Bitmap
-     */
-    private Bitmap imageToBitmapUsingYUV(android.media.Image image) {
-        try {
-            Log.d(TAG, "imageToBitmapUsingYUV: Format = " + image.getFormat());
-            
-            int width = image.getWidth();
-            int height = image.getHeight();
-            
-            // Lấy các planes
-            android.media.Image.Plane[] planes = image.getPlanes();
-            if (planes.length < 3) {
-                Log.e(TAG, "imageToBitmapUsingYUV: Not enough planes: " + planes.length);
-                return null;
-            }
-            
-            ByteBuffer yBuffer = planes[0].getBuffer();
-            ByteBuffer uBuffer = planes[1].getBuffer();
-            ByteBuffer vBuffer = planes[2].getBuffer();
-            
-            // Log thông tin về planes
-            Log.d(TAG, "imageToBitmapUsingYUV: Y plane - stride=" + planes[0].getRowStride() + ", pixelStride=" + planes[0].getPixelStride());
-            Log.d(TAG, "imageToBitmapUsingYUV: U plane - stride=" + planes[1].getRowStride() + ", pixelStride=" + planes[1].getPixelStride());
-            Log.d(TAG, "imageToBitmapUsingYUV: V plane - stride=" + planes[2].getRowStride() + ", pixelStride=" + planes[2].getPixelStride());
-            
-            // Tính toán kích thước dữ liệu
-            int ySize = yBuffer.remaining();
-            int uSize = uBuffer.remaining();
-            int vSize = vBuffer.remaining();
-            
-            Log.d(TAG, "imageToBitmapUsingYUV: Buffer sizes - Y=" + ySize + ", U=" + uSize + ", V=" + vSize);
-            
-            // Tạo mảng NV21 (YUV420SP)
-            byte[] nv21 = new byte[width * height * 3 / 2];
-            
-            // Sao chép Y plane
-            int yActualSize = Math.min(ySize, width * height);
-            yBuffer.get(nv21, 0, yActualSize);
-            Log.d(TAG, "imageToBitmapUsingYUV: Copied Y data: " + yActualSize + " bytes");
-            
-            // Sao chép U và V xen kẽ để tạo UV plane
-            int uvPos = width * height;
-            int uPixelStride = planes[1].getPixelStride();
-            int vPixelStride = planes[2].getPixelStride();
-            
-            // Xử lý theo pixel stride
-            if (uPixelStride == 1 && vPixelStride == 1) {
-                // Planar format
-                Log.d(TAG, "imageToBitmapUsingYUV: Processing planar format");
-                for (int i = 0; i < Math.min(uSize, vSize) && uvPos < nv21.length - 1; i++) {
-                    nv21[uvPos++] = vBuffer.get(i);
-                    nv21[uvPos++] = uBuffer.get(i);
-                }
-            } else {
-                // Semi-planar hoặc interleaved format
-                Log.d(TAG, "imageToBitmapUsingYUV: Processing semi-planar format (uPixelStride=" + uPixelStride + ", vPixelStride=" + vPixelStride + ")");
-                int uvSamples = Math.min(uSize / uPixelStride, vSize / vPixelStride);
-                for (int i = 0; i < uvSamples && uvPos < nv21.length - 1; i++) {
-                    nv21[uvPos++] = vBuffer.get(i * vPixelStride);
-                    nv21[uvPos++] = uBuffer.get(i * uPixelStride);
-                }
-            }
-            
-            Log.d(TAG, "imageToBitmapUsingYUV: UV data copied, total NV21 size: " + nv21.length);
-            
-            // Chuyển đổi YUV sang RGB
-            YuvImage yuvImage = new YuvImage(nv21, android.graphics.ImageFormat.NV21, width, height, null);
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            yuvImage.compressToJpeg(new Rect(0, 0, width, height), 90, out);
-            byte[] imageBytes = out.toByteArray();
-            
-            Log.d(TAG, "imageToBitmapUsingYUV: JPEG size: " + imageBytes.length);
-            
-            Bitmap bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
-            if (bitmap != null) {
-                Log.d(TAG, "imageToBitmapUsingYUV: Successfully created bitmap: " + bitmap.getWidth() + "x" + bitmap.getHeight());
-            } else {
-                Log.e(TAG, "imageToBitmapUsingYUV: Failed to decode JPEG");
-            }
-            
-            return bitmap;
-        } catch (Exception e) {
-            Log.e(TAG, "imageToBitmapUsingYUV: Exception occurred", e);
-            return null;
-        }
-    }
-    
-    /**
-     * Convert generic YUV format Image to Bitmap
-     */
-    private Bitmap imageToBitmapUsingGenericYUV(android.media.Image image) {
-        try {
-            Log.d(TAG, "imageToBitmapUsingGenericYUV: Format = " + image.getFormat());
-            
-            int width = image.getWidth();
-            int height = image.getHeight();
-            
-            // Lấy các planes
-            android.media.Image.Plane[] planes = image.getPlanes();
-            if (planes.length == 0) {
-                Log.e(TAG, "imageToBitmapUsingGenericYUV: No planes available");
-                return null;
-            }
-            
-            Log.d(TAG, "imageToBitmapUsingGenericYUV: " + width + "x" + height + ", planes=" + planes.length);
-            
-            // Nếu chỉ có 1 plane, có thể là grayscale hoặc packed format
-            if (planes.length == 1) {
-                Log.d(TAG, "imageToBitmapUsingGenericYUV: Single plane format");
-                ByteBuffer buffer = planes[0].getBuffer();
-                int pixelStride = planes[0].getPixelStride();
-                int rowStride = planes[0].getRowStride();
-                
-                Log.d(TAG, "imageToBitmapUsingGenericYUV: pixelStride=" + pixelStride + ", rowStride=" + rowStride);
-                
-                // Nếu là packed format (NV21/NV16), thử xử lý
-                if (pixelStride == 1) {
-                    // Đây có thể là NV21 hoặc format tương tự
-                    byte[] data = new byte[buffer.remaining()];
-                    buffer.get(data);
-                    
-                    Log.d(TAG, "imageToBitmapUsingGenericYUV: Data size=" + data.length + ", expected=" + (width * height * 3 / 2));
-                    
-                    // Thử tạo YuvImage với NV21
-                    try {
-                        YuvImage yuvImage = new YuvImage(data, android.graphics.ImageFormat.NV21, width, height, null);
-                        ByteArrayOutputStream out = new ByteArrayOutputStream();
-                        yuvImage.compressToJpeg(new Rect(0, 0, width, height), 100, out);
-                        byte[] imageBytes = out.toByteArray();
-                        
-                        Bitmap bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
-                        if (bitmap != null) {
-                            Log.d(TAG, "imageToBitmapUsingGenericYUV: NV21 conversion successful");
-                            return bitmap;
-                        }
-                    } catch (Exception e) {
-                        Log.w(TAG, "imageToBitmapUsingGenericYUV: NV21 conversion failed", e);
-                    }
-                }
-            }
-            
-            // Nếu có 3 planes, thử xử lý như YUV420
-            if (planes.length >= 3) {
-                Log.d(TAG, "imageToBitmapUsingGenericYUV: Multi-plane format, trying YUV420 conversion");
-                
-                ByteBuffer yBuffer = planes[0].getBuffer();
-                ByteBuffer uBuffer = planes[1].getBuffer();
-                ByteBuffer vBuffer = planes[2].getBuffer();
-                
-                int ySize = yBuffer.remaining();
-                int uSize = uBuffer.remaining();
-                int vSize = vBuffer.remaining();
-                
-                Log.d(TAG, "imageToBitmapUsingGenericYUV: Y=" + ySize + ", U=" + uSize + ", V=" + vSize);
-                
-                // Tạo mảng NV21
-                byte[] nv21 = new byte[width * height * 3 / 2];
-                
-                // Sao chép Y
-                yBuffer.get(nv21, 0, Math.min(ySize, width * height));
-                
-                // Sao chép U và V xen kẽ
-                int uvPos = width * height;
-                int uStep = Math.max(1, planes[1].getPixelStride());
-                int vStep = Math.max(1, planes[2].getPixelStride());
-                
-                for (int i = 0; i < Math.min(uSize / uStep, vSize / vStep) && uvPos < nv21.length - 1; i++) {
-                    if (i * vStep < vSize) {
-                        nv21[uvPos++] = vBuffer.get(i * vStep);
-                    }
-                    if (i * uStep < uSize && uvPos < nv21.length) {
-                        nv21[uvPos++] = uBuffer.get(i * uStep);
-                    }
-                }
-                
-                // Chuyển đổi sang RGB
-                try {
-                    YuvImage yuvImage = new YuvImage(nv21, android.graphics.ImageFormat.NV21, width, height, null);
-                    ByteArrayOutputStream out = new ByteArrayOutputStream();
-                    yuvImage.compressToJpeg(new Rect(0, 0, width, height), 100, out);
-                    byte[] imageBytes = out.toByteArray();
-                    
-                    Bitmap bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
-                    if (bitmap != null) {
-                        Log.d(TAG, "imageToBitmapUsingGenericYUV: Multi-plane conversion successful");
-                        return bitmap;
-                    }
-                } catch (Exception e) {
-                    Log.w(TAG, "imageToBitmapUsingGenericYUV: Multi-plane conversion failed", e);
-                }
-            }
-            
-            Log.w(TAG, "imageToBitmapUsingGenericYUV: All methods failed");
-            return null;
-        } catch (Exception e) {
-            Log.e(TAG, "imageToBitmapUsingGenericYUV: Exception occurred", e);
-            return null;
-        }
-    }
-    
-    /**
-     * Stop camera and release resources
-     */
+
     public void stopCamera() {
         try {
             if (natarioView != null) {
                 natarioView.close();
             }
+            // Stop any active test frame loop
+            if (activeTestFrameRunnable != null) {
+                testFrameHandler.removeCallbacks(activeTestFrameRunnable);
+                activeTestFrameRunnable = null;
+            }
         } catch (Exception ignored) {}
+    }
+
+    // ---------------------------
+    // Test Frame Injection APIs
+    // ---------------------------
+
+    /**
+     * Enable test frame injection with the provided bitmap. Frames will be delivered at the given fps.
+     * Call before startCamera().
+     */
+    public void setTestFrameInjection(@NonNull Bitmap testFrame, int targetFps) {
+        this.testFrameInjectionEnabled = true;
+        this.testFrameBitmap = testFrame;
+        this.preparedTestFrameBitmap = prepareBitmapForPipeline(testFrame);
+        setTestFrameFps(targetFps);
+    }
+
+    /** Disable test frame injection and return to real camera input. */
+    public void disableTestFrameInjection() {
+        this.testFrameInjectionEnabled = false;
+        this.testFrameBitmap = null;
+        this.preparedTestFrameBitmap = null;
+        if (activeTestFrameRunnable != null) {
+            testFrameHandler.removeCallbacks(activeTestFrameRunnable);
+            activeTestFrameRunnable = null;
+        }
+    }
+
+    /** Optional: set the FPS used when injecting test frames. */
+    public void setTestFrameFps(int targetFps) {
+        if (targetFps <= 0) targetFps = 15;
+        this.testFrameIntervalMs = Math.max(10, 1000 / targetFps);
+    }
+
+    /** Convenience: load a bitmap from file path for test injection. Returns true on success. */
+    public boolean setTestFrameFromFile(@NonNull String filePath, int targetFps) {
+        try {
+            Bitmap bmp = BitmapFactory.decodeFile(filePath);
+            if (bmp == null) {
+                Log.e(TAG, "Failed to decode test frame from file: " + filePath);
+                return false;
+            }
+            setTestFrameInjection(bmp, targetFps);
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading test frame from file", e);
+            return false;
+        }
+    }
+
+    /** Convenience: load a bitmap from a Uri using the given context. Returns true on success. */
+    public boolean setTestFrameFromUri(@NonNull Context context, @NonNull Uri uri, int targetFps) {
+        try (InputStream is = context.getContentResolver().openInputStream(uri)) {
+            if (is == null) return false;
+            Bitmap bmp = BitmapFactory.decodeStream(is);
+            if (bmp == null) return false;
+            setTestFrameInjection(bmp, targetFps);
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading test frame from uri", e);
+            return false;
+        }
+    }
+
+    private void startTestFrameLoop(@NonNull FrameAnalysisCallback frameCallback) {
+        if (preparedTestFrameBitmap == null) return;
+        // Ensure previous loop is stopped
+        if (activeTestFrameRunnable != null) {
+            testFrameHandler.removeCallbacks(activeTestFrameRunnable);
+        }
+        activeTestFrameRunnable = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    // Deliver the same prepared bitmap to mimic camera pipeline
+                    frameCallback.onFrameAnalyzed(preparedTestFrameBitmap);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error delivering test frame", e);
+                } finally {
+                    // Schedule next frame if still enabled
+                    if (testFrameInjectionEnabled && preparedTestFrameBitmap != null) {
+                        testFrameHandler.postDelayed(this, testFrameIntervalMs);
+                    }
+                }
+            }
+        };
+        testFrameHandler.post(activeTestFrameRunnable);
+        Log.d(TAG, "Test frame loop started at interval: " + testFrameIntervalMs + "ms");
+    }
+
+    // ---------------------------
+    // Quality Gate
+    // ---------------------------
+
+    private boolean passesQualityGate(@NonNull Bitmap bitmap) {
+        if (!qualityGateEnabled) return true;
+        try {
+            // Downscale for speed
+            int targetW = 320;
+            int targetH = Math.max(1, bitmap.getHeight() * targetW / Math.max(1, bitmap.getWidth()));
+            Bitmap small = Bitmap.createScaledBitmap(bitmap, targetW, targetH, true);
+
+            // Compute Y channel stats and Laplacian variance on grayscale
+            int[] pixels = new int[small.getWidth() * small.getHeight()];
+            small.getPixels(pixels, 0, small.getWidth(), 0, 0, small.getWidth(), small.getHeight());
+
+            int minY = 255, maxY = 0;
+            long sumY = 0;
+            // Simple grayscale Laplacian (3x3 kernel)
+            float lapVar = 0f;
+            // First compute grayscale buffer
+            int w = small.getWidth();
+            int h = small.getHeight();
+            int[] gray = new int[w * h];
+            for (int i = 0; i < pixels.length; i++) {
+                int c = pixels[i];
+                int r = (c >> 16) & 0xFF;
+                int g = (c >> 8) & 0xFF;
+                int b = (c) & 0xFF;
+                int y = (int)(0.299f * r + 0.587f * g + 0.114f * b);
+                gray[i] = y;
+                minY = Math.min(minY, y);
+                maxY = Math.max(maxY, y);
+                sumY += y;
+            }
+            float meanY = (float) sumY / (float) gray.length;
+            float dynamicRange = (float)(maxY - minY);
+
+            // Laplacian
+            long sumLap = 0;
+            long sumLapSq = 0;
+            for (int y = 1; y < h - 1; y++) {
+                for (int x = 1; x < w - 1; x++) {
+                    int cIdx = y * w + x;
+                    int lap = -gray[cIdx - w] - gray[cIdx - 1] + 4 * gray[cIdx] - gray[cIdx + 1] - gray[cIdx + w];
+                    sumLap += lap;
+                    sumLapSq += (long) lap * (long) lap;
+                }
+            }
+            int n = (w - 2) * (h - 2);
+            if (n <= 0) return true; // trivial accept
+            float meanLap = (float) sumLap / (float) n;
+            float varLap = (float) sumLapSq / (float) n - meanLap * meanLap;
+
+            boolean okLuma = meanY >= minLumaMean && meanY <= maxLumaMean;
+            boolean okRange = dynamicRange >= minDynamicRange;
+            boolean okBlur = varLap >= minLaplacianVariance;
+
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "QualityGate -> meanY=" + meanY + ", range=" + dynamicRange + ", lapVar=" + varLap
+                        + " | okLuma=" + okLuma + ", okRange=" + okRange + ", okBlur=" + okBlur);
+            }
+
+            return okLuma && okRange && okBlur;
+        } catch (Exception e) {
+            Log.w(TAG, "Quality gate failed open due to exception", e);
+            return true; // fail-open to avoid blocking capture
+        }
+    }
+    /** Prepare a bitmap to match the normal pipeline (mirror for front camera). */
+    private Bitmap prepareBitmapForPipeline(@NonNull Bitmap source) {
+        try {
+            Matrix mirrorMatrix = new Matrix();
+            mirrorMatrix.preScale(-1.0f, 1.0f);
+            return Bitmap.createBitmap(source, 0, 0, source.getWidth(), source.getHeight(), mirrorMatrix, true);
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to prepare test frame bitmap, returning original", e);
+            return source;
+        }
     }
 
     // Convert natario Frame to Bitmap (NV21/YUV -> JPEG -> Bitmap)

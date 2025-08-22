@@ -560,9 +560,24 @@ public class StudentSettingUpdateFaceIdFragment extends Fragment
                         public void onFaceDetected(Rect boundingBox, boolean isSpoof, float spoofScore) {
                             currentFaceRect = boundingBox;
 
-                            // Update face position in overlay
+                            // Update face position in overlay (map bitmap -> view coordinates)
                             if (faceOverlayView != null) {
-                                boolean isGoodPosition = faceOverlayView.updateFacePosition(boundingBox);
+                                android.graphics.Rect overlayRect = boundingBox;
+                                try {
+                                    android.graphics.RectF viewRectF = vn.edu.fpt.zentryapp.faceid.util.CoordinateMapper
+                                            .getInstance()
+                                            .mapBitmapRectToView(new android.graphics.RectF(boundingBox));
+                                    if (viewRectF != null) {
+                                        overlayRect = new android.graphics.Rect(
+                                                Math.round(viewRectF.left),
+                                                Math.round(viewRectF.top),
+                                                Math.round(viewRectF.right),
+                                                Math.round(viewRectF.bottom)
+                                        );
+                                    }
+                                } catch (Exception ignored) {}
+
+                                boolean isGoodPosition = faceOverlayView.updateFacePosition(overlayRect);
                                 if (!isGoodPosition) {
                                     // While in liveness challenge, do NOT change global state.
                                     // Only provide UI guidance and keep challenge active.
@@ -664,9 +679,24 @@ public class StudentSettingUpdateFaceIdFragment extends Fragment
                     public void onFaceDetected(Rect boundingBox, boolean isSpoof, float spoofScore) {
                         currentFaceRect = boundingBox;
 
-                        // Update face position in overlay for user guidance
+                        // Update face position in overlay for user guidance (map bitmap -> view)
                         if (faceOverlayView != null) {
-                            boolean isGoodPosition = faceOverlayView.updateFacePosition(boundingBox);
+                            android.graphics.Rect overlayRect = boundingBox;
+                            try {
+                                android.graphics.RectF viewRectF = vn.edu.fpt.zentryapp.faceid.util.CoordinateMapper
+                                        .getInstance()
+                                        .mapBitmapRectToView(new android.graphics.RectF(boundingBox));
+                                if (viewRectF != null) {
+                                    overlayRect = new android.graphics.Rect(
+                                            Math.round(viewRectF.left),
+                                            Math.round(viewRectF.top),
+                                            Math.round(viewRectF.right),
+                                            Math.round(viewRectF.bottom)
+                                    );
+                                }
+                            } catch (Exception ignored) {}
+
+                            boolean isGoodPosition = faceOverlayView.updateFacePosition(overlayRect);
 
                             // If position is bad, don't proceed with further processing
                             if (!isGoodPosition && stateManager.getCurrentState() != FaceRegistrationState.FACE_OUT_OF_BOUNDS) {
