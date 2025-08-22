@@ -6,41 +6,34 @@ import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.YuvImage;
+import android.net.Uri;
+import android.graphics.Color;
 import android.util.AttributeSet;
 import android.util.Log;
-import android.util.Size;
-import android.view.Surface;
 import android.view.ViewGroup;
-import android.view.OrientationEventListener;
-import android.view.Surface;
 import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.OptIn;
-import androidx.camera.core.Camera;
-import androidx.camera.core.CameraSelector;
-import androidx.camera.core.AspectRatio;
-import androidx.camera.core.ExperimentalGetImage;
-import androidx.camera.core.ImageAnalysis;
-import androidx.camera.core.ImageCapture;
-import androidx.camera.core.ImageCaptureException;
-import androidx.camera.core.ImageProxy;
-import androidx.camera.core.Preview;
-import androidx.camera.lifecycle.ProcessCameraProvider;
-import androidx.camera.view.PreviewView;
-import androidx.core.content.ContextCompat;
+
+import com.otaliastudios.cameraview.CameraListener;
+import com.otaliastudios.cameraview.PictureResult;
+import com.otaliastudios.cameraview.frame.Frame;
+import com.otaliastudios.cameraview.frame.FrameProcessor;
+import com.otaliastudios.cameraview.controls.Facing;
+import com.otaliastudios.cameraview.controls.Mode;
+import com.otaliastudios.cameraview.controls.Audio;
 import androidx.lifecycle.LifecycleOwner;
 
 import vn.edu.fpt.zentryapp.BuildConfig;
-import com.google.common.util.concurrent.ListenableFuture;
-
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import android.os.Handler;
+import android.os.Looper;
 
 /**
  * Custom camera view for face capture with continuous frame analysis
@@ -48,24 +41,28 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class CameraView extends FrameLayout {
     private static final String TAG = "CameraView";
     
-    private PreviewView previewView;
-    private Preview preview;
-    private Camera camera;
-    private ProcessCameraProvider cameraProvider;
-    private ImageCapture imageCapture;
-    private ImageAnalysis imageAnalysis;
-    private final Executor executor = Executors.newSingleThreadExecutor();
+    // Switched to natario CameraView as the rendering & capture engine
+    private com.otaliastudios.cameraview.CameraView natarioView;
     private AtomicBoolean processingFrame = new AtomicBoolean(false);
-    private OrientationEventListener orientationEventListener;
-    
-    // Biến để log info chỉ một lần
-    private boolean hasLoggedImageInfo = false;
+    private final Handler testFrameHandler = new Handler(Looper.getMainLooper());
+    private Runnable activeTestFrameRunnable;
+    private boolean testFrameInjectionEnabled = false;
+    private Bitmap testFrameBitmap;
+    private Bitmap preparedTestFrameBitmap; // mirrored & prepared to match pipeline
+    private int testFrameIntervalMs = 66; // ~15 FPS by default
+
+    // Quality gate configuration (high impact first)
+    private boolean qualityGateEnabled = true;
+    // Acceptable luminance mean range on Y channel (0..255)
+    private int minLumaMean = 60;
+    private int maxLumaMean = 200;
+    // Minimum dynamic range (maxY - minY) on Y channel
+    private float minDynamicRange = 40f;
+    // Minimum blur metric (variance of Laplacian on downscaled grayscale)
+    private float minLaplacianVariance = 120f;
+
     private int frameCount = 0;
-    
-    public interface CaptureCallback {
-        void onCaptured(Bitmap bitmap);
-        void onError(String message);
-    }
+
     
     public interface FrameAnalysisCallback {
         void onFrameAnalyzed(Bitmap bitmap);
@@ -87,11 +84,17 @@ public class CameraView extends FrameLayout {
     }
     
     private void init(Context context) {
-        // Create and add PreviewView
-        previewView = new PreviewView(context);
-        addView(previewView, new FrameLayout.LayoutParams(
+        // Create and add natario CameraView
+        natarioView = new com.otaliastudios.cameraview.CameraView(context);
+        natarioView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
+        // Configure defaults
+        natarioView.setFacing(Facing.FRONT);
+        natarioView.setMode(Mode.PICTURE);
+        // Disable audio to avoid requiring RECORD_AUDIO permission
+        natarioView.setAudio(Audio.OFF);
+        addView(natarioView);
     }
     
     /**
@@ -108,631 +111,323 @@ public class CameraView extends FrameLayout {
      * @param frameCallback Callback for frame analysis
      */
     public void startCamera(LifecycleOwner lifecycleOwner, @Nullable FrameAnalysisCallback frameCallback) {
-        Log.d(TAG, "Starting camera with frame analysis: " + (frameCallback != null));
-        
-        ListenableFuture<ProcessCameraProvider> cameraProviderFuture = 
-                ProcessCameraProvider.getInstance(getContext());
-        
-        cameraProviderFuture.addListener(() -> {
-            try {
-                cameraProvider = cameraProviderFuture.get();
-                bindCameraUseCases(lifecycleOwner, frameCallback);
-            } catch (ExecutionException | InterruptedException e) {
-                Log.e(TAG, "Error starting camera", e);
-            }
-        }, ContextCompat.getMainExecutor(getContext()));
-    }
-    
-    /**
-     * Bind camera use cases
-     */
-    private void bindCameraUseCases(LifecycleOwner lifecycleOwner, @Nullable FrameAnalysisCallback frameCallback) {
-        Log.d(TAG, "Binding camera use cases, frameCallback: " + (frameCallback != null));
-        
-        // Get screen metrics
-        int rotation = previewView.getDisplay().getRotation();
-        
-        // CameraSelector - Front camera for face capture
-        CameraSelector cameraSelector = new CameraSelector.Builder()
-                .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
-                .build();
-        
-        // Preview use case
-        preview = new Preview.Builder()
-                .setTargetRotation(rotation)
-                .build();
-        
-        // ImageCapture use case
-        imageCapture = new ImageCapture.Builder()
-                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                .setTargetRotation(rotation)
-                .build();
-        
-        // ImageAnalysis use case (if callback provided)
-        if (frameCallback != null) {
-            Log.d(TAG, "Setting up ImageAnalysis with YUV format (default)");
-            
-            // Cấu hình phân tích hình ảnh với độ phân giải phù hợp
-            // Không set OUTPUT_IMAGE_FORMAT để sử dụng format mặc định (YUV_420_888)
-            imageAnalysis = new ImageAnalysis.Builder()
-                    .setTargetRotation(rotation)
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .setTargetAspectRatio(AspectRatio.RATIO_16_9)
-                    .build();
-            
-            imageAnalysis.setAnalyzer(executor, image -> {
-                frameCount++;
-                
-                // Log mỗi 30 frames (khoảng 1 giây)
-                if (frameCount % 30 == 0) {
-                    Log.d(TAG, "Processing frame #" + frameCount + ", format: " + image.getFormat() + 
-                            ", size: " + image.getWidth() + "x" + image.getHeight());
-                }
-                
-                // Skip if we're still processing a previous frame
-                if (processingFrame.get()) {
-                    if (frameCount % 30 == 0) {
-                        Log.d(TAG, "Skipping frame #" + frameCount + " - still processing previous frame");
-                    }
-                    image.close();
-                    return;
-                }
-                
+        Log.d(TAG, "Starting natario CameraView with frame analysis: " + (frameCallback != null));
+
+        try {
+            // If test frame injection is enabled, bypass real camera and feed constant frames
+            if (testFrameInjectionEnabled && preparedTestFrameBitmap != null && frameCallback != null) {
+                Log.d(TAG, "Test frame injection mode enabled. Skipping real camera.");
+                // Initialize coordinate mapping for test frames (front preview mirrored, bitmap mirrored)
                 try {
-                    processingFrame.set(true);
-                    
-                    // Log thông tin về định dạng ảnh (chỉ log lần đầu tiên)
-                    if (!hasLoggedImageInfo) {
-                        logImageInfo(image);
-                        hasLoggedImageInfo = true;
+                    boolean isPreviewMirrored = true;
+                    boolean isBitmapMirrored = true; // preparedTestFrameBitmap already mirrored
+                    vn.edu.fpt.zentryapp.faceid.util.CoordinateMapper.getInstance().updateMappingWithPolicy(
+                            getWidth(), getHeight(), preparedTestFrameBitmap.getWidth(), preparedTestFrameBitmap.getHeight(),
+                            isPreviewMirrored, isBitmapMirrored
+                    );
+                } catch (Exception ignored) {}
+                startTestFrameLoop(bitmap -> {
+                    if (!passesQualityGate(bitmap)) {
+                        return;
                     }
-                    
-                    try {
-                        Log.d(TAG, "Converting frame #" + frameCount + " to bitmap");
-                        
-                        // Convert to bitmap
-                        Bitmap bitmap = imageToBitmap(image);
+                    frameCallback.onFrameAnalyzed(bitmap);
+                });
+                return;
+            }
 
+            // Attach to lifecycle if supported
+            try {
+                natarioView.setLifecycleOwner(lifecycleOwner);
+            } catch (Throwable ignored) {}
 
-                            if (bitmap != null) {
-                                Log.d("DEBUG_CAMERA", "Conversion successful - Bitmap: " +
-                                        bitmap.getWidth() + "x" + bitmap.getHeight() +
-                                        ", Config: " + bitmap.getConfig());
-                            } else {
-                                Log.e("DEBUG_CAMERA", "Conversion failed - bitmap is null");
+            if (frameCallback != null) {
+                natarioView.clearFrameProcessors();
+                natarioView.addFrameProcessor(new FrameProcessor() {
+                    @Override
+                    public void process(@NonNull Frame frame) {
+                        frameCount++;
+                        if (processingFrame.get()) {
+                            if (frameCount % 30 == 0) {
+                                Log.d(TAG, "Skipping frame #" + frameCount + " - still processing previous frame");
                             }
-
-                        
-                        if (bitmap == null) {
-                            Log.e(TAG, "Failed to convert frame #" + frameCount + " to bitmap - bitmap is null");
-                            processingFrame.set(false);
                             return;
                         }
-                        
-                        Log.d(TAG, "Successfully converted frame #" + frameCount + " to bitmap: " + 
-                                bitmap.getWidth() + "x" + bitmap.getHeight());
-                        
-                        // Mirror image for front camera (rotation already handled in converter)
-                        Matrix mirrorMatrix = new Matrix();
-                        mirrorMatrix.preScale(-1.0f, 1.0f);
-                        bitmap = Bitmap.createBitmap(
-                                bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), mirrorMatrix, true);
-                        
-                        Log.d(TAG, "Final bitmap for frame #" + frameCount + ": " + 
-                                bitmap.getWidth() + "x" + bitmap.getHeight());
-                        
-                        // Update coordinate mapping (preview view → bitmap). Here we already mirror bitmap, so mirrorX=false.
-                        try {
-                            boolean mirrorX = false;
-                            vn.edu.fpt.zentryapp.faceid.util.CoordinateMapper.getInstance().updateMapping(
-                                    previewView.getWidth(), previewView.getHeight(),
-                                    bitmap.getWidth(), bitmap.getHeight(),
-                                    mirrorX
-                            );
-                        } catch (Exception ignored) {}
 
-                        // Return bitmap via callback
-                        final Bitmap finalBitmap = bitmap;
-                        post(() -> {
-                            Log.d(TAG, "Calling frameCallback for frame #" + frameCount);
-                            frameCallback.onFrameAnalyzed(finalBitmap);
-                            processingFrame.set(false);
-                        });
-                    } catch (Exception e) {
-                        Log.e(TAG, "Error processing frame #" + frameCount, e);
-                        processingFrame.set(false);
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Error analyzing frame #" + frameCount, e);
-                    processingFrame.set(false);
-                } finally {
-                    image.close();
-                }
-            });
-        } else {
-            Log.d(TAG, "No frame callback provided - ImageAnalysis not set up");
-        }
-        
-        // Unbind previous use cases
-        cameraProvider.unbindAll();
-        
-        try {
-            // Bind use cases to camera
-            if (frameCallback != null && imageAnalysis != null) {
-                Log.d(TAG, "Binding camera with Preview, ImageCapture, and ImageAnalysis");
-                camera = cameraProvider.bindToLifecycle(
-                        lifecycleOwner,
-                        cameraSelector,
-                        preview,
-                        imageCapture,
-                        imageAnalysis);
-            } else {
-                Log.d(TAG, "Binding camera with Preview and ImageCapture only");
-                camera = cameraProvider.bindToLifecycle(
-                        lifecycleOwner,
-                        cameraSelector,
-                        preview,
-                        imageCapture);
-            }
-            
-            // Connect preview to previewView
-            preview.setSurfaceProvider(previewView.getSurfaceProvider());
-            
-            // Enable dynamic orientation updates
-            if (orientationEventListener == null) {
-                orientationEventListener = new OrientationEventListener(getContext()) {
-                    @Override
-                    public void onOrientationChanged(int orientation) {
-                        if (orientation == ORIENTATION_UNKNOWN) return;
-                        int newRotation;
-                        if (orientation >= 45 && orientation < 135) {
-                            newRotation = Surface.ROTATION_270;
-                        } else if (orientation >= 135 && orientation < 225) {
-                            newRotation = Surface.ROTATION_180;
-                        } else if (orientation >= 225 && orientation < 315) {
-                            newRotation = Surface.ROTATION_90;
-                        } else {
-                            newRotation = Surface.ROTATION_0;
-                        }
+                        processingFrame.set(true);
                         try {
-                            if (imageAnalysis != null) imageAnalysis.setTargetRotation(newRotation);
-                            if (preview != null) preview.setTargetRotation(newRotation);
-                        } catch (Exception ignored) {}
+                            int width = frame.getSize().getWidth();
+                            int height = frame.getSize().getHeight();
+                            Bitmap bitmap = frameToBitmap(frame, width, height);
+                            if (bitmap == null) {
+                                processingFrame.set(false);
+                                return;
+                            }
+
+                            // Rotate to user orientation if needed
+                            try {
+                                int rotationToUser = frame.getRotationToUser();
+                                if (rotationToUser != 0) {
+                                    Matrix rot = new Matrix();
+                                    rot.postRotate(rotationToUser);
+                                    bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), rot, true);
+                                }
+                            } catch (Throwable ignored) {}
+
+                            // Mirror horizontally for front camera to keep consistency with previous pipeline
+                            Matrix mirrorMatrix = new Matrix();
+                            mirrorMatrix.preScale(-1.0f, 1.0f);
+                            bitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), mirrorMatrix, true);
+
+                            // Quality gate check
+                            if (!passesQualityGate(bitmap)) {
+                                processingFrame.set(false);
+                                return;
+                            }
+
+                            // Update coordinate mapping using standardized policy
+                            try {
+                                boolean isPreviewMirrored = true;
+                                boolean isBitmapMirrored = true;
+                                vn.edu.fpt.zentryapp.faceid.util.CoordinateMapper.getInstance().updateMappingWithPolicy(
+                                        getWidth(), getHeight(), bitmap.getWidth(), bitmap.getHeight(),
+                                        isPreviewMirrored, isBitmapMirrored
+                                );
+                            } catch (Exception ignored) {}
+
+                            final Bitmap finalBitmap = bitmap;
+                            post(() -> {
+                                try {
+                                    frameCallback.onFrameAnalyzed(finalBitmap);
+                                } catch (Exception e) {
+                                    Log.e(TAG, "Error delivering analyzed frame", e);
+                                } finally {
+                                    processingFrame.set(false);
+                                }
+                            });
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error processing natario frame", e);
+                            processingFrame.set(false);
+                        }
                     }
-                };
+                });
+            } else {
+                natarioView.clearFrameProcessors();
             }
-            if (orientationEventListener != null) orientationEventListener.enable();
-            Log.d(TAG, "Camera binding successful");
+
+            natarioView.open();
+            Log.d(TAG, "natario CameraView opened");
         } catch (Exception e) {
-            Log.e(TAG, "Use case binding failed", e);
+            Log.e(TAG, "Error starting natario CameraView", e);
         }
     }
-    
-    /**
-     * Capture a photo
-     */
-    public void capturePhoto(CaptureCallback callback) {
-        if (imageCapture == null) {
-            callback.onError("Camera not initialized");
-            return;
-        }
-        
-        // Create image capture listener
-        ImageCapture.OnImageCapturedCallback imageCapturedCallback = new ImageCapture.OnImageCapturedCallback() {
-            @Override
-            public void onCaptureSuccess(@NonNull ImageProxy imageProxy) {
-                try {
-                    // Convert ImageProxy to Bitmap
-                    Bitmap bitmap = imageToBitmap(imageProxy);
-                    
-                    // Mirror image for front camera (rotation already handled in converter)
-                    Matrix mirrorMatrix = new Matrix();
-                    mirrorMatrix.preScale(-1.0f, 1.0f);
-                    bitmap = Bitmap.createBitmap(
-                            bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), mirrorMatrix, true);
-                    
-                    // Return bitmap
-                    final Bitmap finalBitmap = bitmap;
-                    imageProxy.close();
-                    
-                    // Post to main thread
-                    post(() -> callback.onCaptured(finalBitmap));
-                } catch (Exception e) {
-                    Log.e(TAG, "Error processing captured image", e);
-                    imageProxy.close();
-                    post(() -> callback.onError("Failed to process captured image: " + e.getMessage()));
-                }
+
+
+    public void stopCamera() {
+        try {
+            if (natarioView != null) {
+                natarioView.close();
             }
-            
+            // Stop any active test frame loop
+            if (activeTestFrameRunnable != null) {
+                testFrameHandler.removeCallbacks(activeTestFrameRunnable);
+                activeTestFrameRunnable = null;
+            }
+        } catch (Exception ignored) {}
+    }
+
+    // ---------------------------
+    // Test Frame Injection APIs
+    // ---------------------------
+
+    /**
+     * Enable test frame injection with the provided bitmap. Frames will be delivered at the given fps.
+     * Call before startCamera().
+     */
+    public void setTestFrameInjection(@NonNull Bitmap testFrame, int targetFps) {
+        this.testFrameInjectionEnabled = true;
+        this.testFrameBitmap = testFrame;
+        this.preparedTestFrameBitmap = prepareBitmapForPipeline(testFrame);
+        setTestFrameFps(targetFps);
+    }
+
+    /** Disable test frame injection and return to real camera input. */
+    public void disableTestFrameInjection() {
+        this.testFrameInjectionEnabled = false;
+        this.testFrameBitmap = null;
+        this.preparedTestFrameBitmap = null;
+        if (activeTestFrameRunnable != null) {
+            testFrameHandler.removeCallbacks(activeTestFrameRunnable);
+            activeTestFrameRunnable = null;
+        }
+    }
+
+    /** Optional: set the FPS used when injecting test frames. */
+    public void setTestFrameFps(int targetFps) {
+        if (targetFps <= 0) targetFps = 15;
+        this.testFrameIntervalMs = Math.max(10, 1000 / targetFps);
+    }
+
+    /** Convenience: load a bitmap from file path for test injection. Returns true on success. */
+    public boolean setTestFrameFromFile(@NonNull String filePath, int targetFps) {
+        try {
+            Bitmap bmp = BitmapFactory.decodeFile(filePath);
+            if (bmp == null) {
+                Log.e(TAG, "Failed to decode test frame from file: " + filePath);
+                return false;
+            }
+            setTestFrameInjection(bmp, targetFps);
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading test frame from file", e);
+            return false;
+        }
+    }
+
+    /** Convenience: load a bitmap from a Uri using the given context. Returns true on success. */
+    public boolean setTestFrameFromUri(@NonNull Context context, @NonNull Uri uri, int targetFps) {
+        try (InputStream is = context.getContentResolver().openInputStream(uri)) {
+            if (is == null) return false;
+            Bitmap bmp = BitmapFactory.decodeStream(is);
+            if (bmp == null) return false;
+            setTestFrameInjection(bmp, targetFps);
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading test frame from uri", e);
+            return false;
+        }
+    }
+
+    private void startTestFrameLoop(@NonNull FrameAnalysisCallback frameCallback) {
+        if (preparedTestFrameBitmap == null) return;
+        // Ensure previous loop is stopped
+        if (activeTestFrameRunnable != null) {
+            testFrameHandler.removeCallbacks(activeTestFrameRunnable);
+        }
+        activeTestFrameRunnable = new Runnable() {
             @Override
-            public void onError(@NonNull ImageCaptureException exception) {
-                Log.e(TAG, "Photo capture failed", exception);
-                post(() -> callback.onError("Failed to capture image: " + exception.getMessage()));
+            public void run() {
+                try {
+                    // Deliver the same prepared bitmap to mimic camera pipeline
+                    frameCallback.onFrameAnalyzed(preparedTestFrameBitmap);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error delivering test frame", e);
+                } finally {
+                    // Schedule next frame if still enabled
+                    if (testFrameInjectionEnabled && preparedTestFrameBitmap != null) {
+                        testFrameHandler.postDelayed(this, testFrameIntervalMs);
+                    }
+                }
             }
         };
-        
-        // Capture the image
-        imageCapture.takePicture(executor, imageCapturedCallback);
+        testFrameHandler.post(activeTestFrameRunnable);
+        Log.d(TAG, "Test frame loop started at interval: " + testFrameIntervalMs + "ms");
     }
-    
-    /**
-     * Convert ImageProxy to Bitmap
-     */
-    @OptIn(markerClass = ExperimentalGetImage.class)
-    private Bitmap imageToBitmap(ImageProxy image) {
+
+    // ---------------------------
+    // Quality Gate
+    // ---------------------------
+
+    private boolean passesQualityGate(@NonNull Bitmap bitmap) {
+        if (!qualityGateEnabled) return true;
         try {
-            // 🔧 DEBUG FLAG 4: Log image format và size
+            // Downscale for speed
+            int targetW = 320;
+            int targetH = Math.max(1, bitmap.getHeight() * targetW / Math.max(1, bitmap.getWidth()));
+            Bitmap small = Bitmap.createScaledBitmap(bitmap, targetW, targetH, true);
+
+            // Compute Y channel stats and Laplacian variance on grayscale
+            int[] pixels = new int[small.getWidth() * small.getHeight()];
+            small.getPixels(pixels, 0, small.getWidth(), 0, 0, small.getWidth(), small.getHeight());
+
+            int minY = 255, maxY = 0;
+            long sumY = 0;
+            // Simple grayscale Laplacian (3x3 kernel)
+            float lapVar = 0f;
+            // First compute grayscale buffer
+            int w = small.getWidth();
+            int h = small.getHeight();
+            int[] gray = new int[w * h];
+            for (int i = 0; i < pixels.length; i++) {
+                int c = pixels[i];
+                int r = (c >> 16) & 0xFF;
+                int g = (c >> 8) & 0xFF;
+                int b = (c) & 0xFF;
+                int y = (int)(0.299f * r + 0.587f * g + 0.114f * b);
+                gray[i] = y;
+                minY = Math.min(minY, y);
+                maxY = Math.max(maxY, y);
+                sumY += y;
+            }
+            float meanY = (float) sumY / (float) gray.length;
+            float dynamicRange = (float)(maxY - minY);
+
+            // Laplacian
+            long sumLap = 0;
+            long sumLapSq = 0;
+            for (int y = 1; y < h - 1; y++) {
+                for (int x = 1; x < w - 1; x++) {
+                    int cIdx = y * w + x;
+                    int lap = -gray[cIdx - w] - gray[cIdx - 1] + 4 * gray[cIdx] - gray[cIdx + 1] - gray[cIdx + w];
+                    sumLap += lap;
+                    sumLapSq += (long) lap * (long) lap;
+                }
+            }
+            int n = (w - 2) * (h - 2);
+            if (n <= 0) return true; // trivial accept
+            float meanLap = (float) sumLap / (float) n;
+            float varLap = (float) sumLapSq / (float) n - meanLap * meanLap;
+
+            boolean okLuma = meanY >= minLumaMean && meanY <= maxLumaMean;
+            boolean okRange = dynamicRange >= minDynamicRange;
+            boolean okBlur = varLap >= minLaplacianVariance;
+
             if (BuildConfig.DEBUG) {
-                Log.d("DEBUG_CAMERA", "Converting frame - Format: " + image.getFormat() +
-                        ", Size: " + image.getWidth() + "x" + image.getHeight() +
-                        ", Rotation: " + image.getImageInfo().getRotationDegrees());
-            }
-            // Canonical path: always try robust YUV_420_888 → NV21 → JPEG decode
-            android.media.Image mediaImage = image.getImage();
-            if (mediaImage != null && mediaImage.getFormat() == android.graphics.ImageFormat.YUV_420_888) {
-                Bitmap bmp = vn.edu.fpt.zentryapp.faceid.util.YuvToRgbConverter.convert(image, image.getImageInfo().getRotationDegrees());
-                if (bmp != null) return bmp;
+                Log.d(TAG, "QualityGate -> meanY=" + meanY + ", range=" + dynamicRange + ", lapVar=" + varLap
+                        + " | okLuma=" + okLuma + ", okRange=" + okRange + ", okBlur=" + okBlur);
             }
 
-            // Fallback: RGBA fast path (if truly RGBA)
-            if (image.getFormat() == ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888) {
-                Bitmap bmp = rgbaImageProxyToBitmap(image);
-                if (bmp != null) return applyRotation(bmp, image.getImageInfo().getRotationDegrees());
-            }
-
-            // Last resort: JPEG decode from first plane (rare)
-            if (image.getPlanes().length > 0) {
-                ByteBuffer buffer = image.getPlanes()[0].getBuffer();
-                byte[] bytes = new byte[buffer.remaining()];
-                buffer.get(bytes);
-                Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                if (bmp != null) return applyRotation(bmp, image.getImageInfo().getRotationDegrees());
-            }
-
-            // Fallback empty bitmap
-            int width = Math.max(1, image.getWidth());
-            int height = Math.max(1, image.getHeight());
-
-            return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            return okLuma && okRange && okBlur;
         } catch (Exception e) {
-            Log.e(TAG, "imageToBitmap: Exception occurred", e);
-            return Bitmap.createBitmap(640, 480, Bitmap.Config.ARGB_8888);
+            Log.w(TAG, "Quality gate failed open due to exception", e);
+            return true; // fail-open to avoid blocking capture
+        }
+    }
+    /** Prepare a bitmap to match the normal pipeline (mirror for front camera). */
+    private Bitmap prepareBitmapForPipeline(@NonNull Bitmap source) {
+        try {
+            Matrix mirrorMatrix = new Matrix();
+            mirrorMatrix.preScale(-1.0f, 1.0f);
+            return Bitmap.createBitmap(source, 0, 0, source.getWidth(), source.getHeight(), mirrorMatrix, true);
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to prepare test frame bitmap, returning original", e);
+            return source;
         }
     }
 
-    private Bitmap applyRotation(Bitmap src, int rotationDegrees) {
-        if (rotationDegrees == 0) return src;
+    // Convert natario Frame to Bitmap (NV21/YUV -> JPEG -> Bitmap)
+    private Bitmap frameToBitmap(Frame frame, int width, int height) {
         try {
-            Matrix m = new Matrix();
-            m.postRotate(rotationDegrees);
-            Bitmap out = Bitmap.createBitmap(src, 0, 0, src.getWidth(), src.getHeight(), m, true);
-            if (out != src) src.recycle();
-            return out;
-        } catch (Exception ignored) {
-            return src;
-        }
-    }
-    
-    /**
-     * Log thông tin về định dạng ảnh từ camera
-     */
-    @OptIn(markerClass = ExperimentalGetImage.class)
-    private void logImageInfo(ImageProxy image) {
-        try {
-            Log.d(TAG, "Image info: " + image.getWidth() + "x" + image.getHeight() + 
-                    ", format=" + image.getFormat() + 
-                    ", cropRect=" + image.getCropRect());
-            
-            if (image.getPlanes() != null && image.getPlanes().length > 0) {
-                for (int i = 0; i < image.getPlanes().length; i++) {
-                    ImageProxy.PlaneProxy plane = image.getPlanes()[i];
-                    Log.d(TAG, "Plane " + i + ": pixelStride=" + plane.getPixelStride() + 
-                            ", rowStride=" + plane.getRowStride() + 
-                            ", bufferSize=" + plane.getBuffer().remaining());
-                }
-            }
-            
-            android.media.Image mediaImage = image.getImage();
-            if (mediaImage != null) {
-                Log.d(TAG, "MediaImage format: " + mediaImage.getFormat() + 
-                        ", timestamp=" + mediaImage.getTimestamp());
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error logging image info", e);
-        }
-    }
-    
-    /**
-     * Convert RGBA_8888 format ImageProxy to Bitmap
-     */
-    private Bitmap rgbaImageProxyToBitmap(ImageProxy image) {
-        try {
-            Log.d(TAG, "rgbaImageProxyToBitmap: Starting RGBA conversion");
-            
-            if (image.getPlanes().length == 0) {
-                Log.e(TAG, "rgbaImageProxyToBitmap: No planes available");
-                return null;
-            }
-            
-            ByteBuffer buffer = image.getPlanes()[0].getBuffer();
-            int pixelStride = image.getPlanes()[0].getPixelStride();
-            int rowStride = image.getPlanes()[0].getRowStride();
-            int width = image.getWidth();
-            int height = image.getHeight();
-            
-            Log.d(TAG, "rgbaImageProxyToBitmap: " + width + "x" + height + 
-                    ", pixelStride=" + pixelStride + ", rowStride=" + rowStride + 
-                    ", bufferSize=" + buffer.remaining());
-            
-            // Nếu pixelStride = 4 (RGBA_8888), chúng ta có thể tạo bitmap trực tiếp
-            if (pixelStride == 4) {
-                Log.d(TAG, "rgbaImageProxyToBitmap: Using direct copy method (pixelStride=4)");
-                try {
-                    Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-                    buffer.rewind();
-                    bitmap.copyPixelsFromBuffer(buffer);
-                    Log.d(TAG, "rgbaImageProxyToBitmap: Direct copy successful");
-                    return bitmap;
-                } catch (Exception e) {
-                    Log.e(TAG, "rgbaImageProxyToBitmap: Direct copy failed", e);
-                    // Fall through to manual method
-                }
-            }
-            
-            // Nếu không, chúng ta cần sao chép dữ liệu theo cách thủ công
-            Log.d(TAG, "rgbaImageProxyToBitmap: Using manual copy method (pixelStride=" + pixelStride + ")");
-            int bufferSize = buffer.remaining();
-            byte[] data = new byte[bufferSize];
-            buffer.get(data);
-            
-            Log.d(TAG, "rgbaImageProxyToBitmap: Read " + data.length + " bytes from buffer");
-            
-            // Tạo bitmap trống
-            Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-            
-            // Sao chép từng pixel
-            int[] pixels = new int[width * height];
-            int offset = 0;
-            int successfulPixels = 0;
-            
-            for (int y = 0; y < height; y++) {
-                for (int x = 0; x < width; x++) {
-                    int pixel = 0;
-                    int bufferIndex = y * rowStride + x * pixelStride;
-                    
-                    if (bufferIndex + 3 < data.length) {
-                        // RGBA -> ARGB
-                        int r = data[bufferIndex] & 0xff;
-                        int g = data[bufferIndex + 1] & 0xff;
-                        int b = data[bufferIndex + 2] & 0xff;
-                        int a = data[bufferIndex + 3] & 0xff;
-                        
-                        pixel = (a << 24) | (r << 16) | (g << 8) | b;
-                        successfulPixels++;
-                    }
-                    
-                    pixels[offset++] = pixel;
-                }
-            }
-            
-            Log.d(TAG, "rgbaImageProxyToBitmap: Processed " + successfulPixels + "/" + (width * height) + " pixels");
-            
-            bitmap.setPixels(pixels, 0, width, 0, 0, width, height);
-            Log.d(TAG, "rgbaImageProxyToBitmap: Manual copy successful");
-            return bitmap;
-        } catch (Exception e) {
-            Log.e(TAG, "rgbaImageProxyToBitmap: Exception occurred", e);
-            return null;
-        }
-    }
-    
-    /**
-     * Convert YUV_420_888 Image to Bitmap
-     */
-    private Bitmap imageToBitmapUsingYUV(android.media.Image image) {
-        try {
-            Log.d(TAG, "imageToBitmapUsingYUV: Format = " + image.getFormat());
-            
-            int width = image.getWidth();
-            int height = image.getHeight();
-            
-            // Lấy các planes
-            android.media.Image.Plane[] planes = image.getPlanes();
-            if (planes.length < 3) {
-                Log.e(TAG, "imageToBitmapUsingYUV: Not enough planes: " + planes.length);
-                return null;
-            }
-            
-            ByteBuffer yBuffer = planes[0].getBuffer();
-            ByteBuffer uBuffer = planes[1].getBuffer();
-            ByteBuffer vBuffer = planes[2].getBuffer();
-            
-            // Log thông tin về planes
-            Log.d(TAG, "imageToBitmapUsingYUV: Y plane - stride=" + planes[0].getRowStride() + ", pixelStride=" + planes[0].getPixelStride());
-            Log.d(TAG, "imageToBitmapUsingYUV: U plane - stride=" + planes[1].getRowStride() + ", pixelStride=" + planes[1].getPixelStride());
-            Log.d(TAG, "imageToBitmapUsingYUV: V plane - stride=" + planes[2].getRowStride() + ", pixelStride=" + planes[2].getPixelStride());
-            
-            // Tính toán kích thước dữ liệu
-            int ySize = yBuffer.remaining();
-            int uSize = uBuffer.remaining();
-            int vSize = vBuffer.remaining();
-            
-            Log.d(TAG, "imageToBitmapUsingYUV: Buffer sizes - Y=" + ySize + ", U=" + uSize + ", V=" + vSize);
-            
-            // Tạo mảng NV21 (YUV420SP)
-            byte[] nv21 = new byte[width * height * 3 / 2];
-            
-            // Sao chép Y plane
-            int yActualSize = Math.min(ySize, width * height);
-            yBuffer.get(nv21, 0, yActualSize);
-            Log.d(TAG, "imageToBitmapUsingYUV: Copied Y data: " + yActualSize + " bytes");
-            
-            // Sao chép U và V xen kẽ để tạo UV plane
-            int uvPos = width * height;
-            int uPixelStride = planes[1].getPixelStride();
-            int vPixelStride = planes[2].getPixelStride();
-            
-            // Xử lý theo pixel stride
-            if (uPixelStride == 1 && vPixelStride == 1) {
-                // Planar format
-                Log.d(TAG, "imageToBitmapUsingYUV: Processing planar format");
-                for (int i = 0; i < Math.min(uSize, vSize) && uvPos < nv21.length - 1; i++) {
-                    nv21[uvPos++] = vBuffer.get(i);
-                    nv21[uvPos++] = uBuffer.get(i);
-                }
+            Object dataObj = frame.getData();
+            byte[] nv21;
+            if (dataObj instanceof byte[]) {
+                nv21 = (byte[]) dataObj;
+            } else if (dataObj instanceof java.nio.ByteBuffer) {
+                java.nio.ByteBuffer buffer = (java.nio.ByteBuffer) dataObj;
+                nv21 = new byte[buffer.remaining()];
+                buffer.get(nv21);
             } else {
-                // Semi-planar hoặc interleaved format
-                Log.d(TAG, "imageToBitmapUsingYUV: Processing semi-planar format (uPixelStride=" + uPixelStride + ", vPixelStride=" + vPixelStride + ")");
-                int uvSamples = Math.min(uSize / uPixelStride, vSize / vPixelStride);
-                for (int i = 0; i < uvSamples && uvPos < nv21.length - 1; i++) {
-                    nv21[uvPos++] = vBuffer.get(i * vPixelStride);
-                    nv21[uvPos++] = uBuffer.get(i * uPixelStride);
-                }
+                Log.w(TAG, "Unsupported frame data type: " + (dataObj != null ? dataObj.getClass() : "null"));
+                return null;
             }
-            
-            Log.d(TAG, "imageToBitmapUsingYUV: UV data copied, total NV21 size: " + nv21.length);
-            
-            // Chuyển đổi YUV sang RGB
-            YuvImage yuvImage = new YuvImage(nv21, android.graphics.ImageFormat.NV21, width, height, null);
+
+            YuvImage yuv = new YuvImage(nv21, android.graphics.ImageFormat.NV21, width, height, null);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
-            yuvImage.compressToJpeg(new Rect(0, 0, width, height), 90, out);
-            byte[] imageBytes = out.toByteArray();
-            
-            Log.d(TAG, "imageToBitmapUsingYUV: JPEG size: " + imageBytes.length);
-            
-            Bitmap bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
-            if (bitmap != null) {
-                Log.d(TAG, "imageToBitmapUsingYUV: Successfully created bitmap: " + bitmap.getWidth() + "x" + bitmap.getHeight());
-            } else {
-                Log.e(TAG, "imageToBitmapUsingYUV: Failed to decode JPEG");
-            }
-            
-            return bitmap;
+            yuv.compressToJpeg(new Rect(0, 0, width, height), 90, out);
+            byte[] jpeg = out.toByteArray();
+            return BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length);
         } catch (Exception e) {
-            Log.e(TAG, "imageToBitmapUsingYUV: Exception occurred", e);
+            Log.e(TAG, "frameToBitmap failed", e);
             return null;
-        }
-    }
-    
-    /**
-     * Convert generic YUV format Image to Bitmap
-     */
-    private Bitmap imageToBitmapUsingGenericYUV(android.media.Image image) {
-        try {
-            Log.d(TAG, "imageToBitmapUsingGenericYUV: Format = " + image.getFormat());
-            
-            int width = image.getWidth();
-            int height = image.getHeight();
-            
-            // Lấy các planes
-            android.media.Image.Plane[] planes = image.getPlanes();
-            if (planes.length == 0) {
-                Log.e(TAG, "imageToBitmapUsingGenericYUV: No planes available");
-                return null;
-            }
-            
-            Log.d(TAG, "imageToBitmapUsingGenericYUV: " + width + "x" + height + ", planes=" + planes.length);
-            
-            // Nếu chỉ có 1 plane, có thể là grayscale hoặc packed format
-            if (planes.length == 1) {
-                Log.d(TAG, "imageToBitmapUsingGenericYUV: Single plane format");
-                ByteBuffer buffer = planes[0].getBuffer();
-                int pixelStride = planes[0].getPixelStride();
-                int rowStride = planes[0].getRowStride();
-                
-                Log.d(TAG, "imageToBitmapUsingGenericYUV: pixelStride=" + pixelStride + ", rowStride=" + rowStride);
-                
-                // Nếu là packed format (NV21/NV16), thử xử lý
-                if (pixelStride == 1) {
-                    // Đây có thể là NV21 hoặc format tương tự
-                    byte[] data = new byte[buffer.remaining()];
-                    buffer.get(data);
-                    
-                    Log.d(TAG, "imageToBitmapUsingGenericYUV: Data size=" + data.length + ", expected=" + (width * height * 3 / 2));
-                    
-                    // Thử tạo YuvImage với NV21
-                    try {
-                        YuvImage yuvImage = new YuvImage(data, android.graphics.ImageFormat.NV21, width, height, null);
-                        ByteArrayOutputStream out = new ByteArrayOutputStream();
-                        yuvImage.compressToJpeg(new Rect(0, 0, width, height), 100, out);
-                        byte[] imageBytes = out.toByteArray();
-                        
-                        Bitmap bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
-                        if (bitmap != null) {
-                            Log.d(TAG, "imageToBitmapUsingGenericYUV: NV21 conversion successful");
-                            return bitmap;
-                        }
-                    } catch (Exception e) {
-                        Log.w(TAG, "imageToBitmapUsingGenericYUV: NV21 conversion failed", e);
-                    }
-                }
-            }
-            
-            // Nếu có 3 planes, thử xử lý như YUV420
-            if (planes.length >= 3) {
-                Log.d(TAG, "imageToBitmapUsingGenericYUV: Multi-plane format, trying YUV420 conversion");
-                
-                ByteBuffer yBuffer = planes[0].getBuffer();
-                ByteBuffer uBuffer = planes[1].getBuffer();
-                ByteBuffer vBuffer = planes[2].getBuffer();
-                
-                int ySize = yBuffer.remaining();
-                int uSize = uBuffer.remaining();
-                int vSize = vBuffer.remaining();
-                
-                Log.d(TAG, "imageToBitmapUsingGenericYUV: Y=" + ySize + ", U=" + uSize + ", V=" + vSize);
-                
-                // Tạo mảng NV21
-                byte[] nv21 = new byte[width * height * 3 / 2];
-                
-                // Sao chép Y
-                yBuffer.get(nv21, 0, Math.min(ySize, width * height));
-                
-                // Sao chép U và V xen kẽ
-                int uvPos = width * height;
-                int uStep = Math.max(1, planes[1].getPixelStride());
-                int vStep = Math.max(1, planes[2].getPixelStride());
-                
-                for (int i = 0; i < Math.min(uSize / uStep, vSize / vStep) && uvPos < nv21.length - 1; i++) {
-                    if (i * vStep < vSize) {
-                        nv21[uvPos++] = vBuffer.get(i * vStep);
-                    }
-                    if (i * uStep < uSize && uvPos < nv21.length) {
-                        nv21[uvPos++] = uBuffer.get(i * uStep);
-                    }
-                }
-                
-                // Chuyển đổi sang RGB
-                try {
-                    YuvImage yuvImage = new YuvImage(nv21, android.graphics.ImageFormat.NV21, width, height, null);
-                    ByteArrayOutputStream out = new ByteArrayOutputStream();
-                    yuvImage.compressToJpeg(new Rect(0, 0, width, height), 100, out);
-                    byte[] imageBytes = out.toByteArray();
-                    
-                    Bitmap bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
-                    if (bitmap != null) {
-                        Log.d(TAG, "imageToBitmapUsingGenericYUV: Multi-plane conversion successful");
-                        return bitmap;
-                    }
-                } catch (Exception e) {
-                    Log.w(TAG, "imageToBitmapUsingGenericYUV: Multi-plane conversion failed", e);
-                }
-            }
-            
-            Log.w(TAG, "imageToBitmapUsingGenericYUV: All methods failed");
-            return null;
-        } catch (Exception e) {
-            Log.e(TAG, "imageToBitmapUsingGenericYUV: Exception occurred", e);
-            return null;
-        }
-    }
-    
-    /**
-     * Stop camera and release resources
-     */
-    public void stopCamera() {
-        if (cameraProvider != null) {
-            cameraProvider.unbindAll();
         }
     }
 } 

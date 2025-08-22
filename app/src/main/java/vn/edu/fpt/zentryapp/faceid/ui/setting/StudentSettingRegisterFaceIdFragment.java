@@ -562,7 +562,21 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
 
                             // Update face position in overlay
                             if (faceOverlayView != null) {
-                                boolean isGoodPosition = faceOverlayView.updateFacePosition(boundingBox);
+                                android.graphics.Rect overlayRect = boundingBox;
+                                try {
+                                    android.graphics.RectF viewRectF = vn.edu.fpt.zentryapp.faceid.util.CoordinateMapper
+                                            .getInstance()
+                                            .mapBitmapRectToView(new android.graphics.RectF(boundingBox));
+                                    if (viewRectF != null) {
+                                        overlayRect = new android.graphics.Rect(
+                                                Math.round(viewRectF.left),
+                                                Math.round(viewRectF.top),
+                                                Math.round(viewRectF.right),
+                                                Math.round(viewRectF.bottom)
+                                        );
+                                    }
+                                } catch (Exception ignored) {}
+                                boolean isGoodPosition = faceOverlayView.updateFacePosition(overlayRect);
                                 if (!isGoodPosition) {
                                     // While in liveness challenge, do NOT change global state.
                                     // Only provide UI guidance and keep challenge active.
@@ -666,7 +680,21 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
 
                         // Update face position in overlay for user guidance
                         if (faceOverlayView != null) {
-                            boolean isGoodPosition = faceOverlayView.updateFacePosition(boundingBox);
+                            android.graphics.Rect overlayRect = boundingBox;
+                            try {
+                                android.graphics.RectF viewRectF = vn.edu.fpt.zentryapp.faceid.util.CoordinateMapper
+                                        .getInstance()
+                                        .mapBitmapRectToView(new android.graphics.RectF(boundingBox));
+                                if (viewRectF != null) {
+                                    overlayRect = new android.graphics.Rect(
+                                            Math.round(viewRectF.left),
+                                            Math.round(viewRectF.top),
+                                            Math.round(viewRectF.right),
+                                            Math.round(viewRectF.bottom)
+                                    );
+                                }
+                            } catch (Exception ignored) {}
+                            boolean isGoodPosition = faceOverlayView.updateFacePosition(overlayRect);
 
                             // If position is bad, don't proceed with further processing
                             if (!isGoodPosition && stateManager.getCurrentState() != FaceRegistrationState.FACE_OUT_OF_BOUNDS) {

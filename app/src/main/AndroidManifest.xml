@@ -38,10 +38,6 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
 
-        <!-- Service -->
-        <activity
-            android:name=".faceid.ui.activity.FaceIdEnhancerActivity"
-            android:exported="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true">
