@@ -44,6 +44,7 @@ public class FaceIdService {
     private final Context context;
     private FaceDetector faceDetector;
     private FaceEmbedding faceEmbedding;
+    private AuthManager authManager;
 
     @Getter
     private FaceSpoofDetector faceSpoofDetector;
@@ -78,7 +79,7 @@ public class FaceIdService {
         this.executor = Executors.newCachedThreadPool(); // Thay đổi thành thread pool
         this.mainHandler = new Handler(Looper.getMainLooper());
         this.faceIdApiController = ApiClient.getClient(context).create(FaceIdApiController.class);
-        
+        this.authManager = AuthManager.getInstance(context);
         // 🔧 NEW: Initialize configuration and managers
         this.configManager = new FaceIdConfig(context);
         this.memoryManager = new FaceIdMemoryManager(context, configManager.getConfig().memoryConfig);
@@ -909,7 +910,7 @@ public class FaceIdService {
                             FaceIdResponse responseBody = response.body();
                             if (responseBody.isSuccess()) {
                                 Log.d(TAG, "registerFaceId: SUCCESS - Face ID registered successfully");
-
+                                authManager.setFaceIdRegistered(true);
                                 runOnMainThread(() -> callback.onSuccess("Face ID registered successfully"));
                             } else {
                                 String errorMsg = "Server error: " + responseBody.getMessage();
@@ -1054,6 +1055,7 @@ public class FaceIdService {
                         @Override
                         public void onResponse(@NonNull Call<FaceIdResponse> call, @NonNull Response<FaceIdResponse> response) {
                             if (response.isSuccessful() && response.body() != null) {
+                                authManager.setFaceIdRegistered(true);
                                 runOnMainThread(() -> callback.onSuccess("Face ID updated successfully"));
                             } else {
                                 runOnMainThread(() -> callback.onFailure("Failed to update Face ID: " + response.message()));
