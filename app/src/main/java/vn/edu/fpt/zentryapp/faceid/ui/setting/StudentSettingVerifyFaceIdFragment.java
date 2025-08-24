@@ -662,10 +662,16 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
         uiController.showLoadingOverlay(true);
 
         // Add a small delay to ensure camera is properly released
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+        mainHandler.postDelayed(() -> {
             // Check again if fragment is still attached before proceeding
             if (!isAdded() || cameraView == null) {
                 Log.w(TAG, "Fragment not attached or camera view is null after delay");
+                return;
+            }
+
+            // Ensure we are still on CAMERA screen before starting camera
+            if (uiController == null || uiController.getCurrentScreenState() != FaceVerificationUIController.UIScreenState.CAMERA) {
+                Log.w(TAG, "Not in CAMERA screen anymore, aborting camera start");
                 return;
             }
 
@@ -1379,9 +1385,16 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
             return;
         }
 
-        stopCamera();
+        // Stop camera and fully reset to cancel any pending operations
+        stopCameraSafe();
+        if (mainHandler != null) {
+            mainHandler.removeCallbacksAndMessages(null);
+        }
         resetComponents();
-        uiController.showScreen(FaceVerificationUIController.UIScreenState.SETUP);
+
+        if (uiController != null) {
+            uiController.showScreen(FaceVerificationUIController.UIScreenState.SETUP);
+        }
         // ✅ REMOVED: Không cần hiện navbar vì đang chạy trong Activity riêng biệt
     }
 

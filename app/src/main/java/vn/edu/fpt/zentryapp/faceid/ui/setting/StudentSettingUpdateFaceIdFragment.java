@@ -499,10 +499,16 @@ public class StudentSettingUpdateFaceIdFragment extends Fragment
         uiController.showLoadingOverlay(true);
 
         // Add a small delay to ensure camera is properly released
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+        mainHandler.postDelayed(() -> {
             // Check again if fragment is still attached before proceeding
             if (!isAdded() || cameraView == null) {
                 Log.w(TAG, "Fragment not attached or camera view is null after delay");
+                return;
+            }
+
+            // Ensure we are still on CAMERA screen before starting camera
+            if (uiController == null || uiController.getCurrentScreenState() != FaceUpdationUIController.UIScreenState.CAMERA) {
+                Log.w(TAG, "Not in CAMERA screen anymore, aborting camera start");
                 return;
             }
 
@@ -1236,16 +1242,19 @@ public class StudentSettingUpdateFaceIdFragment extends Fragment
     private void backToSetup() {
         try {
             Log.d(TAG, "🔄 Returning to setup screen");
-            
-            // ✅ REMOVED: Không cần hiện navbar vì đang chạy trong Activity riêng biệt
-            
-            // Stop camera and reset state
+
+            // Stop camera and fully reset to cancel any pending operations
             stopCamera();
-            stateManager.transitionTo(FaceRegistrationState.INITIALIZING, "Returned to setup");
-            
+            if (mainHandler != null) {
+                mainHandler.removeCallbacksAndMessages(null);
+            }
+            resetComponents();
+
             // Update UI to show setup screen
-            uiController.showScreen(FaceUpdationUIController.UIScreenState.SETUP);
-            
+            if (uiController != null) {
+                uiController.showScreen(FaceUpdationUIController.UIScreenState.SETUP);
+            }
+
             Log.d(TAG, "✅ Successfully returned to setup screen");
         } catch (Exception e) {
             Log.e(TAG, "❌ Error returning to setup", e);
