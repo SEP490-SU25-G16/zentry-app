@@ -217,10 +217,42 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
     }
 
     private String getRequestIdFromArgs() {
+        // 1) Try fragment arguments
         Bundle args = getArguments();
-        if (args == null) return null;
-        String id = args.getString("requestId", null);
-        return (id != null && !id.isEmpty()) ? id : null;
+        String id = null;
+        if (args != null) {
+            id = args.getString("requestId", null);
+            if (id != null && !id.isEmpty()) return id;
+        }
+
+        // 2) Try activity intent extras (Verify Activity passes these)
+        try {
+            if (isAdded()) {
+                android.content.Intent intent = requireActivity().getIntent();
+                if (intent != null) {
+                    String fromExtra = intent.getStringExtra("requestId");
+                    if (fromExtra != null && !fromExtra.isEmpty()) return fromExtra;
+
+                    // 3) Try deeplink URI query param directly if present
+                    android.net.Uri data = intent.getData();
+                    if (data != null && "zentry".equals(data.getScheme()) && "face-verify".equals(data.getHost())) {
+                        String fromUri = data.getQueryParameter("requestId");
+                        if (fromUri != null && !fromUri.isEmpty()) return fromUri;
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+
+        // 4) Fallback to pending args stored by MainActivity (still sourced from deeplink)
+        try {
+            if (isAdded()) {
+                android.content.SharedPreferences prefs = requireActivity().getSharedPreferences("face_verification", android.content.Context.MODE_PRIVATE);
+                String fromPrefs = prefs.getString("pending_request_id", null);
+                if (fromPrefs != null && !fromPrefs.isEmpty()) return fromPrefs;
+            }
+        } catch (Exception ignored) {}
+
+        return null;
     }
 
     private boolean isVerificationWindowActive() {
@@ -1133,64 +1165,12 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
             );
             return;
         }
-
-        // Fallback to legacy capture+verify (ad-hoc) when no requestId
-        faceIdService.captureAndVerifyFace(
-                capturedBitmap,
-                capturedFaceRect,
-                faceOverlayView != null ? faceOverlayView.getOvalRect() : null,
-                finalUserId,
-                new FaceIdService.FaceIdCallback() {
-                    @Override
-                    public void onSuccess(String message) {
-                        if (!isAdded()) {
-                            Log.w(TAG, "Fragment not attached during success callback");
-                            return;
-                        }
-
-                        Log.d(TAG, "✅ Verification successful: " + message);
-                        stateManager.transitionTo(FaceRegistrationState.SUCCESS, message);
-                    }
-
-                    @Override
-                    public void onFailure(String errorMessage) {
-                        if (!isAdded()) {
-                            Log.w(TAG, "Fragment not attached during failure callback");
-                            return;
-                        }
-
-                        Log.e(TAG, "❌ Verification failed: " + errorMessage);
-
-                        // Store detailed error information for UI display
-                        lastDetailedErrorMessage = "Registration failure details:\n" + errorMessage;
-                        hasDetailedError = true;
-
-                        // 🔧 NEW: Enhanced error categorization
-                        if (errorMessage.contains("timeout") || errorMessage.contains("Timeout")) {
-                            lastDetailedErrorMessage += "\n\nError type: Network Timeout";
-                            handleNetworkError("Request timeout. Please try again.");
-                        } else if (errorMessage.contains("Network error") || errorMessage.contains("Cannot connect")) {
-                            lastDetailedErrorMessage += "\n\nError type: Network Connectivity";
-                            handleNetworkError(errorMessage);
-                        } else if (errorMessage.contains("Authentication failed")) {
-                            lastDetailedErrorMessage += "\n\nError type: Authentication";
-                            stateManager.transitionTo(FaceRegistrationState.FAILED_OTHER,
-                                    "Authentication failed. Please login again.");
-                        } else if (errorMessage.contains("Server error")) {
-                            lastDetailedErrorMessage += "\n\nError type: Server";
-                            stateManager.transitionTo(FaceRegistrationState.FAILED_OTHER,
-                                    "Server error. Please try again later.");
-                        } else if (errorMessage.contains("spoof") || errorMessage.contains("Spoof")) {
-                            lastDetailedErrorMessage += "\n\nError type: Spoof Detection";
-                            stateManager.transitionTo(FaceRegistrationState.FAILED_SPOOF,
-                                     "Verification failed: " + errorMessage);
-                        } else {
-                            lastDetailedErrorMessage += "\n\nError type: Other/Unknown";
-                            stateManager.transitionTo(FaceRegistrationState.FAILED_OTHER,
-                                    "Verification failed: " + errorMessage);
-                        }
-                    }
-                });
+        // No requestId present: stop and inform user; do NOT fallback to ad-hoc
+        Log.w(TAG, "⚠️ Missing requestId for verification. Aborting to avoid ad-hoc verify.");
+        lastDetailedErrorMessage = "Missing requestId. Please open verification from the notification link.";
+        hasDetailedError = true;
+        stateManager.transitionTo(FaceRegistrationState.FAILED_OTHER,
+                "Cannot verify: missing requestId. Please retry from notification.");
     }
 
     /**
