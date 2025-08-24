@@ -62,16 +62,6 @@ public interface FaceIdApiController {
             @Part("threshold") RequestBody threshold // optional; pass null to omit
     );
 
-    /**
-     * Legacy ad-hoc verify (no request binding). Kept for backward compatibility.
-     */
-    @Multipart
-    @POST("api/faceid/verify")
-    Call<FaceIdResponse> verifyFaceIdAdhoc(
-            @Part MultipartBody.Part embedding,
-            @Part("userId") RequestBody userId
-    );
-
     @PATCH("api/faceid/requests/{requestId}/cancel")
     Call<Void> cancelFaceIdRequest(@Path("requestId") String requestId);
 

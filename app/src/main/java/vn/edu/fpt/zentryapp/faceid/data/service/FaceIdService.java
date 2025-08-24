@@ -1134,30 +1134,8 @@ public class FaceIdService {
                             MediaType.parse("text/plain"), userId);
                     Log.d(TAG, "verifyFace: sending userId=" + userId);
                     
-                    // Make API call (ad-hoc legacy)
-                    Call<FaceIdResponse> call = faceIdApiController.verifyFaceIdAdhoc(filePart, userIdPart);
-                    call.enqueue(new Callback<FaceIdResponse>() {
-                        @Override
-                        public void onResponse(@NonNull Call<FaceIdResponse> call, @NonNull Response<FaceIdResponse> response) {
-                            if (response.isSuccessful() && response.body() != null) {
-                                FaceIdResponse responseBody = response.body();
-                                if (responseBody.isSuccess()) {
-                                    // Extract confidence from response or use default high confidence
-                                    float confidence = 0.95f; // Default for successful verification
-                                    runOnMainThread(() -> callback.onVerified(confidence));
-                                } else {
-                                    runOnMainThread(() -> callback.onVerificationFailed("Face ID verification failed - face does not match"));
-                                }
-                            } else {
-                                runOnMainThread(() -> callback.onError("Failed to verify Face ID: " + response.message()));
-                            }
-                        }
-                        
-                        @Override
-                        public void onFailure(@NonNull Call<FaceIdResponse> call, @NonNull Throwable t) {
-                            runOnMainThread(() -> callback.onError("Network error: " + t.getMessage()));
-                        }
-                    });
+                    // Legacy ad-hoc verification removed
+                    runOnMainThread(() -> callback.onError("Ad-hoc verification is no longer supported. Use request-based verification."));
                     
                 } catch (Exception e) {
                     Log.e(TAG, "Error verifying face ID", e);
@@ -1206,28 +1184,8 @@ public class FaceIdService {
                             MediaType.parse("text/plain"), userId);
                     Log.d(TAG, "verifyFaceId: sending userId=" + userId);
                     
-                    // Make API call (ad-hoc legacy)
-                    Call<FaceIdResponse> call = faceIdApiController.verifyFaceIdAdhoc(filePart, userIdPart);
-                    call.enqueue(new Callback<FaceIdResponse>() {
-                        @Override
-                        public void onResponse(@NonNull Call<FaceIdResponse> call, @NonNull Response<FaceIdResponse> response) {
-                            if (response.isSuccessful() && response.body() != null) {
-                                FaceIdResponse responseBody = response.body();
-                                if (responseBody.isSuccess()) {
-                                    runOnMainThread(() -> callback.onSuccess("Face ID verified successfully"));
-                                } else {
-                                    runOnMainThread(() -> callback.onFailure("Face ID verification failed"));
-                                }
-                            } else {
-                                runOnMainThread(() -> callback.onFailure("Failed to verify Face ID: " + response.message()));
-                            }
-                        }
-                        
-                        @Override
-                        public void onFailure(@NonNull Call<FaceIdResponse> call, @NonNull Throwable t) {
-                            runOnMainThread(() -> callback.onFailure("Network error: " + t.getMessage()));
-                        }
-                    });
+                    // Legacy ad-hoc verification removed
+                    runOnMainThread(() -> callback.onFailure("Ad-hoc verification is no longer supported. Use request-based verification."));
                     
                 } catch (Exception e) {
                     Log.e(TAG, "Error verifying face ID", e);
