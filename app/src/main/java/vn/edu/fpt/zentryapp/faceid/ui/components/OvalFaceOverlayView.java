@@ -41,7 +41,7 @@ public class OvalFaceOverlayView extends View {
     private final Paint overlayPaint;
     private final Paint ovalPaint;
     private final Paint progressPaint;
-    private final Paint textPaint;
+//    private final Paint textPaint;
     private final Paint successPaint;
     private final Paint guidePaint;
     
@@ -91,10 +91,10 @@ public class OvalFaceOverlayView extends View {
         progressPaint.setColor(Color.parseColor("#4CAF50")); // Material Green
         progressPaint.setStrokeCap(Paint.Cap.ROUND);
         
-        textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        textPaint.setColor(Color.WHITE);
-        textPaint.setTextSize(40);
-        textPaint.setTextAlign(Paint.Align.CENTER);
+//        textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+//        textPaint.setColor(Color.WHITE);
+//        textPaint.setTextSize(40);
+//        textPaint.setTextAlign(Paint.Align.CENTER);
         
         successPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         successPaint.setStyle(Paint.Style.STROKE);
@@ -195,11 +195,11 @@ public class OvalFaceOverlayView extends View {
                     ovalRect.top - 40, guidePaint);
         }
         
-        // Draw status message
-        if (statusMessage != null && !statusMessage.isEmpty()) {
-            canvas.drawText(statusMessage, getWidth() / 2f, 
-                    ovalRect.bottom + 80, textPaint);
-        }
+//        // Draw status message
+//        if (statusMessage != null && !statusMessage.isEmpty()) {
+//            canvas.drawText(statusMessage, getWidth() / 2f,
+//                    ovalRect.bottom + 80, textPaint);
+//        }
     }
     
     /**
