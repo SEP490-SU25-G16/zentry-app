@@ -75,6 +75,7 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
     // 🔍 ERROR TRACKING
     private String lastDetailedErrorMessage = ""; // Store detailed error information
     private boolean hasDetailedError = false;
+    private AlertDialog currentErrorDialog; // Track current error dialog to dismiss when needed
 
     // 📷 CAMERA COMPONENTS
     private CameraView cameraView;
@@ -555,6 +556,13 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
     private void startFaceRegistration() {
         Log.d(TAG, "🚀 Starting face registration process");
 
+        // Dismiss any existing error dialog before starting camera
+        if (currentErrorDialog != null && currentErrorDialog.isShowing()) {
+            Log.d(TAG, "Dismissing existing error dialog before starting registration");
+            currentErrorDialog.dismiss();
+            currentErrorDialog = null;
+        }
+
         // Ensure we have a clean state
         stopCamera();
         resetComponents();
@@ -731,6 +739,24 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
                         @Override
                         public void onFaceDetected(Rect boundingBox, boolean isSpoof, float spoofScore) {
                             currentFaceRect = boundingBox;
+
+                            // 🚨 IMMEDIATE SPOOF DETECTION - Always check spoof first, even during liveness challenge
+                            if (isSpoof) {
+                                Log.w(TAG, "🚫 SPOOF DETECTED during LIVENESS_CHALLENGE! isSpoof=" + isSpoof + ", score=" + spoofScore + " - Stopping pipeline");
+                                
+                                // Set face spoof state immediately - this will override liveness challenge
+                                stateManager.transitionTo(FaceRegistrationState.FACE_SPOOFED, 
+                                        "Spoof detected! Please use a real face.");
+                                
+                                // Update oval to red color immediately  
+                                if (faceOverlayView != null) {
+                                    faceOverlayView.updateState(FaceProcessingState.FACE_SPOOFED, 
+                                            "Spoof detected! Please use a real face.");
+                                }
+                                
+                                // Stop all processing - no liveness challenge for spoofed face
+                                return;
+                            }
 
                             // Update face position in overlay
                             if (faceOverlayView != null) {
@@ -1259,32 +1285,38 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
         if (!isAdded()) return;
 
         // Create alert dialog with retry option
-        new AlertDialog.Builder(requireContext())
+        AlertDialog dialog = new AlertDialog.Builder(requireContext())
                 .setTitle("Network Connection Issue")
                 .setMessage("Cannot connect to the server. Please check your internet connection and try again.")
-                .setPositiveButton("Try Again", (dialog, which) -> {
+                .setPositiveButton("Try Again", (d, which) -> {
                     // Check if fragment is still attached before proceeding
                     if (!isAdded()) {
                         Log.w(TAG, "Fragment not attached, cannot retry registration");
                         return;
                     }
 
-                    // Reset and try again
+                    // Dismiss dialog and reset
+                    currentErrorDialog = null;
                     resetComponents();
                     startFaceRegistration();
                 })
-                .setNegativeButton("Cancel", (dialog, which) -> {
+                .setNegativeButton("Cancel", (d, which) -> {
                     // Check if fragment is still attached before proceeding
                     if (!isAdded()) {
                         Log.w(TAG, "Fragment not attached, cannot handle cancel");
                         return;
                     }
 
-                    // Go back
+                    // Dismiss dialog and go back
+                    currentErrorDialog = null;
                     requireActivity().onBackPressed();
                 })
                 .setCancelable(false)
-                .show();
+                .create();
+                
+        // Store reference and show dialog
+        currentErrorDialog = dialog;
+        dialog.show();
     }
 
     /**
@@ -1337,7 +1369,9 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
                     // Reset error tracking
                     hasDetailedError = false;
                     lastDetailedErrorMessage = "";
-
+                    
+                    // Dismiss dialog
+                    currentErrorDialog = null;
 
                     // Make sure everything is fully reset before retry
                     resetComponents();
@@ -1362,12 +1396,19 @@ public class StudentSettingVerifyFaceIdFragment extends Fragment
                     // Reset error tracking
                     hasDetailedError = false;
                     lastDetailedErrorMessage = "";
+                    
+                    // Dismiss dialog
+                    currentErrorDialog = null;
+                    
                     requireActivity().onBackPressed();
                 })
                 .setCancelable(false);
 
         // Create and show the dialog
         AlertDialog dialog = builder.create();
+        
+        // Store reference before showing
+        currentErrorDialog = dialog;
         dialog.show();
 
         // Make the message scrollable for long detailed errors
