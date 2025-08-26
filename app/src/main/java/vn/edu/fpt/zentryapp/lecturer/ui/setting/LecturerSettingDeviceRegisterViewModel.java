@@ -98,10 +98,7 @@ public class LecturerSettingDeviceRegisterViewModel extends ViewModel {
                                 Log.d(TAG, "  Device ID: " + apiResponse.getData().getDeviceId());
                                 Log.d(TAG, "  Device Token: " + apiResponse.getData().getDeviceToken());
                             } else {
-                                String error = apiResponse.getError() != null ? apiResponse.getError() : "Registration failed";
-                                _errorMessage.setValue(error);
-                                Log.e(TAG, "❌ Lecturer Registration API Error: " + error);
-                            }
+                                handleHttpError(response.code());                            }
                         } else {
                             String error = "HTTP Error: " + response.code();
                             _errorMessage.setValue(error);
@@ -118,7 +115,38 @@ public class LecturerSettingDeviceRegisterViewModel extends ViewModel {
                     }
                 });
     }
+    private void handleHttpError(int responseCode) {
+        String errorMessage;
 
+        switch (responseCode) {
+            case 409:
+                errorMessage = "This device is already registered with another account. Please contact support if this is your device.";
+                Log.e(TAG, "❌ HTTP 409: Device already registered to another user");
+                break;
+            case 400:
+                errorMessage = "Invalid device information. Please try again.";
+                Log.e(TAG, "❌ HTTP 400: Bad request");
+                break;
+            case 401:
+                errorMessage = "Authentication failed. Please login again.";
+                Log.e(TAG, "❌ HTTP 401: Unauthorized");
+                break;
+            case 403:
+                errorMessage = "Access denied. You don't have permission to register devices.";
+                Log.e(TAG, "❌ HTTP 403: Forbidden");
+                break;
+            case 500:
+                errorMessage = "Server error. Please try again later.";
+                Log.e(TAG, "❌ HTTP 500: Internal server error");
+                break;
+            default:
+                errorMessage = "Registration failed with error code: " + responseCode + ". Please try again.";
+                Log.e(TAG, "❌ HTTP " + responseCode + ": Unknown error");
+                break;
+        }
+
+        _errorMessage.setValue(errorMessage);
+    }
     /**
      * Create registration request from device info for lecturer
      */

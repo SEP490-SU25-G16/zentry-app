@@ -227,7 +227,7 @@ public class StudentSettingFragment extends Fragment {
         binding.llStudentSettingRowLogout.setOnClickListener(v -> {
             try {
                 Log.d("StudentSettingFragment", "Performing logout");
-                authManager.clearTokens();
+                authManager.logout();
                 // 2. Điều hướng về LoginFragment với popUpTo để xóa back stack
                 androidx.navigation.NavOptions navOptions = new androidx.navigation.NavOptions.Builder()
                     .setPopUpTo(R.id.nav_graph_root, true)

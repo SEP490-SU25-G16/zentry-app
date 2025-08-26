@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit;
 
 public class ApiClient {
     // https://khanhlongtran-sep490.online/
-    private static final String BASE_URL =  "http://10.33.45.205:8080/"; // ipconfig  => change to call API
+    private static final String BASE_URL =  "https://api.khanhlongtran-sep490.online/"; // ipconfig  => change to call API
     private static Retrofit retrofit = null;
 
     public static Retrofit getClient(Context context) {
@@ -23,9 +23,9 @@ public class ApiClient {
             OkHttpClient client = new OkHttpClient.Builder()
                     .addInterceptor(new AuthInterceptor(authManager))
                     .addInterceptor(logging) // Chỉ cho development
-                    .connectTimeout(1, TimeUnit.SECONDS) // 🔧 NEW: Connection timeout
-                    .readTimeout(1, TimeUnit.SECONDS)    // 🔧 NEW: Read timeout for large data
-                    .writeTimeout(1, TimeUnit.SECONDS)   // 🔧 NEW: Write timeout for large data
+                    .connectTimeout(30, TimeUnit.SECONDS) // 🔧 NEW: Connection timeout
+                    .readTimeout(30, TimeUnit.SECONDS)    // 🔧 NEW: Read timeout for large data
+                    .writeTimeout(30, TimeUnit.SECONDS)   // 🔧 NEW: Write timeout for large data
                     .build();
 
             retrofit = new Retrofit.Builder()

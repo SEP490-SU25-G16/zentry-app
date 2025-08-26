@@ -47,8 +47,6 @@ public class LecturerReportViewModel extends ViewModel {
 
     public void init(AuthManager authManager) {
         this.authManager = authManager;
-        // Initialize API service - bạn cần pass context từ Fragment
-        // this.apiService = ApiClient.getClient(context).create(LecturerApiService.class);
         loadClassrooms();
     }
 
