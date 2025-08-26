@@ -37,6 +37,7 @@ import vn.edu.fpt.zentryapp.faceid.data.service.FaceIdConfig;
 import vn.edu.fpt.zentryapp.faceid.data.service.FaceIdEnhancer;
 import vn.edu.fpt.zentryapp.faceid.data.service.FaceIdService;
 import vn.edu.fpt.zentryapp.faceid.data.service.FaceIdServiceManager;
+import vn.edu.fpt.zentryapp.faceid.data.service.FaceProcessingState;
 import vn.edu.fpt.zentryapp.faceid.data.service.FaceTracker;
 import vn.edu.fpt.zentryapp.faceid.ui.components.CameraView;
 import vn.edu.fpt.zentryapp.faceid.ui.components.OvalFaceOverlayView;
@@ -681,6 +682,30 @@ public class StudentSettingRegisterFaceIdFragment extends Fragment
                     @Override
                     public void onFaceDetected(Rect boundingBox, boolean isSpoof, float spoofScore) {
                         currentFaceRect = boundingBox;
+
+                        // 🚨 IMMEDIATE SPOOF DETECTION - Stop pipeline if spoof detected
+                        if (isSpoof) {
+                            Log.w(TAG, "🚫 SPOOF DETECTED! isSpoof=" + isSpoof + ", score=" + spoofScore + " - Stopping pipeline");
+                            
+                            // Set face spoof state immediately
+                            stateManager.transitionTo(FaceRegistrationState.FACE_SPOOFED, 
+                                    "Spoof detected! Please use a real face.");
+                            
+                            // Update oval to red color immediately  
+                            if (faceOverlayView != null) {
+                                faceOverlayView.updateState(FaceProcessingState.FACE_SPOOFED, 
+                                        "Spoof detected! Please use a real face.");
+                            }
+                            
+                            // Update UI message immediately
+                            if (binding != null && binding.tvStatusMessage != null) {
+                                binding.tvStatusMessage.setText("Spoof detected! Please use a real face.");
+                            }
+                            
+                            // Reset face tracker and stop processing
+                            resetFaceTracker();
+                            return; // 🛑 STOP PIPELINE HERE - No further processing
+                        }
 
                         // Update face position in overlay for user guidance
                         if (faceOverlayView != null) {
