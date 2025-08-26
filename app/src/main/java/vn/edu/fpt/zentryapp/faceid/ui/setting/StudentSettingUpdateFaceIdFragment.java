@@ -1518,56 +1518,39 @@ public class StudentSettingUpdateFaceIdFragment extends Fragment
     }
 
     @Override
-    public void onGazeStepVerified(FaceIdEnhancer.Direction direction, int stepIndex, int totalSteps) {
+    public void onGazeDirectionChanged(float x, float y) {
         if (!isAdded()) return;
-
-        // Haptic feedback: vibrate briefly for confirmation
-        try {
-            android.os.Vibrator v = (android.os.Vibrator) requireContext().getSystemService(android.content.Context.VIBRATOR_SERVICE);
-            if (v != null) {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    v.vibrate(android.os.VibrationEffect.createOneShot(60, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
-                } else {
-                    v.vibrate(60);
-                }
-            }
-        } catch (Exception ignored) {}
-
-        // Update UI instruction to next step
-        if (binding != null) {
-            if (stepIndex + 1 < totalSteps) {
-                // Next direction required
-                FaceIdEnhancer.Direction next = (direction == FaceIdEnhancer.Direction.RIGHT) ? FaceIdEnhancer.Direction.LEFT : FaceIdEnhancer.Direction.RIGHT;
-                binding.tvStatusMessage.setText("Good! ✓");
-                binding.tvInstructionMessage.setText(next == FaceIdEnhancer.Direction.LEFT ? "Please look left" : "Please look right");
-            } else {
-                // Sequence completed; ask user to look straight for analysis
-                binding.tvStatusMessage.setText("Gaze verified! ✓");
-                binding.tvInstructionMessage.setText("Look straight at the camera");
-            }
-
-            // Mark the corresponding icon as green
-            if (direction == FaceIdEnhancer.Direction.RIGHT) {
-                binding.ivGazeIndicator.setColorFilter(
-                        ContextCompat.getColor(requireContext(), R.color.success_green),
-                        android.graphics.PorterDuff.Mode.SRC_IN);
-            }
+        // Keep lightweight; used for real-time gaze visualization
+        Log.d(TAG, "👀 Gaze direction: x=" + x + ", y=" + y);
+    }
+    
+    @Override
+    public void onGazeDirectionCompleted(String direction) {
+        if (!isAdded() || binding == null) return;
+        
+        Log.d(TAG, "✅ Head direction completed: " + direction);
+        
+        // Update UI based on completed direction
+        switch (direction) {
+            case "LEFT":
+                binding.tvStatusMessage.setText("Left turn verified! ✓");
+                break;
+            case "RIGHT":  
+                binding.tvStatusMessage.setText("Right turn verified! ✓");
+                break;
+            case "CENTER":
+                binding.tvStatusMessage.setText("Looking at camera verified! ✓");
+                break;
         }
     }
 
     @Override
-    public void onGazePrompt(FaceIdEnhancer.Direction required, int stepIndex, int totalSteps) {
+    public void onChallengeGenerated(String challengeText) {
         if (!isAdded() || binding == null) return;
-        String prompt = required == FaceIdEnhancer.Direction.LEFT ? "Please look left" : "Please look right";
-        binding.tvInstructionMessage.setText(prompt);
-        binding.tvStatusMessage.setText("Step " + (stepIndex + 1) + "/" + totalSteps);
-    }
-
-    @Override
-    public void onGazeDirectionChanged(float x, float y) {
-        if (!isAdded()) return;
-        // Keep lightweight; prompts are driven by onGazePrompt/onGazeStepVerified
-        Log.d(TAG, "👀 Gaze direction (adjusted): x=" + x + ", y=" + y);
+        
+        Log.d(TAG, "💫 Challenge generated: " + challengeText);
+        // Update UI with challenge instruction
+        binding.tvStatusMessage.setText(challengeText);
     }
 
     @Override

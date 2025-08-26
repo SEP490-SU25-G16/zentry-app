@@ -68,6 +68,7 @@ public class MediaPipeFaceLandmarkExtractor {
     // Eye regions for gaze estimation
     private Bitmap lastLeftEyeRegion;
     private Bitmap lastRightEyeRegion;
+    private Bitmap lastFaceBitmap;  // Add missing face bitmap
 
     // Last estimated eye centers for alignment
     private PointF lastLeftEyeCenter;
@@ -573,6 +574,27 @@ public class MediaPipeFaceLandmarkExtractor {
 
     public PointF getLastRightEyeCenter() {
         return lastRightEyeCenter;
+    }
+    
+    /**
+     * Get all face landmarks as List<PointF> for iTracker model
+     */
+    public List<PointF> getAllFaceLandmarks() {
+        List<PointF> landmarks = new ArrayList<>();
+        for (int i = 0; i < faceLandmarks.size(); i++) {
+            PointF point = faceLandmarks.get(i);
+            if (point != null) {
+                landmarks.add(point);
+            }
+        }
+        return landmarks;
+    }
+    
+    /**
+     * Get the last processed face bitmap (for iTracker model)
+     */
+    public Bitmap getLastFaceBitmap() {
+        return lastFaceBitmap;
     }
     
     /**

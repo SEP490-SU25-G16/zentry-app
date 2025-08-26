@@ -6,10 +6,15 @@ import android.graphics.PointF;
 import android.graphics.Rect;
 import android.util.Log;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import vn.edu.fpt.zentryapp.faceid.data.service.FaceIdServiceManager;
+import vn.edu.fpt.zentryapp.faceid.util.VibrationHelper;
 
 /**
  * Enhances Face ID authentication by adding blink detection and gaze tracking
@@ -40,6 +45,9 @@ public class FaceIdEnhancer implements
     private final MediaPipeFaceLandmarkExtractor landmarkExtractor;
     private final EyeBlinkDetector blinkDetector;
     private final GazeEstimator gazeEstimator;
+    private HeadPoseEstimation headPoseEstimation; // NEW: Head pose for LEFT/RIGHT detection using MediaPipe landmarks
+    private final VibrationHelper vibrationHelper; // NEW: Haptic feedback for step completion
+    
     // Ownership flags to prevent double-close when instances are shared from FaceIdService
     private final boolean ownsLandmarkExtractor;
     private final boolean ownsGazeEstimator;
@@ -49,26 +57,33 @@ public class FaceIdEnhancer implements
     private boolean gazeVerified = false;
     private boolean livenessVerified = false;
     
-    // Robust, prompt-driven gaze challenge
-    public enum Direction { LEFT, RIGHT, UP, DOWN }
-    private java.util.List<Direction> requiredDirections = new java.util.ArrayList<>();
-    private int currentDirectionIndex = 0;
-    private int directionStableFrames = 0;
-    private static final int DIRECTION_STABLE_FRAMES_REQUIRED = 7; // reduced for responsiveness
-    private static final float GAZE_THRESHOLD = 0.35f; // relaxed to improve detection at larger yaw
-    
     // Processing flags
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
     
     // Challenge type
     public enum ChallengeType {
         BLINK_ONLY,     // Only require blinking
-        GAZE_ONLY,      // Only require gaze movement
+        GAZE_ONLY,      // Only require gaze movement (LEFT/RIGHT/CENTER)
         BLINK_AND_GAZE, // Require both blinking and gaze
         RANDOM          // Randomly select challenges
     }
     
-    private ChallengeType challengeType = ChallengeType.BLINK_AND_GAZE;
+    // Head direction for challenges
+    public enum HeadDirection {
+        LEFT,      // Head turned left
+        RIGHT,     // Head turned right  
+        CENTER     // Head facing forward + looking at camera
+    }
+    
+    private ChallengeType challengeType = ChallengeType.GAZE_ONLY; // Default to gaze only
+    private HeadDirection currentChallenge = HeadDirection.RIGHT; // Will be set randomly
+    private HeadDirection detectedDirection = HeadDirection.CENTER;
+    
+    // 3-Step Challenge System
+    private List<HeadDirection> challengeSequence = new ArrayList<>(); // Random sequence of 3 directions
+    private int currentStep = 0; // Current step in the sequence (0-2)
+    private boolean threeStepChallengeActive = false;
+    private Random random = new Random();
     
     /**
      * Callback for face ID enhancement events
@@ -77,12 +92,10 @@ public class FaceIdEnhancer implements
         void onStateChanged(AuthState newState);
         void onBlinkDetected();
         void onGazeDirectionChanged(float x, float y);
+        void onGazeDirectionCompleted(String direction);
+        void onChallengeGenerated(String challengeText);
         void onLivenessVerified(boolean isLive);
         void onVerificationComplete(boolean success);
-        // New: notify when a gaze direction step is completed
-        void onGazeStepVerified(Direction direction, int stepIndex, int totalSteps);
-        // New: continually prompt required gaze direction to the UI
-        void onGazePrompt(Direction required, int stepIndex, int totalSteps);
     }
     
     private FaceIdEnhancerCallback callback;
@@ -126,14 +139,25 @@ public class FaceIdEnhancer implements
             Log.d(TAG, "Created new GazeEstimator (fallback)");
         }
         
+        // Initialize HeadPoseEstimation for LEFT/RIGHT detection
+        // Assume 640x480 default, will be updated when first landmarks arrive
+        headPoseEstimation = new HeadPoseEstimation(640, 480);
+        
+        // Initialize VibrationHelper for haptic feedback
+        vibrationHelper = new VibrationHelper(context);
+        
         Log.d(TAG, "Face ID enhancer initialized");
 
-        // Default gaze challenge pattern: look RIGHT then LEFT
-        this.requiredDirections.clear();
-        this.requiredDirections.add(Direction.RIGHT);
-        this.requiredDirections.add(Direction.LEFT);
-        this.currentDirectionIndex = 0;
-        this.directionStableFrames = 0;
+        // Generate initial challenge
+        generateNewChallenge();
+    }
+    
+    /**
+     * Generate a new head direction challenge - now uses 3-step challenge
+     */
+    private void generateNewChallenge() {
+        // Always start with 3-step challenge for better liveness detection
+        startThreeStepChallenge();
     }
     
     /**
@@ -182,21 +206,28 @@ public class FaceIdEnhancer implements
      * Reset the enhancer state to start a new verification
      */
     public void reset() {
+        Log.i(TAG, "Resetting FaceIdEnhancer state");
+        
         blinkDetected = false;
         gazeVerified = false;
         livenessVerified = false;
-        // Reset gaze sequence state
-        currentDirectionIndex = 0;
-        directionStableFrames = 0;
+        
+        // Reset 3-step challenge state
+        challengeSequence.clear();
+        currentStep = 0;
+        threeStepChallengeActive = false;
         
         currentState = AuthState.WAITING;
         
         // Reset components
         blinkDetector.reset();
         
+        // Generate new random challenge
+        generateNewChallenge();
+        
         isProcessing.set(false);
         
-        Log.d(TAG, "Face ID enhancer reset");
+        Log.i(TAG, "FaceIdEnhancer reset completed");
     }
     
     /**
@@ -267,32 +298,173 @@ public class FaceIdEnhancer implements
     }
     
     /**
-     * Check if the user has looked in all required directions
+     * Initialize a 3-step liveness challenge with random directions
      */
-    private void checkGazeVerification() {
-        if (gazeVerified) return;
-        if (currentDirectionIndex >= requiredDirections.size()) {
-            gazeVerified = true;
-            updateState(AuthState.GAZE_VERIFIED);
-            Log.d(TAG, "Gaze verification complete (sequence)");
-            checkVerificationComplete();
+    public void startThreeStepChallenge() {
+        // Reset challenge state
+        challengeSequence.clear();
+        currentStep = 0;
+        threeStepChallengeActive = true;
+        gazeVerified = false;
+        
+        // Create list of all directions
+        List<HeadDirection> allDirections = new ArrayList<>();
+        allDirections.add(HeadDirection.LEFT);
+        allDirections.add(HeadDirection.RIGHT);
+        allDirections.add(HeadDirection.CENTER);
+        
+        // Shuffle to create random sequence
+        Collections.shuffle(allDirections, random);
+        challengeSequence.addAll(allDirections);
+        
+        // Set first challenge
+        currentChallenge = challengeSequence.get(0);
+        
+        Log.i(TAG, "Started 3-step challenge: " + challengeSequence);
+        Log.i(TAG, "First challenge: " + currentChallenge);
+        
+        // Notify UI with first challenge
+        if (callback != null) {
+            String challengeText = getDirectionText(currentChallenge);
+            String instruction = "Step 1/3: " + challengeText;
+            Log.i(TAG, "Sending challenge instruction to UI: " + instruction);
+            callback.onChallengeGenerated(instruction);
+        } else {
+            Log.w(TAG, "Callback is null - cannot send challenge instruction to UI");
         }
     }
-
+    
     /**
-     * Get the currently required gaze direction in the challenge sequence.
-     * Returns null if the sequence is complete or not configured.
+     * Get user-friendly text for direction
      */
-    private Direction getCurrentRequiredDirection() {
-        if (requiredDirections == null || requiredDirections.isEmpty()) {
-            return null;
+    private String getDirectionText(HeadDirection direction) {
+        switch (direction) {
+            case LEFT: return "Turn your head LEFT";
+            case RIGHT: return "Turn your head RIGHT";
+            case CENTER: return "Look straight at the camera";
+            default: return "Unknown direction";
         }
-        if (currentDirectionIndex < 0 || currentDirectionIndex >= requiredDirections.size()) {
-            return null;
-        }
-        return requiredDirections.get(currentDirectionIndex);
     }
-
+    
+    /**
+     * Process step completion in 3-step challenge
+     */
+    private void processThreeStepChallenge(HeadDirection detectedDir) {
+        if (!threeStepChallengeActive || challengeSequence.isEmpty()) {
+            return;
+        }
+        
+        // Check if current step is completed
+        if (detectedDir == currentChallenge) {
+            currentStep++;
+            Log.i(TAG, String.format("Step %d/3 completed: %s", currentStep, currentChallenge));
+            
+            // Vibrate to indicate step completion
+            vibrationHelper.vibrateStepCompleted();
+            
+            if (currentStep >= 3) {
+                // All 3 steps completed!
+                threeStepChallengeActive = false;
+                gazeVerified = true;
+                
+                Log.i(TAG, "3-step liveness challenge COMPLETED!");
+                
+                // Special vibration for challenge completion
+                vibrationHelper.vibrateChallengeCompleted();
+                
+                if (callback != null) {
+                    callback.onGazeDirectionCompleted("ALL_STEPS_COMPLETED");
+                    callback.onChallengeGenerated("Completed! You passed the liveness challenge");
+                }
+                
+                checkVerificationComplete();
+            } else {
+                // Move to next step
+                currentChallenge = challengeSequence.get(currentStep);
+                
+                if (callback != null) {
+                    String challengeText = getDirectionText(currentChallenge);
+                    callback.onChallengeGenerated(String.format("Step %d/3: %s", currentStep + 1, challengeText));
+                }
+                
+                Log.i(TAG, String.format("Moving to step %d/3: %s", currentStep + 1, currentChallenge));
+            }
+        }
+    }
+    
+    /**
+     * Reset challenge state and restart the 3-step challenge
+     * Call this when UI gets stuck or needs to restart
+     */
+    public void resetAndRestartChallenge() {
+        Log.i(TAG, "Resetting and restarting 3-step challenge");
+        
+        // Reset all state
+        challengeSequence.clear();
+        currentStep = 0;
+        threeStepChallengeActive = false;
+        gazeVerified = false;
+        blinkDetected = false;
+        livenessVerified = false;
+        
+        // Update state
+        updateState(AuthState.WAITING);
+        
+        // Start new challenge
+        startThreeStepChallenge();
+    }
+    
+    /**
+     * Force show current challenge instruction
+     * Call this when UI needs to display the current challenge
+     */
+    public void showCurrentChallenge() {
+        if (threeStepChallengeActive && !challengeSequence.isEmpty() && currentStep < challengeSequence.size()) {
+            String challengeText = getDirectionText(currentChallenge);
+            String instruction = String.format("Step %d/3: %s", currentStep + 1, challengeText);
+            
+            Log.i(TAG, "Showing current challenge: " + instruction);
+            
+            if (callback != null) {
+                callback.onChallengeGenerated(instruction);
+            }
+        } else {
+            Log.w(TAG, "No active challenge to show");
+            // If no active challenge, start a new one
+            resetAndRestartChallenge();
+        }
+    }
+    
+    /**
+     * Get current challenge status for debugging
+     */
+    public String getCurrentChallengeStatus() {
+        if (!threeStepChallengeActive) {
+            return "No active challenge";
+        }
+        
+        return String.format("Challenge active: Step %d/3, Current: %s, Sequence: %s", 
+                           currentStep + 1, 
+                           currentChallenge, 
+                           challengeSequence);
+    }
+    
+    /**
+     * Public method to manually start/restart challenge
+     * UI can call this when face is detected or when stuck
+     */
+    public void startLivenessChallenge() {
+        Log.i(TAG, "Starting liveness challenge (public method)");
+        startThreeStepChallenge();
+    }
+    
+    /**
+     * Check if challenge is currently active
+     */
+    public boolean isChallengeActive() {
+        return threeStepChallengeActive;
+    }
+    
     //------------------------------------------------------------------------------
     // FaceLandmarkExtractor.LandmarkExtractionCallback Implementation
     //------------------------------------------------------------------------------
@@ -332,20 +504,103 @@ public class FaceIdEnhancer implements
             Log.w(TAG, "No eye points available for blink detection");
         }
         
-        // Process for gaze estimation
-        if (!gazeVerified) {
-            Bitmap leftEyeRegion = landmarkExtractor.getLeftEyeRegion();
-            Bitmap rightEyeRegion = landmarkExtractor.getRightEyeRegion();
-            float[] headPose = landmarkExtractor.getHeadEulerAngles();
-            
-            if (leftEyeRegion != null && rightEyeRegion != null) {
-                gazeEstimator.estimateGaze(leftEyeRegion, rightEyeRegion, headPose);
-            } else {
-                Log.w(TAG, "Eye regions not available for gaze estimation");
-            }
+        // NEW APPROACH: Use HeadPoseEstimation for LEFT/RIGHT, GazeEstimator for CENTER
+        if (!gazeVerified && challengeType == ChallengeType.GAZE_ONLY) {
+            processHeadPoseChallenge();
         }
         
         isProcessing.set(false);
+    }
+    
+    /**
+     * Process head pose challenge using PnP algorithm
+     */
+    private void processHeadPoseChallenge() {
+        // Get facial landmarks for head pose estimation
+        if (landmarkExtractor == null) {
+            Log.w(TAG, "Landmark extractor not available");
+            return;
+        }
+        
+        List<PointF> landmarks = landmarkExtractor.getAllFaceLandmarks();
+        
+        if (landmarks != null && landmarks.size() >= 468) {
+            // Estimate head pose using PnP algorithm
+            boolean success = headPoseEstimation.estimateHeadPose(landmarks);
+            
+            if (success) {
+                String detectedDir = headPoseEstimation.getHeadDirection();
+                
+                // Map string to enum
+                HeadDirection detected = HeadDirection.valueOf(detectedDir);
+                detectedDirection = detected;
+                
+                Log.d(TAG, String.format("HEAD POSE: yaw=%.1f°, pitch=%.1f°, roll=%.1f° → %s (challenge: %s)",
+                      headPoseEstimation.getYaw(), headPoseEstimation.getPitch(), headPoseEstimation.getRoll(),
+                      detected, currentChallenge));
+                
+                // Use 3-step challenge if active
+                if (threeStepChallengeActive) {
+                    processThreeStepChallenge(detected);
+                } else {
+                    // Original single-step logic
+                    if (detected == currentChallenge) {
+                        if (currentChallenge == HeadDirection.CENTER) {
+                            // For CENTER, also verify gaze is looking at camera
+                            verifyCenterWithGaze();
+                        } else {
+                            // For LEFT/RIGHT, head pose is sufficient
+                            Log.i(TAG, "Head direction challenge COMPLETED: " + currentChallenge);
+                            gazeVerified = true;
+                            
+                            // Vibrate for single-step completion
+                            vibrationHelper.vibrateChallengeCompleted();
+                            
+                            if (callback != null) {
+                                callback.onGazeDirectionCompleted(currentChallenge.toString());
+                            }
+                            
+                            checkVerificationComplete();
+                        }
+                    } else {
+                        Log.d(TAG, String.format("Challenge not complete: detected=%s, required=%s", detected, currentChallenge));
+                    }
+                }
+                
+            } else {
+                Log.w(TAG, "Head pose estimation failed");
+            }
+        } else {
+            Log.w(TAG, "Insufficient landmarks for head pose estimation: " + 
+                  (landmarks != null ? landmarks.size() : "null"));
+        }
+    }
+    
+    /**
+     * Verify CENTER challenge by combining head pose + gaze detection
+     */
+    private void verifyCenterWithGaze() {
+        // Check if head is facing forward
+        if (headPoseEstimation.isFacingForward()) {
+            // Use gaze estimator to verify looking at camera
+            float[] headPose = landmarkExtractor.getHeadEulerAngles();
+            Bitmap leftEyeRegion = landmarkExtractor.getLeftEyeRegion();
+            Bitmap rightEyeRegion = landmarkExtractor.getRightEyeRegion();
+            
+            if (leftEyeRegion != null && rightEyeRegion != null) {
+                Log.d(TAG, "Verifying CENTER challenge with gaze detection...");
+                gazeEstimator.estimateGaze(leftEyeRegion, rightEyeRegion, headPose);
+                // Result will be handled in onGazeUpdate callback
+            } else {
+                Log.w(TAG, "Eye regions not available for CENTER verification");
+                // For 3-step challenge, accept CENTER based on head pose only
+                if (threeStepChallengeActive) {
+                    processThreeStepChallenge(HeadDirection.CENTER);
+                }
+            }
+        } else {
+            Log.d(TAG, "Head not facing forward for CENTER challenge");
+        }
     }
     
     //------------------------------------------------------------------------------
@@ -357,6 +612,9 @@ public class FaceIdEnhancer implements
         if (!blinkDetected) {
             blinkDetected = true;
             updateState(AuthState.BLINK_VERIFIED);
+            
+            // Vibrate for blink detection
+            vibrationHelper.vibrateStepCompleted();
             
             if (callback != null) {
                 callback.onBlinkDetected();
@@ -381,60 +639,27 @@ public class FaceIdEnhancer implements
     
     @Override
     public void onGazeUpdate(float x, float y, boolean isLookingAtScreen) {
-        // Determine current required direction
-        Direction currentRequired = getCurrentRequiredDirection();
-
-        // If no current required (sequence done), just finalize
-        if (currentRequired == null) {
-            checkGazeVerification();
-            return;
-        }
-
-        // Prompt UI about current required direction on every update (idempotent)
-        if (callback != null) {
-            callback.onGazePrompt(currentRequired, currentDirectionIndex, requiredDirections.size());
-        }
-
-        // GazeEstimator already outputs mirrored coordinates when front camera; use as-is
-        float adjX = x;
-        float adjY = y;
-
-        if (callback != null) {
-            callback.onGazeDirectionChanged(adjX, adjY);
-        }
-
-        boolean meetsDirection = false;
-        switch (currentRequired) {
-            case LEFT:
-                meetsDirection = (adjX < -GAZE_THRESHOLD);
-                break;
-            case RIGHT:
-                meetsDirection = (adjX > GAZE_THRESHOLD);
-                break;
-            case UP:
-                meetsDirection = (adjY < -GAZE_THRESHOLD);
-                break;
-            case DOWN:
-                meetsDirection = (adjY > GAZE_THRESHOLD);
-                break;
-        }
-
-        if (meetsDirection) {
-            directionStableFrames++;
-        } else {
-            // Reset stability counter if user deviates from required direction
-            directionStableFrames = 0;
-        }
-
-        if (directionStableFrames >= DIRECTION_STABLE_FRAMES_REQUIRED) {
-            // Mark this direction as completed and advance to next
-            if (callback != null) {
-                callback.onGazeStepVerified(currentRequired, currentDirectionIndex, requiredDirections.size());
+        // This callback is now only used for CENTER verification (looking at camera)
+        Log.d(TAG, String.format("Gaze callback: isLookingAtScreen=%b (for CENTER verification)", isLookingAtScreen));
+        
+        if (currentChallenge == HeadDirection.CENTER && isLookingAtScreen) {
+            Log.i(TAG, "CENTER challenge COMPLETED: Head facing forward + looking at camera");
+            
+            // Use 3-step challenge if active, otherwise use original logic
+            if (threeStepChallengeActive) {
+                processThreeStepChallenge(HeadDirection.CENTER);
+            } else {
+                gazeVerified = true;
+                
+                // Vibrate for single-step CENTER completion
+                vibrationHelper.vibrateChallengeCompleted();
+                
+                if (callback != null) {
+                    callback.onGazeDirectionCompleted("CENTER");
+                }
+                
+                checkVerificationComplete();
             }
-            currentDirectionIndex++;
-            directionStableFrames = 0;
-            Log.d(TAG, "Gaze direction completed: " + currentRequired);
-            checkGazeVerification();
         }
     }
     
@@ -450,6 +675,15 @@ public class FaceIdEnhancer implements
      * Release resources
      */
     public void close() {
+        try {
+            // Cancel any ongoing vibration
+            if (vibrationHelper != null) {
+                vibrationHelper.cancelVibration();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Error cancelling vibration", e);
+        }
+        
         try {
             if (ownsLandmarkExtractor && landmarkExtractor != null) {
                 landmarkExtractor.close();
