@@ -100,10 +100,6 @@ public class StudentHomeFragment extends Fragment {
             }
         });
 
-        viewModel.isLoading().observe(getViewLifecycleOwner(), isLoading -> {
-            // Show/hide loading indicator if you have one
-            // binding.progressLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
-        });
     }
     private void setupGreeting(String fullName) {
         if (fullName == null || fullName.trim().isEmpty()) return;
@@ -234,20 +230,4 @@ public class StudentHomeFragment extends Fragment {
         binding = null;
     }
     
-    // ✅ NEW: Method to stop BLE attendance service when session ends (fallback for FCM failures)
-    private void stopBLEAttendanceServiceIfNeeded() {
-        try {
-            // Check if BLE service is already stopped via FCM
-            if (!vn.edu.fpt.zentryapp.notification.push.FcmMessagingService.isBLEServiceStopped()) {
-                Intent serviceIntent = new Intent(requireContext(), vn.edu.fpt.zentryapp.service.BLEAttendanceService.class);
-                serviceIntent.setAction("STOP_ATTENDANCE");
-                requireContext().startService(serviceIntent);
-                Log.d(TAG, "✅ Fragment: Sent STOP_ATTENDANCE intent to BLE service (FCM fallback)");
-            } else {
-                Log.d(TAG, "ℹ️ Fragment: BLE service already stopped by FCM, no action needed");
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Fragment: Error stopping BLE service", e);
-        }
-    }
 }

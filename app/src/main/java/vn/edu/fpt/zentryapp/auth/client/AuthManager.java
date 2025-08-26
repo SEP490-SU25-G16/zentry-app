@@ -72,8 +72,7 @@ public class AuthManager {
     // Check đã login chưa
     public boolean isLoggedIn() {
         String token = getAccessToken();
-        UserInfo userInfo = getUserInfo();
-        boolean loggedIn = token != null && userInfo != null;
+        boolean loggedIn = token != null ;
         return loggedIn;
     }
 
@@ -108,12 +107,11 @@ public class AuthManager {
     }
 
     public void logout() {
-        sharedPreferences.edit().clear().apply();
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.remove(ACCESS_TOKEN);
+        editor.apply();
     }
 
-    public void clearTokens() {
-        logout();
-    }
     public boolean hasRole(String role) {
         String currentRole = getCurrentUserRole();
         return currentRole != null && currentRole.equalsIgnoreCase(role);

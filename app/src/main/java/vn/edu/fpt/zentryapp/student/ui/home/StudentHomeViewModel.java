@@ -46,11 +46,11 @@ public class StudentHomeViewModel extends ViewModel {
     public void init(Context context, AuthManager authManager) {
         this.authManager = authManager;
         this.apiService = ApiClient.getClient(context).create(StudentApiService.class);
+        loadStudentHomeData();
     }
 
     public void loadStudentHomeData() {
         _isLoading.setValue(true);
-
         String studentId = authManager.getCurrentUserId();
 
         Call<ApiResponseDto<StudentHomeDataDto>> call = apiService.getStudentHomeData(studentId);
@@ -85,10 +85,8 @@ public class StudentHomeViewModel extends ViewModel {
         // Convert API data to UI models
         List<SessionModel> sessionList = mapNextSessionsToSessionModels(homeData.getNextSessions());
         List<WeeklyModel> weeklyList = mapWeeklyReviewToWeeklyModels(homeData.getWeeklyReview());
-
         _sessions.setValue(sessionList);
         _weekly.setValue(weeklyList);
-
         // Keep exams empty for now (no exam data in this API)
         _exams.setValue(new ArrayList<>());
     }

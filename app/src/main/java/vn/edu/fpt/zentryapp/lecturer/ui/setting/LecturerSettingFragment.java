@@ -82,7 +82,6 @@ public class LecturerSettingFragment extends Fragment {
 
         binding.tvSettingName.setText(authManager.getCurrentUserName());
         binding.tvSettingEmail.setText(authManager.getCurrentUserEmail());
-
     }
 
     private void observeViewModel() {
@@ -93,20 +92,6 @@ public class LecturerSettingFragment extends Fragment {
             setUIEnabled(!isLoading);
         });
 
-        // Observe app settings
-        viewModel.appSettings().observe(getViewLifecycleOwner(), settings -> {
-            if (settings != null) {
-                updateSettingsUI(settings);
-            }
-        });
-
-        // Observe logout success
-        viewModel.logoutSuccess().observe(getViewLifecycleOwner(), success -> {
-            if (Boolean.TRUE.equals(success)) {
-                handleLogoutSuccess();
-            }
-        });
-
         // Observe error messages
         viewModel.errorMessage().observe(getViewLifecycleOwner(), error -> {
             if (error != null) {
@@ -115,44 +100,16 @@ public class LecturerSettingFragment extends Fragment {
         });
     }
 
-    private void updateSettingsUI(LecturerSettingViewModel.AppSettings settings) {
-        // Update UI based on app settings
-        // For example, show notification status, theme info, etc.
-
-        // Add visual indicators for settings status
-        if (settings.isNotificationsEnabled()) {
-            // Could add a small indicator on notifications row
-        }
-
-        if (settings.isFaceIdEnabled()) {
-            // Could add a small indicator on device row
-        }
-    }
-
-    private void showLogoutConfirmationDialog() {
-        new AlertDialog.Builder(requireContext())
-                .setTitle("Logout Confirmation")
-                .setMessage("Are you sure you want to logout?")
-                .setPositiveButton("Logout", (dialog, which) -> {
-                    performLogout();
-                })
-                .setNegativeButton("Cancel", (dialog, which) -> {
-                    dialog.dismiss();
-                })
-                .show();
-    }
-
     private void performLogout() {
         try {
             android.util.Log.d("LecturerSettingFragment", "Performing logout");
             
             // 1. Xóa token và thông tin người dùng
-            vn.edu.fpt.zentryapp.auth.client.AuthManager authManager = 
-                vn.edu.fpt.zentryapp.auth.client.AuthManager.getInstance(requireContext());
-            authManager.clearTokens();
+            AuthManager authManager = AuthManager.getInstance(requireContext());
+            authManager.logout();
             
             // 2. Tìm activity container và lấy NavController gốc
-            androidx.navigation.NavController rootNavController = null;
+            NavController rootNavController = null;
             try {
                 // Lấy NavController từ activity container
                 rootNavController = androidx.navigation.Navigation.findNavController(
@@ -198,18 +155,6 @@ public class LecturerSettingFragment extends Fragment {
             android.util.Log.e("LecturerSettingFragment", "Error during logout: ", e);
         }
     }
-
-    private void handleLogoutSuccess() {
-        Toast.makeText(requireContext(), "Logged out successfully", Toast.LENGTH_SHORT).show();
-
-        // Navigate to login screen and clear all back stack
-        NavOptions navOptions = new NavOptions.Builder()
-                .setPopUpTo(R.id.nav_graph_root, true)
-                .build();
-
-        navController.navigate(R.id.loginFragment, null, navOptions);
-    }
-
 
     private void setUIEnabled(boolean enabled) {
         // Enable/disable UI elements during loading
