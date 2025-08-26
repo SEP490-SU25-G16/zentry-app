@@ -22,14 +22,14 @@ import vn.edu.fpt.zentryapp.auth.models.UserInfo;
 import vn.edu.fpt.zentryapp.auth.services.AuthService;
 
 public class LoginViewModel extends ViewModel {
-    // LiveData cho UI state
+    // LiveData for UI state
     private final MutableLiveData<Boolean> _isLoading = new MutableLiveData<>(false);
     private final MutableLiveData<String> _errorMessage = new MutableLiveData<>();
     private final MutableLiveData<LoginSuccess> _loginSuccess = new MutableLiveData<>();
     private final MutableLiveData<String> _emailError = new MutableLiveData<>();
     private final MutableLiveData<String> _passwordError = new MutableLiveData<>();
 
-    // Public getters cho Fragment observe
+    // Public getters for Fragment to observe
     public LiveData<Boolean> isLoading() {
         return _isLoading;
     }
@@ -114,7 +114,7 @@ public class LoginViewModel extends ViewModel {
                 ));
 
             } catch (Exception e) {
-                _errorMessage.setValue("Lỗi fake login: " + e.getMessage());
+                _errorMessage.setValue("Fake login error: " + e.getMessage());
             } finally {
                 _isLoading.setValue(false);
             }
@@ -153,23 +153,22 @@ public class LoginViewModel extends ViewModel {
         return new TokenResponse(token, userInfo);
     }
 
-
     private boolean validateInput(String email, String password) {
         boolean isValid = true;
 
         if (TextUtils.isEmpty(email)) {
-            _emailError.setValue("Email không được để trống");
+            _emailError.setValue("Email cannot be empty");
             isValid = false;
         } else if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            _emailError.setValue("Email không hợp lệ");
+            _emailError.setValue("Invalid email");
             isValid = false;
         }
 
         if (TextUtils.isEmpty(password)) {
-            _passwordError.setValue("Password không được để trống");
+            _passwordError.setValue("Password cannot be empty");
             isValid = false;
         } else if (password.length() < 6) {
-            _passwordError.setValue("Password phải có ít nhất 6 ký tự");
+            _passwordError.setValue("Password must have at least 6 characters");
             isValid = false;
         }
 
@@ -191,7 +190,7 @@ public class LoginViewModel extends ViewModel {
                 if (response.isSuccessful() && response.body() != null) {
                     ApiResponse<TokenResponse> apiResponse = response.body();
 
-                    // Kiểm tra Success flag từ API
+                    // Check Success flag from API
                     if (apiResponse.isSuccess() && apiResponse.getData() != null) {
                         TokenResponse tokenResponse = apiResponse.getData();
 
@@ -210,9 +209,9 @@ public class LoginViewModel extends ViewModel {
                                 isLecturer
                         ));
                     } else {
-                        // API trả về Success = false
+                        // API returned Success = false
                         String errorMsg = apiResponse.getError() != null ?
-                                apiResponse.getError() : "Đăng nhập thất bại";
+                                apiResponse.getError() : "Login failed";
                         Log.e("LoginViewModel", "API Error: " + errorMsg);
                         _errorMessage.setValue(errorMsg);
                     }
@@ -226,7 +225,7 @@ public class LoginViewModel extends ViewModel {
                     } catch (Exception e) {
                         Log.e("LoginViewModel", "Could not read error body", e);
                     }
-                    _errorMessage.setValue("Đăng nhập thất bại. Vui lòng kiểm tra thông tin.");
+                    _errorMessage.setValue("Login failed. Please check your information.");
                 }
             }
 
@@ -243,18 +242,18 @@ public class LoginViewModel extends ViewModel {
                     Log.e("LoginViewModel", "Request method: " + call.request().method());
                 }
 
-                String errorMessage = "Lỗi kết nối";
+                String errorMessage = "Connection error";
 
                 if (t instanceof java.net.SocketTimeoutException) {
-                    errorMessage = "Kết nối quá chậm. Vui lòng thử lại";
+                    errorMessage = "Connection too slow. Please try again";
                     Log.e("LoginViewModel", "Timeout error");
                 } else if (t instanceof java.net.UnknownHostException) {
-                    errorMessage = "Không có kết nối internet hoặc server không tồn tại";
+                    errorMessage = "No internet connection or server does not exist";
                 } else if (t instanceof java.net.ConnectException) {
-                    errorMessage = "Không thể kết nối đến server";
+                    errorMessage = "Cannot connect to server";
                     Log.e("LoginViewModel", "Connection refused - Server might be down");
                 } else if (t instanceof javax.net.ssl.SSLException) {
-                    errorMessage = "Lỗi bảo mật kết nối";
+                    errorMessage = "Connection security error";
                     Log.e("LoginViewModel", "SSL error");
                 }
 
@@ -262,7 +261,6 @@ public class LoginViewModel extends ViewModel {
             }
         });
     }
-
 
     private void clearErrors() {
         _errorMessage.setValue(null);

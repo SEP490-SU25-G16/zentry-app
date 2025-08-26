@@ -123,7 +123,7 @@ public class LecturerAttendanceFragment extends Fragment implements LecturerAtte
 
         for (Attendance student : attendanceList) {
             // ✅ SỬA: Check status String thay vì boolean
-            if ("Attended".equalsIgnoreCase(student.getStatus())) {
+            if ("Present".equalsIgnoreCase(student.getStatus())) {
                 attendedStudents++;
             }
         }
