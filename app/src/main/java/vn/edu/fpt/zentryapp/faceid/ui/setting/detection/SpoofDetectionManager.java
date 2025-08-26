@@ -249,10 +249,6 @@ public class SpoofDetectionManager {
         suspicionScore = 0;
         // Activate a short bonus window to stabilize real-face decisions
         livenessBonusFramesRemaining = LIVENESS_BONUS_FRAMES;
-		// Propagate liveness to detector so it trusts verified faces
-		if (detector != null) {
-			detector.setLivenessVerified(true);
-		}
     }
 
     private void startLivenessChallenge() {

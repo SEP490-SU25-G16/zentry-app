@@ -1,3 +1,4 @@
+//FaceSpoofDetector.java
 package vn.edu.fpt.zentryapp.faceid.data.service;
 
 import android.content.Context;
@@ -15,11 +16,12 @@ import org.tensorflow.lite.Interpreter;
 import org.tensorflow.lite.support.common.FileUtil;
 import org.tensorflow.lite.support.common.ops.CastOp;
 import org.tensorflow.lite.support.image.ImageProcessor;
-import org.tensorflow.lite.support.image.ops.ResizeOp;
 import org.tensorflow.lite.support.image.TensorImage;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.nio.MappedByteBuffer;
 import java.util.Arrays;
 import java.util.Objects;
@@ -39,9 +41,10 @@ public class FaceSpoofDetector {
     private static final float SCALE_1 = 2.7f;
     private static final float SCALE_2 = 4.0f;
     private static final int INPUT_IMAGE_DIM = 80;
-    private static final int OUTPUT_DIM = 2;
+    private static final int OUTPUT_DIM = 3;
 
     private final java.util.Queue<TemporalFrameData> frameHistory = new java.util.LinkedList<>();
+    private static final boolean DEBUG_SPOOF = false; // Simplified debugging
 
     private Interpreter firstModelInterpreter;
     private Interpreter secondModelInterpreter;
@@ -53,12 +56,10 @@ public class FaceSpoofDetector {
 
     private volatile boolean isInitialized = false;
     private final CountDownLatch initLatch = new CountDownLatch(1);
-    // Track if liveness challenge was verified for this face
-    private boolean livenessVerified = false;
 
 
     /**
-     * Class to track temporal data for analysis
+     * Class to track temporal data for analysis (kept for future use if needed)
      */
     private static class TemporalFrameData {
         final float[] combinedResult;
@@ -106,8 +107,10 @@ public class FaceSpoofDetector {
                 try {
                     Log.d(TAG, "Loading model files...");
 
-                    // Initialize TFLiteInterpreter
-                    Interpreter.Options interpreterOptions = InterpreterOptionsFactory.createBestOptions(context);
+                    // Initialize TFLiteInterpreter with OnDevice-like options (CPU, 4 threads)
+                    Interpreter.Options interpreterOptions = new Interpreter.Options();
+                    try { interpreterOptions.setNumThreads(4); } catch (Throwable ignore) {}
+                    try { interpreterOptions.setUseXNNPACK(true); } catch (Throwable ignore) {}
 
                     // Load models from assets
                     MappedByteBuffer model1Buffer = FileUtil.loadMappedFile(context, MODEL_FILE_1);
@@ -142,7 +145,6 @@ public class FaceSpoofDetector {
 
                     // Create image processor for preprocessing
                     imageTensorProcessor = new ImageProcessor.Builder()
-                            .add(new ResizeOp(INPUT_IMAGE_DIM, INPUT_IMAGE_DIM, ResizeOp.ResizeMethod.BILINEAR))
                             .add(new CastOp(DataType.FLOAT32))
                             .build();
 
@@ -255,7 +257,7 @@ public class FaceSpoofDetector {
                 return new SpoofResult(false, 0.5f, System.currentTimeMillis() - startTime);
             }
 
-            // Crop and scale face image with the two given constants
+            // Crop and scale face image with the two given constants (exactly like OnDevice)
             Bitmap croppedImage1 = crop(
                     frameImage,
                     faceRect,
@@ -264,11 +266,8 @@ public class FaceSpoofDetector {
                     INPUT_IMAGE_DIM
             );
 
-            Log.d(TAG, "Cropped image 1 with scale " + SCALE_1 + ", size: " + croppedImage1.getWidth() + "x" + croppedImage1.getHeight());
-
-            // Convert RGB to BGR
+            // Convert RGB to BGR (exactly like OnDevice)
             Bitmap bgrImage1 = convertRgbToBgr(croppedImage1);
-            Log.d(TAG, "Converted image 1 to BGR");
 
             Bitmap croppedImage2 = crop(
                     frameImage,
@@ -278,155 +277,67 @@ public class FaceSpoofDetector {
                     INPUT_IMAGE_DIM
             );
 
-            Log.d(TAG, "Cropped image 2 with scale " + SCALE_2 + ", size: " + croppedImage2.getWidth() + "x" + croppedImage2.getHeight());
-
-            // Convert RGB to BGR
+            // Convert RGB to BGR (exactly like OnDevice)
             Bitmap bgrImage2 = convertRgbToBgr(croppedImage2);
-            Log.d(TAG, "Converted image 2 to BGR");
 
-            // Process images
-            TensorImage tensorImage1 = TensorImage.fromBitmap(bgrImage1);
-            TensorImage tensorImage2 = TensorImage.fromBitmap(bgrImage2);
-
-            tensorImage1 = imageTensorProcessor.process(tensorImage1);
-            tensorImage2 = imageTensorProcessor.process(tensorImage2);
-
-            Log.d(TAG, "Processed tensor images");
+            // Process images (exactly like OnDevice: only CastOp)
+            TensorImage tensorImage1 = imageTensorProcessor.process(TensorImage.fromBitmap(bgrImage1));
+            TensorImage tensorImage2 = imageTensorProcessor.process(TensorImage.fromBitmap(bgrImage2));
 
             // Get buffers from TensorImages
             ByteBuffer input1 = tensorImage1.getBuffer();
             ByteBuffer input2 = tensorImage2.getBuffer();
-            // Ensure direct buffers with native order
-            if (input1 != null) {
-                input1.order(java.nio.ByteOrder.nativeOrder());
-                if (!input1.isDirect()) {
-                    ByteBuffer direct = ByteBuffer.allocateDirect(input1.capacity()).order(java.nio.ByteOrder.nativeOrder());
-                    input1.rewind(); direct.put(input1); input1 = direct;
-                }
-            }
-            if (input2 != null) {
-                input2.order(java.nio.ByteOrder.nativeOrder());
-                if (!input2.isDirect()) {
-                    ByteBuffer direct2 = ByteBuffer.allocateDirect(input2.capacity()).order(java.nio.ByteOrder.nativeOrder());
-                    input2.rewind(); direct2.put(input2); input2 = direct2;
-                }
-            }
 
-            // Prepare output buffers based on actual model output dims
-            int outDim1 = firstModelInterpreter.getOutputTensor(0).shape()[1];
-            int outDim2 = secondModelInterpreter.getOutputTensor(0).shape()[1];
-            if (outDim1 != 2 || outDim2 != 2) {
-                Log.w(TAG, "Model output dims are not 2; detected dims: " + outDim1 + ", " + outDim2 + ". Adjusting to smaller common dim.");
-            }
-            int outDim = Math.min(outDim1, outDim2);
-            float[][] output1 = new float[1][outDim];
-            float[][] output2 = new float[1][outDim];
+            // Use fixed OUTPUT_DIM like OnDevice instead of dynamic detection
+            float[][] output1 = new float[1][OUTPUT_DIM];
+            float[][] output2 = new float[1][OUTPUT_DIM];
 
-            // Run inference guarded and retry allocate once on failure
-            try { Objects.requireNonNull(input1).rewind(); } catch (Throwable ignore) {}
-            try { Objects.requireNonNull(input2).rewind(); } catch (Throwable ignore) {}
+            // Run inference
             synchronized (interpreterLock) {
                 ensureAllocatedSafe(firstModelInterpreter);
                 ensureAllocatedSafe(secondModelInterpreter);
-                try {
-                    firstModelInterpreter.run(input1, output1);
-                    secondModelInterpreter.run(input2, output2);
-                } catch (IllegalArgumentException allocErr) {
-                    Log.w(TAG, "Re-allocating tensors due to allocation error", allocErr);
-                    ensureAllocatedSafe(firstModelInterpreter);
-                    ensureAllocatedSafe(secondModelInterpreter);
-                    firstModelInterpreter.run(input1, output1);
-                    secondModelInterpreter.run(input2, output2);
-                }
+                firstModelInterpreter.run(input1, output1);
+                secondModelInterpreter.run(input2, output2);
             }
 
-            Log.d(TAG, "Ran inference");
             Log.d(TAG, "Output model 1: " + Arrays.toString(output1[0]));
             Log.d(TAG, "Output model 2: " + Arrays.toString(output2[0]));
 
-            // Apply softmax to outputs (use the actual dim)
+            // Apply softmax to outputs (exactly like OnDevice)
             float[] softmax1 = softMax(output1[0]);
             float[] softmax2 = softMax(output2[0]);
 
             Log.d(TAG, "Softmax model 1: " + Arrays.toString(softmax1));
             Log.d(TAG, "Softmax model 2: " + Arrays.toString(softmax2));
 
-            // Combine probabilities by summation across scales (post-softmax)
-            float[] combined = new float[outDim];
-            for (int i = 0; i < outDim; i++) {
+            // Combine probabilities by summation (exactly like OnDevice)
+            float[] combined = new float[OUTPUT_DIM];
+            for (int i = 0; i < OUTPUT_DIM; i++) {
                 combined[i] = softmax1[i] + softmax2[i];
             }
+            Log.d(TAG, "Combined probs: " + Arrays.toString(combined));
 
-            Log.d(TAG, "Combined probs (sum): " + Arrays.toString(combined));
-
-            // Map real/spoof probabilities according to 2-class model semantics:
-            // index 0 = spoof, index 1 = real
-            float realProb;
-            float spoofProb;
-            if (outDim >= 2) {
-                realProb = combined[1] / 2.0f;
-                spoofProb = combined[0] / 2.0f;
-            } else {
-                // Fallback if model unexpectedly returns 1-dim: treat as spoof probability
-                spoofProb = Math.min(1f, Math.max(0f, combined[0] / 2.0f));
-                realProb = 1f - spoofProb;
+            // Find max index (exactly like OnDevice)
+            int label = 0;
+            float maxVal = combined[0];
+            for (int i = 1; i < OUTPUT_DIM; i++) {
+                if (combined[i] > maxVal) {
+                    maxVal = combined[i];
+                    label = i;
+                }
             }
 
-            Log.d(TAG, "Raw probabilities: realProb=" + realProb + ", spoofProb=" + spoofProb);
+            // Decision logic: index 1 is real, others are spoof (exactly like OnDevice)
+            boolean isSpoof = label != 1;
+            float score = combined[label] / 2.0f;
 
-            // Apply multi-layer detection
-
-            // Layer 1: Natural movement check
-            boolean hasNaturalMovement = checkTemporalVariance();
-
-            // Layer 2: Texture analysis
-            boolean hasUniformTexture = checkUniformTexture(softmax1, softmax2);
-            
-            // Layer 3: Oval boundary validation
-            boolean isWithinOvalBoundary = true; // Default to true if no oval provided
-            if (ovalRect != null) {
-                // Add oval validation logic here (simplified for now)
-                isWithinOvalBoundary = true;
-            }
-
-            // Enhanced decision logic with liveness awareness
-            boolean isSpoof = !isRealFace(realProb, spoofProb, hasNaturalMovement, hasUniformTexture, isWithinOvalBoundary);
-
-            // Confidence definition: use the winning class probability, with liveness-friendly floor
-            float confidence;
-            if (livenessVerified) {
-                confidence = isSpoof ? Math.max(0.60f, spoofProb) : Math.max(0.85f, realProb);
-            } else {
-                confidence = isSpoof ? Math.max(0.70f, spoofProb) : Math.max(0.70f, realProb);
-            }
-            
-            Log.d(TAG, "🎯 FINAL RESULT: " + (isSpoof ? "SPOOF" : "REAL") + 
-                    " with confidence: " + String.format(java.util.Locale.US, "%.4f", confidence) +
-                    ", realProb=" + String.format(java.util.Locale.US, "%.4f", realProb) +
-                    ", spoofProb=" + String.format(java.util.Locale.US, "%.4f", spoofProb) +
-                    ", livenessVerified=" + livenessVerified +
-                    ", naturalMovement=" + hasNaturalMovement +
-                    ", uniformTexture=" + hasUniformTexture +
-                    ", withinOval=" + isWithinOvalBoundary);
-
-            // Store frame data for temporal analysis (cap history)
-            frameHistory.offer(new TemporalFrameData(combined, faceRect));
-            while (frameHistory.size() > 30) {
-                frameHistory.poll();
-            }
+            Log.d(TAG, "Decision: label=" + label + " isSpoof=" + isSpoof + " score=" + score);
 
             long timeMillis = System.currentTimeMillis() - startTime;
-            return new SpoofResult(isSpoof, confidence, timeMillis);
+            return new SpoofResult(isSpoof, score, timeMillis);
 
         } catch (Throwable e) {
             Log.e(TAG, "Error in spoof detection: " + e.getMessage(), e);
-
-            // ENHANCED ERROR HANDLING - stricter for security:
-            Log.w(TAG, "⚠️ Processing error in spoof detection. Error type: " + e.getClass().getSimpleName());
-
-            // Always default to spoof on error for maximum security
-            // This prevents bypass through intentional errors or manipulations
-            Log.w(TAG, "⚠️ Error detected - defaulting to spoof for security");
             return new SpoofResult(true, 0.85f, System.currentTimeMillis() - startTime);
         }
     }
@@ -471,6 +382,52 @@ public class FaceSpoofDetector {
         }
 
         return exp;
+    }
+
+    private void logBitmapStats(Bitmap bmp, String tagSuffix) {
+        if (!DEBUG_SPOOF) return;
+        int w = bmp.getWidth();
+        int h = bmp.getHeight();
+        long sumR = 0, sumG = 0, sumB = 0;
+        for (int i = 0; i < w; i++) {
+            for (int j = 0; j < h; j++) {
+                int p = bmp.getPixel(i, j);
+                sumR += Color.red(p);
+                sumG += Color.green(p);
+                sumB += Color.blue(p);
+            }
+        }
+        float n = (float) (w * h);
+        Log.d(TAG, "CropStats(" + tagSuffix + ") meanRGB=" +
+                (sumR / n) + "," + (sumG / n) + "," + (sumB / n));
+    }
+
+    private float sumFloatBuffer(ByteBuffer buf) {
+        if (!DEBUG_SPOOF) return 0f;
+        ByteBuffer dup = buf.duplicate();
+        dup.rewind();
+        dup.order(java.nio.ByteOrder.nativeOrder());
+        int count = dup.remaining() / 4;
+        float sum = 0f;
+        for (int i = 0; i < count; i++) {
+            sum += dup.getFloat();
+        }
+        return sum;
+    }
+
+    private void saveBitmapToCache(Bitmap bmp, String name) {
+        if (!DEBUG_SPOOF) return;
+        try {
+            File cacheDir = new File(android.os.Environment.getExternalStorageDirectory(), "zentry_spoof_debug");
+            if (!cacheDir.exists()) cacheDir.mkdirs();
+            File out = new File(cacheDir, name);
+            try (FileOutputStream fos = new FileOutputStream(out)) {
+                bmp.compress(Bitmap.CompressFormat.PNG, 100, fos);
+            }
+            Log.d(TAG, "Saved debug crop: " + out.getAbsolutePath());
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to save debug crop: " + t.getMessage());
+        }
     }
 
     /**
@@ -567,331 +524,5 @@ public class FaceSpoofDetector {
         if (secondModelInterpreter != null) {
             secondModelInterpreter.close();
         }
-    }
-
-    /**
-     * Sets the liveness verification flag and resets frame history
-     * This method should be called by FaceIdService when a liveness challenge is passed
-     *
-     * @param verified True if liveness challenge was passed
-     */
-    public void setLivenessVerified(boolean verified) {
-        this.livenessVerified = verified;
-
-        if (verified) {
-            // Reset frame history to ensure temporal analysis only considers post-verification frames
-            frameHistory.clear();
-            Log.d(TAG, "✓ LIVENESS VERIFIED: Reset frame history for fresh analysis");
-        }
-    }
-
-
-    private float calculateConfidenceVariance() {
-        if (frameHistory.size() < 2) {
-            return 0.01f; // Default value if not enough data
-        }
-
-        float sum = 0;
-        float sumSq = 0;
-        int count = 0;
-        
-        // Calculate variance on REAL probability (index 1 in 2-class mapping)
-        for (TemporalFrameData frame : frameHistory) {
-            float realProb = frame.combinedResult.length >= 2 ? frame.combinedResult[1] : (1f - frame.combinedResult[0]);
-            sum += realProb;
-            sumSq += realProb * realProb;
-            count++;
-        }
-        
-        float mean = sum / count;
-        float variance = (sumSq / count) - (mean * mean);
-
-        return variance;
-    }
-
-    private boolean checkAbnormalPatternAcrossFrames() {
-        if (frameHistory.size() < 4) {
-            return false; // Not enough data
-        }
-        
-        // Convert queue to array for easier processing
-        TemporalFrameData[] frames = frameHistory.toArray(new TemporalFrameData[0]);
-        
-        // Count classification flips (real<->spoof) using 2-class mapping
-        int classificationFlips = 0;
-        for (int i = 1; i < frames.length; i++) {
-            float prevSpoof = frames[i-1].combinedResult[0];
-            float prevReal = frames[i-1].combinedResult.length >= 2 ? frames[i-1].combinedResult[1] : 1f - prevSpoof;
-            float currSpoof = frames[i].combinedResult[0];
-            float currReal = frames[i].combinedResult.length >= 2 ? frames[i].combinedResult[1] : 1f - currSpoof;
-            boolean prevIsReal = prevReal >= prevSpoof;
-            boolean currIsReal = currReal >= currSpoof;
-            if (prevIsReal != currIsReal) {
-                classificationFlips++;
-            }
-        }
-        
-        // Calculate confidence stability (suspicious if too stable)
-        float confidenceVariance = calculateConfidenceVariance();
-        boolean suspiciouslyStableConfidence = confidenceVariance < 0.001f;
-        
-        // Calculate pattern score
-        boolean abnormalPattern = classificationFlips > 2 || suspiciouslyStableConfidence;
-        
-        Log.d(TAG, "📊 PATTERN ANALYSIS: flips=" + classificationFlips + 
-                  ", confVariance=" + confidenceVariance + 
-                  ", abnormal=" + abnormalPattern);
-                  
-        return abnormalPattern;
-    }
-
-
-    /**
-     * Add method to check if uniform texture is present in the face
-     * Important: This method was missing a return statement which caused inconsistent behavior
-     */
-    private boolean checkUniformTexture(float[] softmax1, float[] softmax2) {
-        // If liveness is verified, be extremely lenient in texture analysis
-        if (this.livenessVerified) {
-            // Only detect uniform texture in extremely obvious cases for verified faces
-            boolean extremelyUniform =
-                (softmax1[1] < 0.10f && softmax2[1] < 0.10f) &&
-                (Math.abs(softmax1[0] - softmax2[0]) < 0.01f) &&
-                (Math.abs(softmax1[1] - softmax2[1]) < 0.01f) &&
-                (Math.abs(softmax1[2] - softmax2[2]) < 0.01f) &&
-                calculateConfidenceVariance() < 0.0001f;
-
-            // For liveness verified faces, only return true in extremely obvious cases
-            return extremelyUniform;
-        }
-
-        // Standard checks for faces without liveness verification
-        // 1. Check for unusual texture
-        boolean unusualTextureIndicator =
-                (softmax1[1] < 0.25f && softmax2[1] < 0.25f);
-        
-        // 2. Check for inconsistency between models
-        boolean modelInconsistency =
-                Math.abs(softmax1[0] - softmax2[0]) > 0.75f ||
-                Math.abs(softmax1[2] - softmax2[2]) > 0.70f;
-        
-        // 3. Check for ambiguous classification
-        boolean ambiguousClassification =
-                (softmax1[0] > 0.55f && softmax1[2] > 0.55f &&
-                 softmax2[0] > 0.50f && softmax2[2] > 0.50f);
-        
-        // 4. Check for abnormal pattern
-        boolean abnormalPattern = checkAbnormalPatternAcrossFrames();
-        
-        // 5. Check for low texture variance
-        boolean lowTextureVariance = calculateConfidenceVariance() < 0.001f;
-        
-        // 6. Check for suspiciously stable predictions
-        boolean suspiciouslyStablePredictions = 
-                Math.abs(softmax1[0] - softmax2[0]) < 0.03f &&
-                Math.abs(softmax1[1] - softmax2[1]) < 0.03f &&
-                Math.abs(softmax1[2] - softmax2[2]) < 0.03f;
-
-        // Combine multiple indicators, requiring strong evidence to reduce false positives
-        return unusualTextureIndicator &&
-               (modelInconsistency || ambiguousClassification ||
-                (abnormalPattern && lowTextureVariance) ||
-                (suspiciouslyStablePredictions && lowTextureVariance));
-    }
-
-    /**
-     * Modified detection logic to properly handle liveness verified faces
-     * This replaces the original detection logic to fix issues with false positives
-     */
-    private boolean isRealFace(float realProb, float spoofProb, boolean hasNaturalMovement,
-                              boolean hasUniformTexture, boolean isWithinOvalBoundary) {
-        // Case 1: Liveness verified - trust it completely
-        if (this.livenessVerified) {
-            // Only flag as spoof in extreme cases that are virtually impossible for real faces
-            if (spoofProb > 0.99f && !hasNaturalMovement && hasUniformTexture) {
-                Log.d(TAG, "🔴 LIVENESS VERIFIED BUT EXTREME SPOOF INDICATORS: Very rare case");
-                return false;
-            }
-
-            // In all other cases, trust the liveness verification completely
-            Log.d(TAG, "🟢 LIVENESS VERIFIED: Treating as real face with high confidence");
-            return true;
-        }
-
-        // Case 2: High confidence for real face
-        if (realProb > 0.65f) {
-            Log.d(TAG, "🟢 HIGH CONFIDENCE REAL: Strong ML model confidence");
-            return true;
-        }
-
-        // Case 3: Good ML confidence + valid position
-        if (realProb > 0.55f && isWithinOvalBoundary) {
-            Log.d(TAG, "🟢 GOOD CONFIDENCE REAL: ML model + oval validation");
-            return true;
-        }
-
-        // Case 4: Decent ML confidence - only if no uniform texture detected
-        if (realProb > 0.50f && !hasUniformTexture) {
-            Log.d(TAG, "🟢 ACCEPTABLE REAL: ML model result trusted");
-            return true;
-        }
-
-        // Case 5: Very high spoof probability - definitely spoof
-        if (spoofProb >= 0.88f && hasUniformTexture) {
-            Log.d(TAG, "🔴 HIGH CONFIDENCE SPOOF: Multiple strong indicators");
-            return false;
-        }
-
-        // Case 6: More lenient on unclear cases - bias toward real face detection
-        if (realProb > 0.40f && spoofProb < 0.65f) {
-            Log.d(TAG, "🟡 LIKELY REAL: Borderline case favoring real");
-            return true;
-        }
-
-        // Case 7: Default to real face for very unclear cases
-        boolean isReal = spoofProb < 0.75f;
-        Log.d(TAG, "🟠 BORDERLINE CASE: " + (isReal ? "REAL" : "SPOOF") + " with limited confidence");
-        return isReal;
-    }
-
-    private float calculatePositionVariance() {
-        if (frameHistory.size() < 2) {
-            return 0.01f; // Default value if not enough data
-        }
-
-        float sumX = 0;
-        float sumY = 0;
-        float sumSqX = 0;
-        float sumSqY = 0;
-        int count = 0;
-
-        for (TemporalFrameData frame : frameHistory) {
-            float centerX = frame.faceRect.exactCenterX();
-            float centerY = frame.faceRect.exactCenterY();
-
-            sumX += centerX;
-            sumY += centerY;
-            sumSqX += centerX * centerX;
-            sumSqY += centerY * centerY;
-            count++;
-        }
-
-        float meanX = sumX / count;
-        float meanY = sumY / count;
-        float varianceX = (sumSqX / count) - (meanX * meanX);
-        float varianceY = (sumSqY / count) - (meanY * meanY);
-
-        // Normalize by face size
-        TemporalFrameData lastFrame = getLastFrame();
-        if (lastFrame != null) {
-            float faceSize = Math.max(lastFrame.faceRect.width(), lastFrame.faceRect.height());
-            varianceX /= (faceSize * faceSize);
-            varianceY /= (faceSize * faceSize);
-        }
-
-        return (varianceX + varianceY) / 2;
-    }
-
-    private TemporalFrameData getLastFrame() {
-        if (frameHistory.isEmpty()) {
-            return null;
-        }
-
-        // Convert queue to array and get last element
-        TemporalFrameData[] frames = frameHistory.toArray(new TemporalFrameData[0]);
-        return frames[frames.length - 1];
-    }
-    private float calculateSizeVariance() {
-        if (frameHistory.size() < 2) {
-            return 0.005f; // Default value if not enough data
-        }
-
-        float sumW = 0;
-        float sumH = 0;
-        float sumSqW = 0;
-        float sumSqH = 0;
-        int count = 0;
-
-        for (TemporalFrameData frame : frameHistory) {
-            float width = frame.faceRect.width();
-            float height = frame.faceRect.height();
-
-            sumW += width;
-            sumH += height;
-            sumSqW += width * width;
-            sumSqH += height * height;
-            count++;
-        }
-
-        float meanW = sumW / count;
-        float meanH = sumH / count;
-        float varianceW = (sumSqW / count) - (meanW * meanW);
-        float varianceH = (sumSqH / count) - (meanH * meanH);
-
-        // Normalize by face size
-        TemporalFrameData lastFrame = getLastFrame();
-        if (lastFrame != null) {
-            float faceWidth = lastFrame.faceRect.width();
-            float faceHeight = lastFrame.faceRect.height();
-            varianceW /= (faceWidth * faceWidth);
-            varianceH /= (faceHeight * faceHeight);
-        }
-
-        return (varianceW + varianceH) / 2;
-    }
-    /**
-     * Enhanced temporal variance check that's more lenient for liveness verified faces
-     */
-    private boolean checkTemporalVariance() {
-        if (frameHistory.size() < 3) {
-            return true; // Not enough data, assume natural (benefit of doubt)
-        }
-
-        // Calculate variance in face position and size
-        float positionVariance = calculatePositionVariance();
-        float sizeVariance = calculateSizeVariance();
-
-        // Special case for liveness verified faces - extremely lenient thresholds
-        if (this.livenessVerified) {
-            // For verified faces, only fail if extremely abnormal (practically never)
-            boolean extremelyAbnormal =
-                (positionVariance < 0.00001f && sizeVariance < 0.00001f) || // Practically static image
-                (positionVariance > 0.5f || sizeVariance > 0.25f);    // Extreme erratic movement
-
-            // Almost always return true for liveness verified faces
-            return !extremelyAbnormal;
-        }
-
-        // Regular path for non-verified faces - still lenient but more careful
-        float actualMinPositionVariance = 0.00003f; // Very low minimum threshold
-        float actualMaxPositionVariance = 0.12f;    // Higher maximum allowed
-        float actualMinSizeVariance = 0.00003f;     // Very low minimum threshold
-        float actualMaxSizeVariance = 0.075f;       // Higher maximum allowed
-
-        // Real faces have natural micro-movements within acceptable ranges
-        boolean hasNaturalMovement = positionVariance >= actualMinPositionVariance &&
-                                    positionVariance <= actualMaxPositionVariance &&
-                                    sizeVariance >= actualMinSizeVariance &&
-                                    sizeVariance <= actualMaxSizeVariance;
-
-        // Special check for very low variance - could indicate a static image (definite spoof)
-        boolean suspiciouslyStatic = positionVariance < 0.000005f && sizeVariance < 0.000005f;
-
-        // Only flag as unnatural if extremely static or way outside reasonable bounds
-        boolean definitelyUnnatural = suspiciouslyStatic ||
-                                    positionVariance > 0.3f ||
-                                    sizeVariance > 0.2f;
-
-        // Give benefit of doubt in borderline cases - only fail if definitely unnatural
-        if (!hasNaturalMovement && !definitelyUnnatural) {
-            Log.d(TAG, "📊 TEMPORAL ANALYSIS: Borderline movement - giving benefit of doubt for real face");
-            hasNaturalMovement = true;
-        }
-
-        Log.d(TAG, "📊 TEMPORAL ANALYSIS: posVar=" + positionVariance +
-                ", sizeVar=" + sizeVariance +
-                ", natural=" + hasNaturalMovement);
-
-        return hasNaturalMovement;
     }
 }
